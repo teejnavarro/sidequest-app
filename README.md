@@ -37,3 +37,4 @@ trip in May 2027.
 - 2026-10-31 - `/pm` backlog approved: SQ-001..SQ-028 in 11 epics (local `backlog/`, git-excluded). Cut list: SQ-009, SQ-012, SQ-017, SQ-018. Phase 2 not backlogged. Next: SQ-001.
 - 2026-10-31 - SQ-001: tech stack approved: Next.js on Vercel (free Hobby), Neon Postgres database (free, wakes itself after idle), Vercel Blob for images, Google sign-in via Auth.js. Rejected Supabase/Appwrite (pause after 7 idle days) and Firebase (image storage needs a card). GitHub repo private until SQ-028. Planned on branch `chore/project-setup`.
 - 2026-10-31 - Owner created the GitHub repo `teejnavarro/sidequest` as public from the start, to track commits and time spent. Code goes public from the first push; secret/personal-data check before every push; merges keep individual commits.
+- 2026-10-31 - GitHub repo renamed by the owner to `teejnavarro/sidequest-app`.
