@@ -30,6 +30,19 @@ trip in May 2027.
 ## Links
 - Brief: `docs/BRIEF.md`
 
+## Run it on your PC
+Needs Node.js (LTS) installed. In a terminal, in this folder:
+1. `npm install` - downloads the libraries the app uses (first time only).
+2. `npx vercel env pull .env.local` - fetches the app's private settings (such as the database address) into a file git ignores. Needs a one-time `npx vercel login` and `npx vercel link` first. Skip this step to run without a database; the page then says "Database not connected".
+3. `npm run dev` - starts the app.
+4. Open http://localhost:3000 in your browser. Stop it with Ctrl+C.
+
+Other checks: `npm run lint` (style check) and `npm run build` (the same build Vercel does).
+Chapter 1 of `LEARNING.md` explains how the pieces fit together.
+
+## Live
+[LIVE URL: to fill in once `main` is deployed on Vercel]
+
 ## Log
 - 2026-10-31 - Brief approved. Project created.
 - 2026-10-31 - Owner's "Approved" also accepted the four-tab trip layout and per-trip balances on "My trips"; both are in the brief.
@@ -38,3 +51,4 @@ trip in May 2027.
 - 2026-10-31 - SQ-001: tech stack approved: Next.js on Vercel (free Hobby), Neon Postgres database (free, wakes itself after idle), Vercel Blob for images, Google sign-in via Auth.js. Rejected Supabase/Appwrite (pause after 7 idle days) and Firebase (image storage needs a card). GitHub repo private until SQ-028. Planned on branch `chore/project-setup`.
 - 2026-10-31 - Owner created the GitHub repo `teejnavarro/sidequest` as public from the start, to track commits and time spent. Code goes public from the first push; secret/personal-data check before every push; merges keep individual commits.
 - 2026-10-31 - GitHub repo renamed by the owner to `teejnavarro/sidequest-app`.
+- 2026-11-01 - SQ-001 in progress: Node.js installed; Next.js app scaffolded with a placeholder home page and database check (local only, not yet pushed); LEARNING.md chapter 1 and run steps drafted.
