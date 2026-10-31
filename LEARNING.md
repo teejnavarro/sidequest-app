@@ -95,6 +95,10 @@ GitHub/Vercel setup step: how many milliseconds the page showed after 10+ idle m
 The home page shows a small status line ("Database connected ✓ (N ms)") so you can see
 this yourself. The number is how long the database took to answer.
 
+### Windows tip
+
+In Windows PowerShell, type `npm.cmd` and `npx.cmd` instead of `npm` and `npx`. PowerShell blocks the plain scripts by default; the `.cmd` versions do the same job. After installing a tool, open a new terminal so it can be found.
+
 ### The boring technology habit
 
 When there is a choice, prefer tools that are popular, well documented and have been

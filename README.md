@@ -31,13 +31,19 @@ trip in May 2027.
 - Brief: `docs/BRIEF.md`
 
 ## Run it on your PC
-Needs Node.js (LTS) installed. In a terminal, in this folder:
-1. `npm install` - downloads the libraries the app uses (first time only).
-2. `npx vercel env pull .env.local` - fetches the app's private settings (such as the database address) into a file git ignores. Needs a one-time `npx vercel login` and `npx vercel link` first. Skip this step to run without a database; the page then says "Database not connected".
-3. `npm run dev` - starts the app.
+Before you start:
+- Node.js (LTS) must be installed.
+- On Windows PowerShell, type `npm.cmd` and `npx.cmd` instead of `npm` and `npx` (PowerShell blocks the plain versions).
+- After installing anything, open a NEW terminal (or reload PATH), or the new tool won't be found.
+- The Vercel steps (`npx.cmd vercel ...`) need the Vercel account and project from the hosting setup first.
+
+In a terminal, in this folder:
+1. `npm.cmd install` - downloads the libraries the app uses (first time only).
+2. `npx.cmd vercel env pull .env.local` - fetches the app's private settings (such as the database address) into a file git ignores. Needs a one-time `npx.cmd vercel login` and `npx.cmd vercel link` first. Skip this step to run without a database; the page then says "Database not connected".
+3. `npm.cmd run dev` - starts the app.
 4. Open http://localhost:3000 in your browser. Stop it with Ctrl+C.
 
-Other checks: `npm run lint` (style check) and `npm run build` (the same build Vercel does).
+Other checks: `npm.cmd run lint` (style check) and `npm.cmd run build` (the same build Vercel does).
 Chapter 1 of `LEARNING.md` explains how the pieces fit together.
 
 ## Live
