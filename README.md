@@ -47,7 +47,7 @@ Other checks: `npm.cmd run lint` (style check) and `npm.cmd run build` (the same
 Chapter 1 of `LEARNING.md` explains how the pieces fit together.
 
 ## Live
-Production address: confirmed after SQ-001 is merged into main (see Vercel → Settings → Domains).
+Production address: https://sidequest-app-rho.vercel.app/ (updates on every merge into `main`).
 
 ## Log
 - 2026-10-31 - Brief approved. Project created.
@@ -59,3 +59,4 @@ Production address: confirmed after SQ-001 is merged into main (see Vercel → S
 - 2026-10-31 - GitHub repo renamed by the owner to `teejnavarro/sidequest-app`.
 - 2026-11-01 - SQ-001 in progress: Node.js installed; Next.js app scaffolded with a placeholder home page and database check (local only, not yet pushed); LEARNING.md chapter 1 and run steps drafted.
 - 2026-11-01 - SQ-001 built and pushed on `chore/project-setup`: preview on Vercel shows "Database connected" (fixed Vercel Framework Preset Other → Next.js); Neon wake-up measured at 684 ms. Next: /qa.
+- 2026-11-01 - SQ-001 done: QA passed, PR #1 merged into `main` with a merge commit. Live at https://sidequest-app-rho.vercel.app/ showing "Database connected" with no login. Next: SQ-002 (Google sign-in).
