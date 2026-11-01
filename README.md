@@ -23,7 +23,7 @@ trip in May 2027.
 
 ## Next steps
 - [x] Run `/pm` to turn the brief into a backlog by stage, with a cut list
-- [ ] `/architect Work on SQ-001` (tech stack and first live page)
+- [x] `/architect Work on SQ-001` (tech stack and first live page)
 - [ ] Early friend test in January 2027
 - [ ] Stage 1 ready for the group by end of February 2027
 
