@@ -89,8 +89,8 @@ usually well under 2 seconds. Later loads are fast again.
 We deliberately do **not** add tricks to keep it awake. A short wait is a fair price
 for staying free, and fewer tricks means fewer things to break.
 
-Measured wake-up time on this project: **[TO FILL IN after the idle test in the
-GitHub/Vercel setup step: how many milliseconds the page showed after 10+ idle minutes]**
+Measured wake-up time on this project: **684 ms**, about two-thirds of a second,
+on a phone after a 10-minute nap.
 
 The home page shows a small status line ("Database connected ✓ (N ms)") so you can see
 this yourself. The number is how long the database took to answer.
@@ -109,5 +109,25 @@ your app, not on a risky tool. Every choice in this project follows that habit.
 ### Where we are
 
 The first working chain is in place: **your PC → GitHub → Vercel → Neon**. The page
-at **[LIVE ADDRESS: to fill in once the site is deployed]** is deliberately plain. It
-exists to prove that every link in the chain works.
+is deliberately plain. It exists to prove that every link in the chain works.
+
+Two kinds of web address exist:
+
+- **Preview addresses** are made per branch, for example for `chore/project-setup`.
+  They are private: Vercel asks for a login before showing them. That is Vercel's
+  default protection for previews, and it is a good thing.
+- **The production address** is the public one, built from `main`. It is confirmed
+  after the first merge into `main`, in Vercel under Settings, then Domains. Don't
+  guess it: a similar-looking address can belong to someone else.
+
+### What went wrong and what we learned
+
+The first preview build failed with "No Output Directory named public". Vercel looks
+at the project **once, when you import it**, and guesses what kind of project it is
+(the "Framework Preset"). We imported before the app existed on `main`, so Vercel
+guessed "Other" and treated the project as a plain folder of files. The fix was to
+change the Framework Preset to **Next.js** in the project settings and redeploy.
+
+The habit: when something works on your PC but not on the server, compare the two
+environments first (versions, settings, variables, what was there at the time),
+before you suspect the code. Here the code was fine; the server's guess was wrong.

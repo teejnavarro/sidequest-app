@@ -47,7 +47,7 @@ Other checks: `npm.cmd run lint` (style check) and `npm.cmd run build` (the same
 Chapter 1 of `LEARNING.md` explains how the pieces fit together.
 
 ## Live
-[LIVE URL: to fill in once `main` is deployed on Vercel]
+Production address: confirmed after SQ-001 is merged into main (see Vercel → Settings → Domains).
 
 ## Log
 - 2026-10-31 - Brief approved. Project created.
