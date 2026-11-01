@@ -39,11 +39,12 @@ Before you start:
 
 In a terminal, in this folder:
 1. `npm.cmd install` - downloads the libraries the app uses (first time only).
-2. `npx.cmd vercel env pull .env.local` - fetches the app's private settings (such as the database address) into a file git ignores. Needs a one-time `npx.cmd vercel login` and `npx.cmd vercel link` first. Skip this step to run without a database; the page then says "Database not connected".
-3. `npm.cmd run dev` - starts the app.
-4. Open http://localhost:3000 in your browser. Stop it with Ctrl+C.
+2. `npx.cmd vercel env pull .env.local` - fetches the app's private settings (the database address and the sign-in settings) into a file git ignores. Needs a one-time `npx.cmd vercel login` and `npx.cmd vercel link` first. Skip this step to run without a database; the page then says "Database not connected".
+3. `npx.cmd drizzle-kit migrate` - only when the database tables have changed (a new file appeared in `drizzle/`). It updates the database to match.
+4. `npm.cmd run dev` - starts the app.
+5. Open http://localhost:3000 in your browser. Use `localhost`, not `127.0.0.1`: Google sign-in only works on `localhost`. Stop it with Ctrl+C.
 
-Other checks: `npm.cmd run lint` (style check) and `npm.cmd run build` (the same build Vercel does).
+Other checks: `npm.cmd run lint` (style check), `npm.cmd test` (automatic tests) and `npm.cmd run build` (the same build Vercel does).
 Chapter 1 of `LEARNING.md` explains how the pieces fit together.
 
 ## Live
@@ -60,3 +61,4 @@ Production address: https://sidequest-app-rho.vercel.app/ (updates on every merg
 - 2026-11-01 - SQ-001 in progress: Node.js installed; Next.js app scaffolded with a placeholder home page and database check (local only, not yet pushed); LEARNING.md chapter 1 and run steps drafted.
 - 2026-11-01 - SQ-001 built and pushed on `chore/project-setup`: preview on Vercel shows "Database connected" (fixed Vercel Framework Preset Other → Next.js); Neon wake-up measured at 684 ms. Next: /qa.
 - 2026-11-01 - SQ-001 done: QA passed, PR #1 merged into `main` with a merge commit. Live at https://sidequest-app-rho.vercel.app/ showing "Database connected" with no login. Next: SQ-002 (Google sign-in).
+- 2026-11-01 - SQ-002 in progress: Google sign-in built with Better Auth instead of Auth.js (Auth.js is now security-fix-only and its team recommends Better Auth). Added Vitest for automatic tests. Chapter 2 of LEARNING.md explains signing in.
