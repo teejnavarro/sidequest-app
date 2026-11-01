@@ -58,3 +58,4 @@ Production address: confirmed after SQ-001 is merged into main (see Vercel → S
 - 2026-10-31 - Owner created the GitHub repo `teejnavarro/sidequest` as public from the start, to track commits and time spent. Code goes public from the first push; secret/personal-data check before every push; merges keep individual commits.
 - 2026-10-31 - GitHub repo renamed by the owner to `teejnavarro/sidequest-app`.
 - 2026-11-01 - SQ-001 in progress: Node.js installed; Next.js app scaffolded with a placeholder home page and database check (local only, not yet pushed); LEARNING.md chapter 1 and run steps drafted.
+- 2026-11-01 - SQ-001 built and pushed on `chore/project-setup`: preview on Vercel shows "Database connected" (fixed Vercel Framework Preset Other → Next.js); Neon wake-up measured at 684 ms. Next: /qa.
