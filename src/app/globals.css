@@ -1,26 +1,97 @@
 @import "tailwindcss";
 
+/* Colors from docs/design.md. Light on :root, dark follows the phone's setting. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #f3f7f9;
+  --card: #ffffff;
+  --ink: #1c2f3f;
+  --muted: #4f6475;
+  --line: #dde6eb;
+  --chip: #eaf0f3;
+  --band: #304c64;
+  --on-band: #ffffff;
+  --band-muted: #c9dde4;
+  --amber: #f2a65a;
+  --on-amber: #14232f;
+  --pin: #e08a2e;
+  --blue-text: #24607a;
+  --blue-soft: #dcebf0;
+  --owed: #1f7a3d;
+  --owe: #b4321b;
+  --face-1: #fbddbd;
+  --face-2: #cfe3ea;
+  --face-3: #cdebdd;
+  --face-4: #d8def7;
+  --on-face: #14232f;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: dark;
+    --bg: #111a21;
+    --card: #1a2730;
+    --ink: #eef4f7;
+    --muted: #a9bac6;
+    --line: #2e3d48;
+    --chip: #25343f;
+    --band: #22384a;
+    --on-band: #eef4f7;
+    --band-muted: #bcd0da;
+    --pin: #f2a65a;
+    --blue-text: #7fcfe0;
+    --blue-soft: #234956;
+    --owed: #7edb9a;
+    --owe: #ff9a8b;
+    --face-1: #6a4a24;
+    --face-2: #2c5364;
+    --face-3: #24574a;
+    --face-4: #38406e;
+    --on-face: #eef4f7;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-chip: var(--chip);
+  --color-band: var(--band);
+  --color-on-band: var(--on-band);
+  --color-band-muted: var(--band-muted);
+  --color-amber: var(--amber);
+  --color-on-amber: var(--on-amber);
+  --color-pin: var(--pin);
+  --color-blue-text: var(--blue-text);
+  --color-blue-soft: var(--blue-soft);
+  --color-owed: var(--owed);
+  --color-owe: var(--owe);
+  --color-face-1: var(--face-1);
+  --color-face-2: var(--face-2);
+  --color-face-3: var(--face-3);
+  --color-face-4: var(--face-4);
+  --color-on-face: var(--on-face);
+  --font-sans: var(--font-manrope), "Segoe UI", Arial, sans-serif;
+  --font-display: var(--font-bricolage), "Trebuchet MS", sans-serif;
+  --radius-card: 20px;
+  --radius-field: 12px;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-manrope), "Segoe UI", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Headings use the display font (Tailwind utility: font-display). */
+h1,
+h2,
+h3 {
+  font-family: var(--font-bricolage), "Trebuchet MS", sans-serif;
+  font-weight: 700;
+  line-height: 1.15;
+  text-wrap: balance;
 }
