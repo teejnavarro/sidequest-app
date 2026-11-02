@@ -62,3 +62,7 @@ Production address: https://sidequest-app-rho.vercel.app/ (updates on every merg
 - 2026-11-01 - SQ-001 built and pushed on `chore/project-setup`: preview on Vercel shows "Database connected" (fixed Vercel Framework Preset Other → Next.js); Neon wake-up measured at 684 ms. Next: /qa.
 - 2026-11-01 - SQ-001 done: QA passed, PR #1 merged into `main` with a merge commit. Live at https://sidequest-app-rho.vercel.app/ showing "Database connected" with no login. Next: SQ-002 (Google sign-in).
 - 2026-11-01 - SQ-002 in progress: Google sign-in built with Better Auth instead of Auth.js (Auth.js is now security-fix-only and its team recommends Better Auth). Added Vitest for automatic tests. Chapter 2 of LEARNING.md explains signing in.
+- 2026-11-02 - SQ-002 done: QA passed, PR #2 merged into `main` with a merge commit. Google sign-in, My trips and Profile are live; the owner confirmed sign-in on the live site. Next: `/designer` round, then SQ-003.
+- 2026-11-02 - Design direction chosen by the owner: Barkada (warm, friendly, orange accent, Bricolage Grotesque and Manrope). Mockup in `assets/mockups/barkada.html`, guide in `docs/design.md`.
+- 2026-11-02 - Design colors changed by the owner from orange and brown to Open Road: ocean blue header, white cards and amber buttons, plus a route line on trip cards. Mockup and `docs/design.md` updated.
+- 2026-11-02 - Design approved by the owner, with "You're owed" changed to green to match the depth of the red "You owe". Next: `/architect` for SQ-003, which also restyles the three existing screens.

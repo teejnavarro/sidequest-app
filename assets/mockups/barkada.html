@@ -1,0 +1,287 @@
+<title>Sidequest Barkada Mockup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Manrope:wght@400;500;700&display=swap">
+<style>
+/* Layout: one phone-width column with a bottom tab bar; from 768px the column widens and tabs move to the top. */
+:root {
+  --bg: #F3F7F9; --card: #FFFFFF; --ink: #1C2F3F; --muted: #4F6475; --line: #DDE6EB;
+  --orange: #F2A65A; --on-orange: #14232F; --orange-text: #24607A; --orange-soft: #DCEBF0; --band: #304C64; --on-band: #FFFFFF; --band-muted: #C9DDE4; --pin: #E08A2E;
+  --owed: #1F7A3D; --owe: #B4321B; --chip: #EAF0F3; --scrim: rgb(20 35 47 / .5);
+  --face-1: #FBDDBD; --face-2: #CFE3EA; --face-3: #CDEBDD; --face-4: #D8DEF7; --on-face: #14232F;
+  --display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+  --body: "Manrope", "Segoe UI", Arial, sans-serif;
+  --r-card: 20px; --r-field: 12px; --r-full: 999px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111A21; --card: #1A2730; --ink: #EEF4F7; --muted: #A9BAC6; --line: #2E3D48;
+  --orange-text: #7FCFE0; --orange-soft: #234956; --band: #22384A; --on-band: #EEF4F7; --band-muted: #BCD0DA; --pin: #F2A65A;
+  --owed: #7EDB9A; --owe: #FF9A8B; --chip: #25343F; --scrim: rgb(0 0 0 / .6);
+  --face-1: #6A4A24; --face-2: #2C5364; --face-3: #24574A; --face-4: #38406E; --on-face: #EEF4F7; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #111A21; --card: #1A2730; --ink: #EEF4F7; --muted: #A9BAC6; --line: #2E3D48;
+  --orange-text: #7FCFE0; --orange-soft: #234956; --band: #22384A; --on-band: #EEF4F7; --band-muted: #BCD0DA; --pin: #F2A65A;
+  --owed: #7EDB9A; --owe: #FF9A8B; --chip: #25343F; --scrim: rgb(0 0 0 / .6);
+  --face-1: #6A4A24; --face-2: #2C5364; --face-3: #24574A; --face-4: #38406E; --on-face: #EEF4F7; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--body); }
+h1, h2, h3, p { margin: 0; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.15; text-wrap: balance; }
+h1 { font-size: 30px; } h2 { font-size: 19px; } h3 { font-size: 17px; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--orange-text); outline-offset: 2px; }
+.icon { width: 1.25em; height: 1.25em; fill: currentColor; flex: none; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); font-size: 13px; }
+.owed { color: var(--owed); font-weight: 700; } .owe { color: var(--owe); font-weight: 700; }
+
+.demo { background: var(--chip); padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.demo span { color: var(--muted); margin-right: 4px; }
+.demo button { min-height: 36px; padding: 0 12px; border-radius: var(--r-full); background: var(--card); font-weight: 500; }
+.demo button[aria-current="true"] { background: var(--ink); color: var(--bg); }
+
+.screen { width: 100%; max-width: 480px; margin-inline: auto; padding-block: 24px 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 16px; align-content: start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px; display: grid; gap: 8px; min-width: 0; }
+.tripcard { width: 100%; text-align: left; transition: transform .12s ease; }
+.tripcard:active, .btn:active { transform: scale(.98); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.row > :first-child { min-width: 0; }
+
+.btn { min-height: 48px; padding: 0 22px; border-radius: var(--r-full); font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: transform .12s ease; white-space: nowrap; }
+.btn.primary { background: var(--orange); color: var(--on-orange); }
+.btn.quiet { background: var(--chip); }
+.btn.small { min-height: 44px; padding: 0 16px; font-size: 14px; }
+.btn.block { width: 100%; }
+
+.faces { display: flex; }
+.face { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--on-face); border: 2px solid var(--card); margin-left: -8px; }
+.faces .face:first-child { margin-left: 0; }
+.f1 { background: var(--face-1); } .f2 { background: var(--face-2); } .f3 { background: var(--face-3); } .f4 { background: var(--face-4); }
+.face.big { width: 72px; height: 72px; font-size: 24px; margin: 0; border: 0; }
+
+.hero { min-height: 70dvh; align-content: center; gap: 20px; }
+.hero h1 { font-size: 44px; line-height: 1.05; }
+.hero .faces .face { width: 52px; height: 52px; font-size: 16px; margin-left: -12px; border-color: var(--bg); }
+.hero .faces .face:first-child { margin-left: 0; }
+
+.empty { text-align: left; gap: 12px; padding: 24px 20px; }
+.back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; font-weight: 500; color: var(--muted); padding: 0; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { min-height: 36px; padding: 0 12px; border-radius: var(--r-full); background: var(--chip); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; }
+.chip[aria-pressed="true"] { background: var(--orange-soft); color: var(--orange-text); font-weight: 700; }
+.tag { font-size: 12px; font-weight: 700; color: var(--orange-text); background: var(--orange-soft); padding: 2px 10px; border-radius: var(--r-full); white-space: nowrap; }
+.field { display: grid; gap: 6px; }
+.field label { font-weight: 700; font-size: 14px; }
+.input { width: 100%; min-height: 48px; padding: 0 14px; font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--muted); border-radius: var(--r-field); }
+.vote { min-height: 44px; min-width: 64px; padding: 0 12px; border-radius: var(--r-full); background: var(--chip); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; font-size: 14px; }
+.vote[aria-pressed="true"] { background: var(--orange-soft); color: var(--orange-text); }
+.when { font-size: 13px; font-weight: 700; color: var(--orange-text); }
+.item { display: grid; gap: 2px; padding-block: 10px; }
+.item + .item { border-top: 1px solid var(--line); }
+.balance { font-family: var(--display); font-size: 30px; font-weight: 700; line-height: 1.1; }
+.estimate { background: var(--orange-soft); border-color: transparent; }
+
+.tabs { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(4, 1fr); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.tab { min-height: 58px; display: grid; justify-items: center; align-content: center; gap: 2px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.tab .icon { width: 22px; height: 22px; }
+.tab[aria-selected="true"] { color: var(--orange-text); font-weight: 700; }
+.band { background: var(--band); color: var(--on-band); }
+.band .inner { max-width: 480px; margin-inline: auto; padding-block: 20px 36px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 4px; }
+.band .back { color: var(--band-muted); justify-self: start; }
+.band .sub { color: var(--band-muted); font-size: 13px; }
+.lift { margin-top: -20px; padding-top: 0; }
+.leg { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.route { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.route i { flex: 1; min-width: 12px; border-top: 2px dashed var(--line); }
+.route .plane { color: var(--pin); transform: rotate(90deg); }
+.trip { min-height: calc(100dvh - 53px); display: flex; flex-direction: column; }
+.trip .screen { flex: 1; }
+
+.scrim { position: fixed; inset: 0; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
+.sheet { width: 100%; max-width: 480px; background: var(--card); border-radius: var(--r-card) var(--r-card) 0 0; padding-block: 20px calc(20px + env(safe-area-inset-bottom, 0px)); padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); display: grid; gap: 14px; }
+.sheet .row .btn { flex: 1; }
+
+@media (min-width: 768px) {
+  .screen, .band .inner { max-width: 640px; }
+  .tabs { position: static; order: -1; max-width: 640px; width: calc(100% - 32px); margin: 12px auto 0; border: 1px solid var(--line); border-radius: var(--r-full); padding: 4px; }
+  .tab { min-height: 44px; grid-auto-flow: column; gap: 6px; font-size: 14px; }
+  .tab[aria-selected="true"] { background: var(--orange-soft); border-radius: var(--r-full); }
+  .trip .band { order: -2; }
+  .scrim { align-items: center; }
+  .sheet { border-radius: var(--r-card); }
+}
+@media (prefers-reduced-motion: reduce) { .tripcard, .btn { transition: none; } .tripcard:active, .btn:active { transform: none; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="airplane-tilt" viewBox="0 0 256 256"><path d="M190,115.31,217.21,89.7l.26-.26a36,36,0,0,0-50.91-50.91c-.09.08-.17.17-.26.26L140.69,66,60.1,36.71A12,12,0,0,0,47.52,39.5l-24,24A12,12,0,0,0,25.34,82l59.83,39.88L75,132H56a12,12,0,0,0-8.48,3.51l-24,24a12,12,0,0,0,4,19.62l35.23,14.1,14.06,35.14.09.22a12,12,0,0,0,19.76,3.7l23.81-23.81A12,12,0,0,0,124,200V181l10.13-10.13L174,230.65a12,12,0,0,0,18.47,1.83l24-24a12,12,0,0,0,2.79-12.59Zm-4.11,89.85L146,145.33a12,12,0,0,0-8.8-5.28A11.66,11.66,0,0,0,136,140a12,12,0,0,0-8.49,3.52l-24,24A12,12,0,0,0,100,176v19l-7.62,7.62-9.24-23.1a12,12,0,0,0-6.69-6.69l-23.1-9.24L61,156H80a12,12,0,0,0,8.48-3.51l24-24A12,12,0,0,0,110.66,110L50.84,70.12l8.24-8.25,80.83,29.39a12,12,0,0,0,12.84-3.05l30.89-32.82a12,12,0,0,1,17,17l-32.82,30.89a12,12,0,0,0-3.06,12.84l29.4,80.82Z"/></symbol><symbol id="bed" viewBox="0 0 256 256"><path d="M212,68H36V48a12,12,0,0,0-24,0V208a12,12,0,0,0,24,0V180H232v28a12,12,0,0,0,24,0V112A44.05,44.05,0,0,0,212,68ZM100,156H36V92h64Zm132,0H124V92h88a20,20,0,0,1,20,20Z"/></symbol><symbol id="calendar-blank" viewBox="0 0 256 256"><path d="M208,28H188V24a12,12,0,0,0-24,0v4H92V24a12,12,0,0,0-24,0v4H48A20,20,0,0,0,28,48V208a20,20,0,0,0,20,20H208a20,20,0,0,0,20-20V48A20,20,0,0,0,208,28ZM68,52a12,12,0,0,0,24,0h72a12,12,0,0,0,24,0h16V76H52V52ZM52,204V100H204V204Z"/></symbol><symbol id="caret-left" viewBox="0 0 256 256"><path d="M168.49,199.51a12,12,0,0,1-17,17l-80-80a12,12,0,0,1,0-17l80-80a12,12,0,0,1,17,17L97,128Z"/></symbol><symbol id="check" viewBox="0 0 256 256"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></symbol><symbol id="airplane" viewBox="0 0 256 256"><path d="M237.37,125.27,164,88.58V48a36,36,0,0,0-72,0V88.58L18.63,125.27A12,12,0,0,0,12,136v32a12,12,0,0,0,14.35,11.77L92,166.64V179L79.51,191.51A12,12,0,0,0,76,200v32a12,12,0,0,0,16.46,11.14L128,228.92l35.54,14.22A11.91,11.91,0,0,0,168,244a12,12,0,0,0,12-12V200a12,12,0,0,0-3.51-8.49L164,179V166.64l65.65,13.13A12,12,0,0,0,244,168V136A12,12,0,0,0,237.37,125.27ZM220,153.36l-65.65-13.13A12,12,0,0,0,140,152v32a12,12,0,0,0,3.51,8.49L156,205v9.31l-23.54-9.42a12,12,0,0,0-8.92,0L100,214.28V205l12.49-12.48A12,12,0,0,0,116,184V152a12,12,0,0,0-14.35-11.77L36,153.36v-9.94l73.37-36.69A12,12,0,0,0,116,96V48a12,12,0,0,1,24,0V96a12,12,0,0,0,6.63,10.73L220,143.42Z"/></symbol><symbol id="google-logo" viewBox="0 0 256 256"><path d="M228,128a100,100,0,1,1-22.86-63.64,12,12,0,0,1-18.51,15.28A76,76,0,1,0,203.05,140H128a12,12,0,0,1,0-24h88A12,12,0,0,1,228,128Z"/></symbol><symbol id="lightbulb" viewBox="0 0 256 256"><path d="M180,232a12,12,0,0,1-12,12H88a12,12,0,0,1,0-24h80A12,12,0,0,1,180,232Zm40-128a91.51,91.51,0,0,1-35.17,72.35A12.26,12.26,0,0,0,180,186v2a20,20,0,0,1-20,20H96a20,20,0,0,1-20-20v-2a12,12,0,0,0-4.7-9.51A91.57,91.57,0,0,1,36,104.52C35.73,54.69,76,13.2,125.79,12A92,92,0,0,1,220,104Zm-24,0a68,68,0,0,0-69.65-68C89.56,36.88,59.8,67.55,60,104.38a67.71,67.71,0,0,0,26.1,53.19A35.87,35.87,0,0,1,100,184h56.1A36.13,36.13,0,0,1,170,157.49,67.68,67.68,0,0,0,196,104Zm-20.07-5.32a48.5,48.5,0,0,0-31.91-40,12,12,0,0,0-8,22.62,24.31,24.31,0,0,1,16.09,20,12,12,0,0,0,23.86-2.64Z"/></symbol><symbol id="magnifying-glass" viewBox="0 0 256 256"><path d="M232.49,215.51,185,168a92.12,92.12,0,1,0-17,17l47.53,47.54a12,12,0,0,0,17-17ZM44,112a68,68,0,1,1,68,68A68.07,68.07,0,0,1,44,112Z"/></symbol><symbol id="map-pin" viewBox="0 0 256 256"><path d="M128,60a44,44,0,1,0,44,44A44.05,44.05,0,0,0,128,60Zm0,64a20,20,0,1,1,20-20A20,20,0,0,1,128,124Zm0-112a92.1,92.1,0,0,0-92,92c0,77.36,81.64,135.4,85.12,137.83a12,12,0,0,0,13.76,0,259,259,0,0,0,42.18-39C205.15,170.57,220,136.37,220,104A92.1,92.1,0,0,0,128,12Zm31.3,174.71A249.35,249.35,0,0,1,128,216.89a249.35,249.35,0,0,1-31.3-30.18C80,167.37,60,137.31,60,104a68,68,0,0,1,136,0C196,137.31,176,167.37,159.3,186.71Z"/></symbol><symbol id="plus" viewBox="0 0 256 256"><path d="M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z"/></symbol><symbol id="receipt" viewBox="0 0 256 256"><path d="M68,100A12,12,0,0,1,80,88h96a12,12,0,0,1,0,24H80A12,12,0,0,1,68,100Zm12,52h96a12,12,0,0,0,0-24H80a12,12,0,0,0,0,24ZM236,56V208a12,12,0,0,1-17.37,10.73L192,205.42l-26.63,13.31a12,12,0,0,1-10.74,0L128,205.42l-26.63,13.31a12,12,0,0,1-10.74,0L64,205.42,37.37,218.73A12,12,0,0,1,20,208V56A20,20,0,0,1,40,36H216A20,20,0,0,1,236,56Zm-24,4H44V188.58l14.63-7.31a12,12,0,0,1,10.74,0L96,194.58l26.63-13.31a12,12,0,0,1,10.74,0L160,194.58l26.63-13.31a12,12,0,0,1,10.74,0L212,188.58Z"/></symbol><symbol id="sign-out" viewBox="0 0 256 256"><path d="M124,216a12,12,0,0,1-12,12H48a12,12,0,0,1-12-12V40A12,12,0,0,1,48,28h64a12,12,0,0,1,0,24H60V204h52A12,12,0,0,1,124,216Zm108.49-96.49-40-40a12,12,0,0,0-17,17L195,116H112a12,12,0,0,0,0,24h83l-19.52,19.51a12,12,0,0,0,17,17l40-40A12,12,0,0,0,232.49,119.51Z"/></symbol><symbol id="thumbs-down" viewBox="0 0 256 256"><path d="M243.78,156.53l-12-96A28,28,0,0,0,204,36H32A20,20,0,0,0,12,56v88a20,20,0,0,0,20,20H72.58l36.69,73.37A12,12,0,0,0,120,244a44.05,44.05,0,0,0,44-44V188h52a28,28,0,0,0,27.78-31.47ZM68,140H36V60H68Zm151,22.65a4,4,0,0,1-3,1.35H152a12,12,0,0,0-12,12v24a20,20,0,0,1-13.18,18.8L92,149.17V60H204a4,4,0,0,1,4,3.5l12,96A4,4,0,0,1,219,162.65Z"/></symbol><symbol id="thumbs-up" viewBox="0 0 256 256"><path d="M237,77.47A28,28,0,0,0,216,68H164V56a44.05,44.05,0,0,0-44-44,12,12,0,0,0-10.73,6.63L72.58,92H32a20,20,0,0,0-20,20v88a20,20,0,0,0,20,20H204a28,28,0,0,0,27.78-24.53l12-96A28,28,0,0,0,237,77.47ZM36,116H68v80H36ZM220,96.5l-12,96a4,4,0,0,1-4,3.5H92V106.83L126.82,37.2A20,20,0,0,1,140,56V80a12,12,0,0,0,12,12h64a4,4,0,0,1,4,4.5Z"/></symbol></svg>
+
+<nav class="demo" aria-label="Mockup screens">
+  <span>Sample data. Pick a screen:</span>
+  <button data-go="home">Sign in</button>
+  <button data-go="trips">My trips</button>
+  <button data-go="none">No trips yet</button>
+  <button data-go="trip">Inside a trip</button>
+  <button data-go="profile">Profile</button>
+</nav>
+
+<main id="home" class="screen hero" hidden>
+  <div class="faces" aria-hidden="true"><span class="face f1">BA</span><span class="face f2">MI</span><span class="face f3">JO</span><span class="face f4">RI</span></div>
+  <h1>Sidequest</h1>
+  <p style="font-size:17px">Plan trips together and split costs without the awkward chats.</p>
+  <button class="btn primary block" data-go="trips"><svg class="icon"><use href="#google-logo"/></svg>Continue with Google</button>
+</main>
+
+<div id="trips" hidden>
+<header class="band"><div class="inner"><div class="row"><h1>My trips</h1><button aria-label="Open your profile" data-go="profile"><span class="face f1" style="margin:0;width:44px;height:44px;font-size:14px;border-color:transparent">BA</span></button></div></div></header>
+<main class="screen lift">
+  <button class="card tripcard" data-go="trip">
+    <h2>Hội An long weekend</h2>
+    <span class="route"><span class="leg">Mar 12<i></i></span><svg class="icon plane" aria-hidden="true"><use href="#airplane"/></svg><span class="leg"><i></i>Mar 15, 2027</span></span>
+    <span class="row"><span class="owed num">You're owed ₱1,400</span><span class="faces" aria-label="4 people"><span class="face f1">BA</span><span class="face f2">MI</span><span class="face f3">JO</span><span class="face f4">RI</span></span></span>
+  </button>
+  <button class="card tripcard" data-go="trip">
+    <h2>Siargao with the org</h2>
+    <span class="route"><span class="leg">Jun 4<i></i></span><svg class="icon plane" aria-hidden="true"><use href="#airplane"/></svg><span class="leg"><i></i>Jun 8, 2027</span></span>
+    <span class="row"><span class="owe num">You owe ₱640.50</span><span class="faces" aria-label="8 people"><span class="face f3">KA</span><span class="face f4">LE</span><span class="face f2">+6</span></span></span>
+  </button>
+  <button class="btn primary block"><svg class="icon"><use href="#plus"/></svg>New trip</button>
+</main>
+</div>
+
+<div id="none" hidden>
+<header class="band"><div class="inner"><div class="row"><h1>My trips</h1><span class="face f1" style="margin:0;width:44px;height:44px;font-size:14px;border-color:transparent">BA</span></div></div></header>
+<main class="screen lift">
+  <div class="card empty">
+    <h2>Start your first trip</h2>
+    <p class="muted">Add the dates, then send your group the invite link.</p>
+    <button class="btn primary block"><svg class="icon"><use href="#plus"/></svg>New trip</button>
+  </div>
+</main>
+</div>
+
+<main id="profile" class="screen" hidden>
+  <button class="back" data-go="trips"><svg class="icon"><use href="#caret-left"/></svg>My trips</button>
+  <h1>Profile</h1>
+  <div class="card" style="gap:16px">
+    <span class="face big f1">BA</span>
+    <div class="field"><label for="name">Display name</label><input id="name" class="input" value="Bea"><span class="muted">This is the name your group sees.</span></div>
+    <button class="btn primary block">Save</button>
+  </div>
+  <button class="btn quiet block"><svg class="icon"><use href="#sign-out"/></svg>Sign out</button>
+</main>
+
+<div id="trip" class="trip" hidden>
+  <header class="band"><div class="inner" style="padding-block:8px 20px">
+    <button class="back" data-go="trips"><svg class="icon"><use href="#caret-left"/></svg>My trips</button>
+    <h1>Hội An long weekend</h1>
+    <p class="sub">Mar 12-15, 2027. Times are Vietnam time.</p>
+  </div></header>
+
+  <main id="t-schedule" class="screen tabview" style="padding-top:16px">
+    <section class="card" aria-label="Friday, March 12">
+      <h2>Fri, Mar 12</h2>
+      <div class="item"><span class="when">08:15 Manila time</span><strong>Flight to Da Nang</strong><span class="muted">Lands 10:05 Da Nang time</span></div>
+      <div class="item"><span class="when">Afternoon</span><strong>Check in at the hotel</strong></div>
+      <div class="item"><span class="when">Evening</span><strong>Chợ Đêm Hội An</strong><span class="muted">Last changed by Migs</span></div>
+    </section>
+    <section class="card" aria-label="Saturday, March 13">
+      <h2>Sat, Mar 13</h2>
+      <div class="item"><span class="when">Full day</span><strong>Bà Nà Hills</strong><span class="muted">Last changed by Jo</span></div>
+    </section>
+    <button class="btn primary block"><svg class="icon"><use href="#plus"/></svg>Add to schedule</button>
+  </main>
+
+  <main id="t-ideas" class="screen tabview" style="padding-top:16px" hidden>
+    <div class="field"><label for="find">Search ideas</label><input id="find" class="input" placeholder="banh mi"><span class="muted">Search ignores accents, so "banh mi" finds "Bánh mì".</span></div>
+    <div class="chips"><button class="chip" aria-pressed="true">All</button><button class="chip" aria-pressed="false">Food</button><button class="chip" aria-pressed="false">Sightseeing</button><button class="chip" aria-pressed="false">Adventure</button><button class="chip" aria-pressed="false">Nightlife</button></div>
+    <article class="card">
+      <div class="row"><h3>Bánh mì Phượng</h3><span class="tag">Food</span></div>
+      <span class="muted num">1-2 hrs, about ₱120 per person</span>
+      <div class="row"><span style="display:flex;gap:6px"><button class="vote" aria-pressed="true" aria-label="Thumbs up, 3 votes"><svg class="icon"><use href="#thumbs-up"/></svg>3</button><button class="vote" aria-pressed="false" aria-label="Thumbs down, 0 votes"><svg class="icon"><use href="#thumbs-down"/></svg>0</button></span><button class="btn quiet small">Approve</button></div>
+    </article>
+    <article class="card">
+      <div class="row"><h3>Lantern boat ride</h3><span class="tag">Experience</span></div>
+      <span class="muted num">1-2 hrs, about ₱350 per person</span>
+      <div class="row"><span style="display:flex;gap:6px"><button class="vote" aria-pressed="false" aria-label="Thumbs up, 2 votes"><svg class="icon"><use href="#thumbs-up"/></svg>2</button><button class="vote" aria-pressed="false" aria-label="Thumbs down, 1 vote"><svg class="icon"><use href="#thumbs-down"/></svg>1</button></span><button class="btn quiet small">Approve</button></div>
+    </article>
+    <button class="btn primary block"><svg class="icon"><use href="#plus"/></svg>Add an idea</button>
+  </main>
+
+  <main id="t-bookings" class="screen tabview" style="padding-top:16px" hidden>
+    <div class="card estimate"><span style="font-weight:700">Estimated trip cost</span><span class="balance num">~₱12,100 per person</span><span class="muted">This is the plan. Costs shows what was actually paid.</span></div>
+    <article class="card">
+      <div class="row"><h3>Manila to Da Nang</h3><svg class="icon" aria-hidden="true"><use href="#airplane-tilt"/></svg></div>
+      <span class="muted">Mar 12, 08:15 Manila time. Lands 10:05 Da Nang time.</span>
+      <div class="row"><span class="num" style="font-weight:700">₱6,200 per person</span><button class="btn quiet small">Log as cost</button></div>
+    </article>
+    <article class="card">
+      <div class="row"><h3>Riverside homestay</h3><svg class="icon" aria-hidden="true"><use href="#bed"/></svg></div>
+      <span class="muted">Check in Mar 12. Check out Mar 15.</span>
+      <div class="row"><span class="num" style="font-weight:700">₱3,450 per person</span><button class="btn quiet small">Log as cost</button></div>
+    </article>
+    <button class="btn primary block"><svg class="icon"><use href="#plus"/></svg>Add a booking</button>
+  </main>
+
+  <main id="t-costs" class="screen tabview" style="padding-top:16px" hidden>
+    <div class="card"><span class="muted">Your balance for this trip</span><span class="balance owed num">You're owed ₱1,400</span></div>
+    <section class="card" aria-label="Settle up">
+      <h2>Settle up</h2>
+      <div class="item row"><span class="row" style="justify-content:start"><span class="face f2" style="margin:0">MI</span><span class="num">Migs pays you ₱1,400</span></span></div>
+      <div class="item row"><span class="row" style="justify-content:start"><span class="face f2" style="margin:0">MI</span><span class="num">Migs pays Ria ₱200</span></span></div>
+      <div class="item row"><span class="row" style="justify-content:start"><span class="face f3" style="margin:0">JO</span><span class="num">Jo pays Ria ₱200</span></span></div>
+    </section>
+    <section class="card" aria-label="Costs">
+      <h2>Costs</h2>
+      <div class="item"><div class="row"><strong>Hotel deposit</strong><strong class="num">₱3,000.00</strong></div><span class="muted">Bea paid, split 4 ways. Added by Bea.</span></div>
+      <div class="item"><div class="row"><strong>Group dinner</strong><strong class="num">₱2,000.00</strong></div><span class="muted">Ria paid, split 4 ways. Added by Ria.</span></div>
+      <div class="item"><div class="row"><strong>Airport van</strong><strong class="num">₱1,400.00</strong></div><span class="muted">Jo paid, split 4 ways. Added by Jo, edited by Bea.</span></div>
+    </section>
+    <button class="btn primary block" id="logcost"><svg class="icon"><use href="#plus"/></svg>Log a cost</button>
+  </main>
+
+  <nav class="tabs" role="tablist" aria-label="Trip sections">
+    <button class="tab" role="tab" aria-selected="true" data-tab="schedule"><svg class="icon"><use href="#calendar-blank"/></svg>Schedule</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="ideas"><svg class="icon"><use href="#lightbulb"/></svg>Ideas</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="bookings"><svg class="icon"><use href="#airplane-tilt"/></svg>Bookings</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="costs"><svg class="icon"><use href="#receipt"/></svg>Costs</button>
+  </nav>
+</div>
+
+<div id="sheet" class="scrim" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <h2 id="sheet-title">Save this cost?</h2>
+    <p class="num" style="font-size:17px">Bea paid ₱3,000, split 4 ways = ₱750 each.</p>
+    <div class="row"><button class="btn quiet" id="sheet-back">Go back</button><button class="btn primary" id="sheet-save">Save</button></div>
+  </div>
+</div>
+
+<script>
+const screens = ["home", "trips", "none", "profile", "trip"];
+function go(name) {
+  for (const id of screens) document.getElementById(id).hidden = id !== name;
+  document.querySelectorAll(".demo button").forEach(b => b.setAttribute("aria-current", String(b.dataset.go === name)));
+  window.scrollTo(0, 0);
+}
+function tab(name) {
+  document.querySelectorAll(".tabview").forEach(v => { v.hidden = v.id !== "t-" + name; });
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.tab === name)));
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => go(b.dataset.go)));
+document.querySelectorAll("[data-tab]").forEach(b => b.addEventListener("click", () => tab(b.dataset.tab)));
+document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+  document.querySelectorAll(".chip").forEach(o => o.setAttribute("aria-pressed", String(o === c)));
+}));
+document.querySelectorAll(".vote").forEach(v => v.addEventListener("click", () => {
+  v.setAttribute("aria-pressed", String(v.getAttribute("aria-pressed") !== "true"));
+}));
+const sheet = document.getElementById("sheet");
+document.getElementById("logcost").addEventListener("click", () => { sheet.hidden = false; document.getElementById("sheet-save").focus(); });
+["sheet-back", "sheet-save"].forEach(id => document.getElementById(id).addEventListener("click", () => { sheet.hidden = true; document.getElementById("logcost").focus(); }));
+go("trips");
+</script>
