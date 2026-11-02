@@ -11,8 +11,9 @@ import { Face } from "@/components/face";
 import { TripTabs } from "@/components/trip-tabs";
 import { linkClass } from "@/components/ui";
 
-// Checks the person belongs to this trip before anything of the trip is shown.
-// `children` (the tab pages) are only rendered after that check passes.
+// Checks the person belongs to this trip before showing the trip's header and tabs.
+// This does not protect the pages inside: Next.js can run them and send their data
+// even when this check fails. Any page that shows trip data must check for itself.
 async function TripShell({
   params,
   children,
