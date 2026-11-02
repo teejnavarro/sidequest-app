@@ -47,6 +47,7 @@ In a terminal, in this folder:
 6. Open http://localhost:3000 in your browser. Use `localhost`, not `127.0.0.1`: Google sign-in only works on `localhost`. Sign in again the first time, since the dev database has its own sign-ins. Stop it with Ctrl+C.
 
 Other checks: `npm.cmd run lint` (style check), `npm.cmd test` (automatic tests) and `npm.cmd run build` (the same build Vercel does).
+On Vercel, previews read `PREVIEW_DATABASE_URL` when it is set, so phone tests use the `dev` database. Set it for Preview only and NEVER on Production, or the live site would read test data.
 Chapters 1 to 3 of `LEARNING.md` explain how the pieces fit together.
 
 ## Live
