@@ -4,6 +4,6 @@ import { drizzle } from "drizzle-orm/neon-http";
 import * as authSchema from "@/db/auth-schema";
 import * as tripSchema from "@/db/trip-schema";
 
-export const db = drizzle(neon(process.env.PREVIEW_DATABASE_URL ?? process.env.DATABASE_URL!), {
+export const db = drizzle(neon(process.env.PREVIEW_DATABASE_URL || process.env.DATABASE_URL!), {
   schema: { ...authSchema, ...tripSchema },
 });
