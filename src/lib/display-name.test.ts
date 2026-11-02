@@ -35,6 +35,18 @@ describe("validateDisplayName", () => {
     expect(validateDisplayName("😀".repeat(41)).ok).toBe(false);
   });
 
+  it("rejects names made only of invisible characters", () => {
+    for (const blank of ["​", "​‍ ﻿", "⁠", "­", "ㅤ", "⠀", "\u0007"]) {
+      expect(validateDisplayName(blank)).toEqual({ ok: false, error: "Please enter a name." });
+    }
+  });
+
+  it("keeps invisible joiners that are part of a real name", () => {
+    const family = "\u{1F468}‍\u{1F469}‍\u{1F467}";
+    expect(validateDisplayName(family)).toEqual({ ok: true, name: family });
+    expect(validateDisplayName("Maya​Cruz")).toEqual({ ok: true, name: "Maya​Cruz" });
+  });
+
   it("rejects non-string input", () => {
     for (const bad of [null, undefined, 42, {}, ["Maya"]]) {
       expect(validateDisplayName(bad)).toEqual({ ok: false, error: "Please enter a name." });
