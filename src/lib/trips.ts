@@ -1,8 +1,10 @@
 import "server-only";
-import { and, desc, eq, exists } from "drizzle-orm";
+import { and, asc, desc, eq, exists } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import { user } from "@/db/auth-schema";
 import { trip, tripMember } from "@/db/trip-schema";
+import { isInviteCode } from "@/lib/invite-code";
 import type { TripInput } from "@/lib/trip-input";
 
 // The one door to trip data. Every function here checks that the person is a member
@@ -116,4 +118,99 @@ export async function updateTripForMember(
     )
     .returning({ id: trip.id });
   return updated.length > 0;
+}
+
+export type TripMemberSummary = { id: string; name: string; image: string | null };
+
+// The invite code of a trip, but only for a member. Anyone else gets null.
+export async function getInviteCodeForMember(
+  tripId: string,
+  userId: string,
+): Promise<string | null> {
+  const rows = await db
+    .select({ inviteCode: trip.inviteCode })
+    .from(trip)
+    .innerJoin(tripMember, eq(tripMember.tripId, trip.id))
+    .where(and(eq(trip.id, tripId), eq(tripMember.userId, userId)))
+    .limit(1);
+  return rows[0]?.inviteCode ?? null;
+}
+
+// Who is in the trip, oldest member first: id, name and photo, never email. A person who
+// is not a member gets an empty list, because the membership check is in the same query.
+export async function listTripMembers(
+  tripId: string,
+  userId: string,
+): Promise<TripMemberSummary[]> {
+  const viewer = alias(tripMember, "viewer");
+  return db
+    .select({ id: user.id, name: user.name, image: user.image })
+    .from(tripMember)
+    .innerJoin(user, eq(user.id, tripMember.userId))
+    .where(
+      and(
+        eq(tripMember.tripId, tripId),
+        exists(
+          db
+            .select({ one: viewer.userId })
+            .from(viewer)
+            .where(and(eq(viewer.tripId, tripId), eq(viewer.userId, userId))),
+        ),
+      ),
+    )
+    .orderBy(asc(tripMember.joinedAt), asc(user.id));
+}
+
+export type InvitedTrip = {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  ownerName: string;
+};
+
+// What the invite code opens: the trip and its owner's name. No email, no members, no code.
+export async function getTripByInviteCode(code: string): Promise<InvitedTrip | null> {
+  if (!isInviteCode(code)) return null;
+  const rows = await db
+    .select({
+      id: trip.id,
+      name: trip.name,
+      startDate: trip.startDate,
+      endDate: trip.endDate,
+      ownerName: user.name,
+    })
+    .from(trip)
+    .innerJoin(user, eq(user.id, trip.ownerId))
+    .where(eq(trip.inviteCode, code.toLowerCase()))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function isTripMember(tripId: string, userId: string): Promise<boolean> {
+  const rows = await db
+    .select({ one: tripMember.userId })
+    .from(tripMember)
+    .where(and(eq(tripMember.tripId, tripId), eq(tripMember.userId, userId)))
+    .limit(1);
+  return rows.length > 0;
+}
+
+// Adds the person to the trip that owns this code and returns the trip id, or null when
+// the code opens nothing. Joining twice changes nothing. Only the join action calls this,
+// never a page load, so link previews and prefetching can't add anyone.
+export async function joinTripByInviteCode(
+  code: string,
+  userId: string,
+): Promise<string | null> {
+  if (!isInviteCode(code)) return null;
+  const found = await db
+    .select({ id: trip.id })
+    .from(trip)
+    .where(eq(trip.inviteCode, code.toLowerCase()))
+    .limit(1);
+  const tripId = found[0]?.id;
+  if (!tripId) return null;
+  await db.insert(tripMember).values({ tripId, userId }).onConflictDoNothing();
+  return tripId;
 }
