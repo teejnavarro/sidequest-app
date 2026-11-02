@@ -2,6 +2,12 @@
 
 import { useActionState } from "react";
 import { updateDisplayName, type NameFormState } from "./actions";
+import {
+  helpClass,
+  inputClass,
+  labelClass,
+  primaryButton,
+} from "@/components/ui";
 
 const initialState: NameFormState = { ok: false, message: "" };
 
@@ -12,29 +18,32 @@ export function NameForm({ currentName }: { currentName: string }) {
   );
 
   return (
-    <form action={formAction} className="flex flex-col gap-2">
-      <label htmlFor="name" className="text-sm font-medium">
-        Display name
-      </label>
-      <input
-        id="name"
-        name="name"
-        type="text"
-        defaultValue={currentName}
-        maxLength={40}
-        required
-        className="min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:focus-visible:outline-neutral-100"
-      />
-      <button
-        type="submit"
-        disabled={pending}
-        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-neutral-300 bg-white px-5 text-base font-medium text-neutral-900 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800 dark:focus-visible:outline-neutral-100"
-      >
+    <form action={formAction} className="grid gap-4">
+      <div className="grid gap-1.5">
+        <label htmlFor="name" className={labelClass}>
+          Display name
+        </label>
+        <input
+          id="name"
+          name="name"
+          type="text"
+          defaultValue={currentName}
+          maxLength={40}
+          required
+          aria-describedby="name-help name-message"
+          className={inputClass}
+        />
+        <span id="name-help" className={helpClass}>
+          This is the name your group sees.
+        </span>
+      </div>
+      <button type="submit" disabled={pending} className={`${primaryButton} w-full`}>
         {pending ? "Saving…" : "Save"}
       </button>
       <p
+        id="name-message"
         aria-live="polite"
-        className={`min-h-5 text-sm ${state.ok ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}
+        className={`min-h-5 text-[13px] font-bold ${state.ok ? "text-owed" : "text-owe"}`}
       >
         {state.message}
       </p>

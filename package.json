@@ -7,10 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:dev-db": "vitest run --config vitest.dev-db.config.mts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
+    "@phosphor-icons/react": "^2.1.10",
     "better-auth": "^1.7.15",
     "drizzle-orm": "^0.45.4",
     "next": "16.4.3",

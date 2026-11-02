@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { DrizzleQueryError } from "drizzle-orm/errors";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -47,6 +48,70 @@ describe("auth config", () => {
 
   it("only offers Google", () => {
     expect(Object.keys(auth.options.socialProviders)).toEqual(["google"]);
+  });
+});
+
+describe("auth logs", () => {
+  const TOKEN = "made-up-session-token-1234567890";
+  const hanging = Object.assign(new Error("fetch() rejects when the prerender is complete"), {
+    digest: "HANGING_PROMISE_REJECTION",
+  });
+  const failed = new DrizzleQueryError('select * from "session" where token = $1', [TOKEN], hanging);
+
+  function captureLogs() {
+    return (["error", "warn", "log"] as const).map((level) =>
+      vi.spyOn(console, level).mockImplementation(() => {}),
+    );
+  }
+  const printed = (spies: ReturnType<typeof captureLogs>) =>
+    JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("drops tokens from a real failed-query error going through Better Auth's logger", async () => {
+    vi.stubEnv("DATABASE_URL", "postgresql://test:test@db.invalid/test");
+    vi.stubEnv("BETTER_AUTH_URL", BASE);
+    vi.stubEnv("BETTER_AUTH_SECRET", SECRET);
+    const { auth } = await import("./auth");
+    const { logger } = await auth.$context;
+    const spies = captureLogs();
+
+    logger.error("INTERNAL_SERVER_ERROR", failed);
+
+    const output = printed(spies);
+    expect(output).not.toContain(TOKEN);
+    expect(output).not.toContain("select");
+    expect(output).toContain("INTERNAL_SERVER_ERROR");
+    expect(output).toContain("HANGING_PROMISE_REJECTION");
+  });
+
+  it("drops tokens when the error itself is passed as the message", async () => {
+    const { writeAuthLog } = await import("./auth");
+    const spies = captureLogs();
+    writeAuthLog("error", failed);
+    expect(printed(spies)).not.toContain(TOKEN);
+  });
+
+  it("drops tokens from message text, plain details and nested causes", async () => {
+    const { writeAuthLog } = await import("./auth");
+    const spies = captureLogs();
+    writeAuthLog("warn", `Lookup broke. Failed query: select 1\nparams: ${TOKEN}`, TOKEN, {
+      token: TOKEN,
+    });
+    writeAuthLog("error", "Outer", new Error("Outer", { cause: failed }));
+    const output = printed(spies);
+    expect(output).not.toContain(TOKEN);
+    expect(output).toContain("Lookup broke.");
+    expect(output).toContain("HANGING_PROMISE_REJECTION");
+  });
+
+  it("does not repeat a code or name that is shaped like a token", async () => {
+    const { writeAuthLog } = await import("./auth");
+    const spies = captureLogs();
+    writeAuthLog("error", "Oops", Object.assign(new Error("x"), { code: TOKEN, name: TOKEN }));
+    expect(printed(spies)).not.toContain(TOKEN);
   });
 });
 
