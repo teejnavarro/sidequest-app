@@ -1,30 +1,23 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { connection } from "next/server";
-import { checkDatabase } from "@/lib/db-health";
+import { GoogleLogo } from "@phosphor-icons/react/dist/ssr";
 import { getOptionalUser } from "@/lib/current-user";
 import { signInWithGoogle } from "@/app/actions";
+import { primaryButton } from "@/components/ui";
 
-async function DatabaseStatus() {
-  await connection(); // run at request time, never at build time
-  const { ok, ms } = await checkDatabase();
-
-  return (
-    <p className="text-sm text-neutral-600 dark:text-neutral-400">
-      {ok ? `Database connected ✓ (${ms} ms)` : "Database not connected"}
-    </p>
-  );
-}
-
-const buttonClass =
-  "inline-flex min-h-11 items-center justify-center rounded-lg border border-neutral-300 bg-white px-5 text-base font-medium text-neutral-900 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800 dark:focus-visible:outline-neutral-100";
+const DEMO_FACES = [
+  { initials: "BA", color: "bg-face-1" },
+  { initials: "MI", color: "bg-face-2" },
+  { initials: "JO", color: "bg-face-3" },
+  { initials: "RI", color: "bg-face-4" },
+];
 
 async function SignInArea() {
   const user = await getOptionalUser();
 
   if (user) {
     return (
-      <Link href="/trips" className={buttonClass}>
+      <Link href="/trips" className={`${primaryButton} w-full`}>
         Go to My trips
       </Link>
     );
@@ -32,7 +25,8 @@ async function SignInArea() {
 
   return (
     <form action={signInWithGoogle}>
-      <button type="submit" className={buttonClass}>
+      <button type="submit" className={`${primaryButton} w-full`}>
+        <GoogleLogo size={20} weight="bold" aria-hidden="true" />
         Continue with Google
       </button>
     </form>
@@ -41,29 +35,30 @@ async function SignInArea() {
 
 export default function Home() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-      <h1 className="text-4xl font-semibold tracking-tight">Sidequest</h1>
-      <p className="max-w-sm text-lg text-neutral-700 dark:text-neutral-300">
-        Plan trips together. Split costs without the awkward chats.
+    <main className="mx-auto grid min-h-[70dvh] w-full max-w-[480px] flex-1 content-center gap-5 px-4 py-8 md:max-w-[640px]">
+      <div className="flex" aria-hidden="true">
+        {DEMO_FACES.map((face, i) => (
+          <span
+            key={face.initials}
+            className={`grid size-[52px] place-items-center rounded-full border-2 border-bg text-base font-bold text-on-face ${face.color} ${i > 0 ? "-ml-3" : ""}`}
+          >
+            {face.initials}
+          </span>
+        ))}
+      </div>
+      <h1 className="text-[44px] leading-[1.05]">Sidequest</h1>
+      <p className="text-[17px]">
+        Plan trips together and split costs without the awkward chats.
       </p>
       <Suspense
         fallback={
           <div
             aria-hidden="true"
-            className="min-h-11 w-52 rounded-lg border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900"
+            className="min-h-12 w-full animate-pulse rounded-full bg-chip"
           />
         }
       >
         <SignInArea />
-      </Suspense>
-      <Suspense
-        fallback={
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Checking database…
-          </p>
-        }
-      >
-        <DatabaseStatus />
       </Suspense>
     </main>
   );
