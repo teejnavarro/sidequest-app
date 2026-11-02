@@ -2,16 +2,16 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
+import { listMyTrips } from "@/lib/trips";
+import { formatTripDates } from "@/lib/trip-dates";
 import { Band } from "@/components/band";
 import { Face } from "@/components/face";
-import {
-  cardClass,
-  primaryButton,
-  screenClass,
-} from "@/components/ui";
+import { RouteLine } from "@/components/route-line";
+import { cardClass, pressCard, primaryButton, screenClass } from "@/components/ui";
 
 async function TripsContent() {
   const user = await getCurrentUser();
+  const trips = await listMyTrips(user.id);
 
   return (
     <>
@@ -28,16 +28,38 @@ async function TripsContent() {
         </div>
       </Band>
       <main className={`${screenClass} -mt-5 pt-0`}>
-        <div className={`${cardClass} gap-3 px-5 py-6`}>
-          <h2 className="text-[19px]">Start your first trip</h2>
-          <p className="text-[13px] text-muted">
-            Add the dates, then send your group the invite link.
-          </p>
-          <Link href="/trips/new" className={`${primaryButton} w-full`}>
-            <Plus size={20} weight="bold" aria-hidden="true" />
-            New trip
-          </Link>
-        </div>
+        {trips.length === 0 ? (
+          <div className={`${cardClass} gap-3 px-5 py-6`}>
+            <h2 className="text-[19px]">Start your first trip</h2>
+            <p className="text-[13px] text-muted">
+              Add the dates, then send your group the invite link.
+            </p>
+            <Link href="/trips/new" className={`${primaryButton} w-full`}>
+              <Plus size={20} weight="bold" aria-hidden="true" />
+              New trip
+            </Link>
+          </div>
+        ) : (
+          <>
+            {trips.map((trip) => {
+              const dates = formatTripDates(trip.startDate, trip.endDate);
+              return (
+                <Link
+                  key={trip.id}
+                  href={`/trips/${trip.id}`}
+                  className={`${cardClass} ${pressCard}`}
+                >
+                  <h2 className="text-[19px]">{trip.name}</h2>
+                  <RouteLine start={dates.start} end={dates.end} />
+                </Link>
+              );
+            })}
+            <Link href="/trips/new" className={`${primaryButton} w-full`}>
+              <Plus size={20} weight="bold" aria-hidden="true" />
+              New trip
+            </Link>
+          </>
+        )}
       </main>
     </>
   );
@@ -52,7 +74,8 @@ function TripsLoading() {
         </div>
       </div>
       <div className={`${screenClass} -mt-5 pt-0`}>
-        <div className="h-36 animate-pulse rounded-card bg-chip" />
+        <div className="h-24 animate-pulse rounded-card bg-chip" />
+        <div className="h-24 animate-pulse rounded-card bg-chip" />
       </div>
     </div>
   );
