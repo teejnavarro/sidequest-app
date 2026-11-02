@@ -207,3 +207,62 @@ its newest version in "beta". It recommends **Better Auth** for new projects, so
 switched before writing any code. The habit: before adopting a tool, look at when it
 last had a real release, who maintains it, and whether its own authors point
 elsewhere. Ten minutes of checking saves a rewrite later.
+
+---
+
+## Chapter 3: Trips and tabs
+
+### Tables that point to each other
+
+Chapter 2 gave the pantry shelves for people. This step adds two more: `trip` (one row
+per trip: its name, dates, time zone, currency and who owns it) and `trip_member` (one
+row for each person who belongs to a trip). The second table is a guest list. It does not
+copy anything about the trip or the person. It only holds two labels: the trip's id and
+the person's id. This is called a **foreign key**: a label in one table that points to a
+row in another. To list "my trips", the app looks up my rows on the guest list, then
+follows each label to the trip. It also means a trip can have many people, and a person
+can be on many trips, without storing anything twice.
+
+### One privacy checkpoint
+
+Trips are private, so every question about trips ("show me this trip", "change this
+trip") has to ask first: is this person on the guest list? If twenty different pages each
+remembered to ask, one of them would eventually forget. So all trip questions go through
+one file, `src/lib/trips.ts`, like a single front desk. The check is part of the database
+question itself ("give me this trip, but only if this person is a member"), so there is no
+gap between checking and doing. A stranger gets the same "we couldn't find that trip"
+whether the trip does not exist or just isn't theirs, so they can't learn which trips
+exist.
+
+### All-or-nothing saves
+
+Creating a trip means writing two rows: the trip, and the owner's place on the guest
+list. If the computer failed between the two, we would have a trip nobody belongs to.
+Databases solve this with an all-or-nothing save: either both rows are written or
+neither. Our database connection can't hold a save open while the app thinks, so we send
+both writes together in one **batch**, which the database treats as one unit.
+
+### Why test data and live data are separate
+
+Until now the app on your PC and the live site shared one database. That was fine while
+it held only sign-in records. Now it holds real trips, so playing around on your PC could
+leave junk (or break something) on the live site. Neon, our database host, lets us make a
+**branch**: a full copy of the database that lives on its own. We made one called `dev`.
+On your PC the app uses `dev`, so anything you try there never reaches the live site.
+Changing the live database is a deliberate step that needs your OK, and new tables are
+added to it with a migration only after they work on `dev`.
+
+### Design tokens
+
+A **design token** is a name for a design choice, such as `card` for "the white of a
+card" or `owe` for "the red used when you owe money". We keep every color in one place
+(`src/app/globals.css`), with a light and a dark value for each. Screens use the name,
+never the color. To change the look of the whole app, or to make dark mode work, we
+change one line and every screen follows.
+
+### Dates that don't move
+
+A trip date such as 12 March is a day on the calendar, not a moment in time. If a computer
+treats it as a moment, then in another part of the world 12 March can turn into 11
+March. So we store dates as plain text days and format them without looking at the
+viewer's own time zone. The test even changes the computer's time zone to prove it.

@@ -36,16 +36,18 @@ Before you start:
 - On Windows PowerShell, type `npm.cmd` and `npx.cmd` instead of `npm` and `npx` (PowerShell blocks the plain versions).
 - After installing anything, open a NEW terminal (or reload PATH), or the new tool won't be found.
 - The Vercel steps (`npx.cmd vercel ...`) need the Vercel account and project from the hosting setup first.
+- Test data lives on a separate Neon branch called `dev` (free). Create it in Neon (Vercel, Storage, open the database in Neon, make a branch named `dev` from the main branch) before you run the app, so trips you create on your PC never reach the live site.
 
 In a terminal, in this folder:
 1. `npm.cmd install` - downloads the libraries the app uses (first time only).
-2. `npx.cmd vercel env pull .env.local` - fetches the app's private settings (the database address and the sign-in settings) into a file git ignores. Needs a one-time `npx.cmd vercel login` and `npx.cmd vercel link` first. Skip this step to run without a database; the page then says "Database not connected".
-3. `npx.cmd drizzle-kit migrate` - only when the database tables have changed (a new file appeared in `drizzle/`). It updates the database to match.
-4. `npm.cmd run dev` - starts the app.
-5. Open http://localhost:3000 in your browser. Use `localhost`, not `127.0.0.1`: Google sign-in only works on `localhost`. Stop it with Ctrl+C.
+2. `npx.cmd vercel env pull .env.local` - fetches the app's private settings (the database address and the sign-in settings) into a file git ignores. Needs a one-time `npx.cmd vercel login` and `npx.cmd vercel link` first.
+3. Create `.env.development.local` in this folder with one line, `DATABASE_URL=` followed by the `dev` branch's connection address from Neon. `npm.cmd run dev` and `npx.cmd drizzle-kit` use this file first, so your PC works on test data. Never share or commit it.
+4. `npx.cmd drizzle-kit migrate` - only when the database tables have changed (a new file appeared in `drizzle/`). It updates the dev database to match. To update the live database instead, you need the owner's OK: `npx.cmd vercel env pull .env.production.local --environment=production`, then run `drizzle-kit migrate` with `DB_ENV_FILE=.env.production.local` set, then delete that file.
+5. `npm.cmd run dev` - starts the app.
+6. Open http://localhost:3000 in your browser. Use `localhost`, not `127.0.0.1`: Google sign-in only works on `localhost`. Sign in again the first time, since the dev database has its own sign-ins. Stop it with Ctrl+C.
 
 Other checks: `npm.cmd run lint` (style check), `npm.cmd test` (automatic tests) and `npm.cmd run build` (the same build Vercel does).
-Chapter 1 of `LEARNING.md` explains how the pieces fit together.
+Chapters 1 to 3 of `LEARNING.md` explain how the pieces fit together.
 
 ## Live
 Production address: https://sidequest-app-rho.vercel.app/ (updates on every merge into `main`).
@@ -66,3 +68,4 @@ Production address: https://sidequest-app-rho.vercel.app/ (updates on every merg
 - 2026-11-02 - Design direction chosen by the owner: Barkada (warm, friendly, orange accent, Bricolage Grotesque and Manrope). Mockup in `assets/mockups/barkada.html`, guide in `docs/design.md`.
 - 2026-11-02 - Design colors changed by the owner from orange and brown to Open Road: ocean blue header, white cards and amber buttons, plus a route line on trip cards. Mockup and `docs/design.md` updated.
 - 2026-11-02 - Design approved by the owner, with "You're owed" changed to green to match the depth of the red "You owe". Next: `/architect` for SQ-003, which also restyles the three existing screens.
+- 2026-11-02 - SQ-003 in progress on `feature/trips-and-tabs`: trips with Schedule, Ideas, Bookings and Costs tabs, the new look on every screen, and a separate `dev` database for test data. Chapter 3 of `LEARNING.md` explains it.
