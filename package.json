@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:dev-db": "vitest run --config vitest.dev-db.config.mts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
