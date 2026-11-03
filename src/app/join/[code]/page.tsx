@@ -1,18 +1,14 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { GoogleLogo } from "@phosphor-icons/react/dist/ssr";
 import { getOptionalUser } from "@/lib/current-user";
 import { isInviteCode } from "@/lib/invite-code";
-import { formatTripDates } from "@/lib/trip-dates";
 import { getTripByInviteCode, isTripMember } from "@/lib/trips";
-import { RouteLine } from "@/components/route-line";
-import { cardClass, primaryButton, screenClass } from "@/components/ui";
-import { signInToJoin } from "../actions";
-import { JoinForm } from "./join-form";
+import { screenClass } from "@/components/ui";
+import { JoinView } from "./join-view";
 
-// Fixed text only: chat apps build link previews from this, and the trip name must
-// never appear there.
+// Fixed text only: chat apps build link previews from this, and nothing about the trip
+// (not even its name) may appear there.
 export const metadata: Metadata = {
   title: "You're invited | Sidequest",
   robots: { index: false, follow: false },
@@ -27,38 +23,10 @@ async function JoinContent({ params }: { params: Promise<{ code: string }> }) {
   const user = await getOptionalUser();
   const lowerCode = code.toLowerCase();
 
-  // Signed out: only the trip name and the owner's name. No dates, photos or members.
-  if (!user) {
-    return (
-      <div className={`${cardClass} gap-4 px-5 py-6`}>
-        <div className="grid gap-1">
-          <h1 className="text-[30px] break-words">You&apos;re invited to {invited.name}</h1>
-          <p className="text-[13px] text-muted">Trip owner: {invited.ownerName}</p>
-        </div>
-        <form action={signInToJoin}>
-          <input type="hidden" name="code" value={lowerCode} />
-          <button type="submit" className={`${primaryButton} w-full`}>
-            <GoogleLogo size={20} weight="bold" aria-hidden="true" />
-            Continue with Google
-          </button>
-        </form>
-      </div>
-    );
-  }
+  if (!user) return <JoinView invited={invited} code={lowerCode} signedIn={false} />;
 
   if (await isTripMember(invited.id, user.id)) redirect(`/trips/${invited.id}`);
-
-  const dates = formatTripDates(invited.startDate, invited.endDate);
-  return (
-    <div className={`${cardClass} gap-4 px-5 py-6`}>
-      <div className="grid gap-1">
-        <h1 className="text-[30px] break-words">{invited.name}</h1>
-        <p className="text-[13px] text-muted">Trip owner: {invited.ownerName}</p>
-      </div>
-      <RouteLine start={dates.start} end={dates.end} />
-      <JoinForm code={lowerCode} />
-    </div>
-  );
+  return <JoinView invited={invited} code={lowerCode} signedIn />;
 }
 
 function JoinLoading() {

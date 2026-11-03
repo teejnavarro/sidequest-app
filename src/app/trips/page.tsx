@@ -6,6 +6,7 @@ import { listMyTrips } from "@/lib/trips";
 import { formatTripDates } from "@/lib/trip-dates";
 import { Band } from "@/components/band";
 import { Face } from "@/components/face";
+import { FaceStack } from "@/components/face-stack";
 import { RouteLine } from "@/components/route-line";
 import { cardClass, pressCard, primaryButton, screenClass } from "@/components/ui";
 
@@ -49,8 +50,22 @@ async function TripsContent() {
                   href={`/trips/${trip.id}`}
                   className={`${cardClass} ${pressCard}`}
                 >
-                  <h2 className="text-[19px]">{trip.name}</h2>
+                  <h2 className="text-[19px] break-words">{trip.name}</h2>
+                  {trip.destination ? (
+                    <p className="text-[13px] break-words text-muted">{trip.destination}</p>
+                  ) : null}
                   <RouteLine start={dates.start} end={dates.end} />
+                  <span className="flex items-center justify-between gap-3">
+                    <FaceStack
+                      people={trip.members}
+                      size={32}
+                      borderClass="border-card"
+                      decorative
+                    />
+                    <span className="sr-only">
+                      {trip.members.length === 1 ? "1 person" : `${trip.members.length} people`}
+                    </span>
+                  </span>
                 </Link>
               );
             })}

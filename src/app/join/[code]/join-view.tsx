@@ -1,0 +1,64 @@
+import { GoogleLogo } from "@phosphor-icons/react/dist/ssr";
+import type { InvitedTrip } from "@/lib/trips";
+import { formatTripDates } from "@/lib/trip-dates";
+import { FaceStack } from "@/components/face-stack";
+import { RouteLine } from "@/components/route-line";
+import { cardClass, primaryButton } from "@/components/ui";
+import { signInToJoin } from "../actions";
+import { JoinForm } from "./join-form";
+
+// What a visitor sees for a valid invite. Signed out, only the owner's name appears as
+// words: the other people are shown as decorative circles with no names or alt text.
+export function JoinView({
+  invited,
+  code,
+  signedIn,
+}: {
+  invited: InvitedTrip;
+  code: string;
+  signedIn: boolean;
+}) {
+  const dates = formatTripDates(invited.startDate, invited.endDate);
+  const count = invited.members.length;
+
+  return (
+    <div className={`${cardClass} gap-4 px-5 py-6`}>
+      <div className="grid gap-1">
+        <h1 className="text-[30px] break-words">
+          {signedIn ? invited.name : `You're invited to ${invited.name}`}
+        </h1>
+        {invited.destination ? (
+          <p className="text-[17px] break-words">{invited.destination}</p>
+        ) : null}
+      </div>
+
+      <RouteLine start={dates.start} end={dates.end} />
+
+      <div className="flex items-center gap-3">
+        <FaceStack
+          people={invited.members}
+          size={36}
+          borderClass="border-card"
+          decorative={!signedIn}
+        />
+        <p className="text-[13px] text-muted">
+          {count === 1 ? "1 person is going" : `${count} people are going`}
+        </p>
+      </div>
+
+      <p className="text-[13px] text-muted">Trip owner: {invited.ownerName}</p>
+
+      {signedIn ? (
+        <JoinForm code={code} />
+      ) : (
+        <form action={signInToJoin}>
+          <input type="hidden" name="code" value={code} />
+          <button type="submit" className={`${primaryButton} w-full`}>
+            <GoogleLogo size={20} weight="bold" aria-hidden="true" />
+            Continue with Google
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}

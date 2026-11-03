@@ -305,3 +305,15 @@ with a **default**: "when nothing is given, let the database make a random code"
 When the database applied that to the table, it filled in a different random code for
 each existing trip, all at once. It also means the live site keeps working while the
 new column is being added, because the old code never needs to supply one.
+
+### A privacy trade-off, chosen on purpose
+
+At first the invite page showed a stranger only the trip name and who owns it. Then we
+decided friends would feel more at ease seeing where, when and who is going, so a visitor
+with the link now also sees the destination, the dates and the photo circles of everyone
+already in. That is a trade: more welcoming, less private. What we did to keep it
+reasonable: the link is a long random secret that only members can see; other people's
+names stay out of the page (their photos and initials show, but nothing a screen reader or
+a text search would pick up as a name); and the page tells you to share the link only with
+your group. Privacy is rarely all or nothing. It helps to write down what is shown, to
+whom, and why, so the choice is deliberate and can be changed later.

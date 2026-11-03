@@ -3,11 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CaretLeft } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
-import { getTripForMember } from "@/lib/trips";
+import { getTripForMember, listTripMembers } from "@/lib/trips";
 import { formatTripRange } from "@/lib/trip-dates";
 import { timeZonePlace } from "@/lib/trip-options";
 import { Band } from "@/components/band";
-import { Face } from "@/components/face";
+import { FaceStack } from "@/components/face-stack";
 import { TripTabs } from "@/components/trip-tabs";
 import { linkClass } from "@/components/ui";
 
@@ -23,7 +23,10 @@ async function TripShell({
 }) {
   const { tripId } = await params;
   const user = await getCurrentUser();
-  const trip = await getTripForMember(tripId, user.id);
+  const [trip, members] = await Promise.all([
+    getTripForMember(tripId, user.id),
+    listTripMembers(tripId, user.id),
+  ]);
   if (!trip) notFound();
 
   const place = timeZonePlace(trip.timeZone) ?? trip.timeZone;
@@ -40,17 +43,15 @@ async function TripShell({
             My trips
           </Link>
           <h1 className="text-[30px]">{trip.name}</h1>
+          {trip.destination ? (
+            <p className="text-[15px] break-words text-band-muted">{trip.destination}</p>
+          ) : null}
           <p className="text-[13px] text-band-muted">
             {formatTripRange(trip.startDate, trip.endDate)}. Times are {place} time.
           </p>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
             <span className="flex min-w-0 items-center gap-2 text-[13px] text-band-muted">
-              <Face
-                userId={trip.ownerId}
-                name={trip.ownerName}
-                image={trip.ownerImage}
-                size={32}
-              />
+              <FaceStack people={members} size={32} borderClass="border-band" />
               <span className="min-w-0 break-words">
                 Owner: <span className="font-bold text-on-band">{trip.ownerName}</span>
               </span>
