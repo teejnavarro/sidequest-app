@@ -215,14 +215,16 @@ describe("privacy layer on the dev database", () => {
       await expect(trips.isTripMember(tripA, STRANGER)).resolves.toBe(false);
     });
 
-    it("shows a visitor with the code only the trip name, dates and owner's name", async () => {
+    it("shows a visitor with the code the trip details and who is going, never email", async () => {
       const seen = await trips.getTripByInviteCode(codeA);
       expect(seen).toEqual({
         id: tripA,
         name: "Group A trip",
         startDate: input.startDate,
         endDate: input.endDate,
+        destination: null,
         ownerName: "Maya Test",
+        members: [{ id: OWNER, name: "Maya Test", image: null }],
       });
       expect(JSON.stringify(seen)).not.toContain("@example.test");
       await expect(trips.getTripByInviteCode(crypto.randomUUID())).resolves.toBeNull();
@@ -264,6 +266,58 @@ describe("privacy layer on the dev database", () => {
 
       // Group A's code opens nothing of trip B.
       expect(await rowsFor(OUTSIDER, tripA)).toHaveLength(0);
+    });
+
+    it("lists each trip's own people in My trips, and nobody else's", async () => {
+      // JOINER is in trip A only; OUTSIDER is in trip B only.
+      const joinerSees = await trips.listMyTrips(JOINER);
+      expect(joinerSees.map((row) => row.id)).toEqual([tripA]);
+      expect(joinerSees[0].members.map((m) => m.id)).toEqual([OWNER, JOINER]);
+
+      const outsiderSees = await trips.listMyTrips(OUTSIDER);
+      expect(outsiderSees.map((row) => row.id)).toEqual([tripB]);
+      expect(outsiderSees[0].members.map((m) => m.id)).toEqual([OWNER_TWO, OUTSIDER]);
+
+      // A person in both trips sees each trip with its own people.
+      await dbModule.db.insert(schema.tripMember).values({ tripId: tripB, userId: MEMBER });
+      await dbModule.db.insert(schema.tripMember).values({ tripId: tripA, userId: MEMBER });
+      const both = await trips.listMyTrips(MEMBER);
+      const byId = new Map(both.map((row) => [row.id, row.members.map((m) => m.id)]));
+      expect(byId.get(tripA)).toEqual([OWNER, JOINER, MEMBER]);
+      expect(byId.get(tripB)).toEqual([OWNER_TWO, OUTSIDER, MEMBER]);
+
+      // Nobody gets email in the list.
+      expect(JSON.stringify(both)).not.toContain("@example.test");
+      expect(JSON.stringify(both)).not.toContain("inviteCode");
+    });
+
+    it("saves a destination, clears it on edit, and never leaks it to a stranger", async () => {
+      const withPlace = await trips.createTrip(OWNER, { ...input, name: "Place trip", destination: "Hội An" });
+      await expect(trips.getTripForMember(withPlace, OWNER)).resolves.toMatchObject({
+        destination: "Hội An",
+      });
+      await expect(trips.getTripForMember(withPlace, STRANGER)).resolves.toBeNull();
+      expect((await trips.listMyTrips(OWNER)).find((row) => row.id === withPlace)?.destination).toBe(
+        "Hội An",
+      );
+      await expect(
+        trips.updateTripForMember(withPlace, OWNER, { ...input, name: "Place trip", destination: null }),
+      ).resolves.toBe(true);
+      await expect(trips.getTripForMember(withPlace, OWNER)).resolves.toMatchObject({
+        destination: null,
+      });
+    });
+
+    it("shows a visitor with the code the destination and the people going, never email", async () => {
+      const code = (await trips.getInviteCodeForMember(tripB, OWNER_TWO))!;
+      const seen = await trips.getTripByInviteCode(code);
+      expect(seen?.members.map((m) => m.id)).toEqual([OWNER_TWO, OUTSIDER, MEMBER]);
+      expect(seen).toHaveProperty("destination");
+      const text = JSON.stringify(seen);
+      expect(text).not.toContain("@example.test");
+      expect(text).not.toContain(code);
+      // Trip A's people never appear in trip B's invite.
+      expect(text).not.toContain(JOINER);
     });
 
     it("never puts the invite code in the list or detail results", async () => {

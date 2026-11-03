@@ -17,6 +17,8 @@ const fake = vi.hoisted(() => ({
   queries: [] as { sql: string; params: unknown[] }[],
   batches: [] as number[],
   rows: [] as unknown[][],
+  // Answers for the next queries, one entry per query, used before `rows`.
+  queue: [] as unknown[][][],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -27,7 +29,8 @@ vi.mock("@/lib/db", async () => {
   const client = Object.assign(
     async (sql: string, params: unknown[]) => {
       fake.queries.push({ sql, params });
-      return { rows: fake.rows, fields: [], rowCount: fake.rows.length };
+      const rows = fake.queue.length > 0 ? fake.queue.shift()! : fake.rows;
+      return { rows, fields: [], rowCount: rows.length };
     },
     {
       transaction: async (queries: Promise<unknown>[]) => {
@@ -54,6 +57,7 @@ beforeEach(() => {
   fake.queries.length = 0;
   fake.batches.length = 0;
   fake.rows = [];
+  fake.queue.length = 0;
 });
 
 describe("listMyTrips", () => {
@@ -198,5 +202,76 @@ describe("joinTripByInviteCode", () => {
     expect(insert.sql).toContain('insert into "trip_member"');
     expect(insert.sql).toContain("on conflict do nothing");
     expect(insert.params).toEqual(expect.arrayContaining(["trip-1", "u1"]));
+  });
+});
+
+describe("people in the list and on the invite", () => {
+  it("lists each trip's members with one extra query, never one per trip", async () => {
+    fake.queue = [
+      [
+        ["t1", "Trip one", "2027-03-12", "2027-03-15", "Asia/Manila", "PHP", null],
+        ["t2", "Trip two", "2027-04-01", "2027-04-02", "Asia/Manila", "PHP", "Cebu"],
+        ["t3", "Trip three", "2027-05-01", "2027-05-02", "Asia/Manila", "PHP", null],
+      ],
+      [
+        ["t1", "u1", "Maya", null],
+        ["t2", "u1", "Maya", null],
+        ["t1", "u2", "Ben", "https://example.test/ben.png"],
+      ],
+    ];
+    const listed = await listMyTrips("u1");
+
+    expect(fake.queries).toHaveLength(2);
+    const [first, second] = fake.queries;
+    expect(first.sql).toContain('"trip_member"."user_id" = $1');
+    expect(second.sql).toContain('"trip_member"."trip_id" in ($1, $2, $3)');
+    expect(second.params).toEqual(["t1", "t2", "t3"]);
+    expect(second.sql).toMatch(/order by "trip_member"\."joined_at" asc/i);
+
+    expect(listed.map((row) => row.id)).toEqual(["t1", "t2", "t3"]);
+    expect(listed[0].members.map((m) => m.id)).toEqual(["u1", "u2"]);
+    expect(listed[1].members.map((m) => m.id)).toEqual(["u1"]);
+    expect(listed[2].members).toEqual([]);
+    expect(listed[1].destination).toBe("Cebu");
+  });
+
+  it("asks for people only about the person's own trips, and skips the query when there are none", async () => {
+    await expect(listMyTrips("stranger")).resolves.toEqual([]);
+    expect(fake.queries).toHaveLength(1);
+  });
+
+  it("never asks for an email or the invite code in the list", async () => {
+    fake.queue = [[["t1", "Trip", "2027-03-12", "2027-03-15", "Asia/Manila", "PHP", null]], []];
+    await listMyTrips("u1");
+    for (const { sql } of fake.queries) {
+      expect(sql).not.toContain("email");
+      expect(sql).not.toContain("invite_code");
+    }
+  });
+
+  it("gives the invite page the destination and the people going, without email or code", async () => {
+    fake.queue = [
+      [["t1", "Trip", "2027-03-12", "2027-03-15", "Cebu", "Maya"]],
+      [
+        ["u1", "Maya", null],
+        ["u2", "Ben", null],
+      ],
+    ];
+    const seen = await getTripByInviteCode(CODE);
+    expect(seen).toEqual({
+      id: "t1",
+      name: "Trip",
+      startDate: "2027-03-12",
+      endDate: "2027-03-15",
+      destination: "Cebu",
+      ownerName: "Maya",
+      members: [
+        { id: "u1", name: "Maya", image: null },
+        { id: "u2", name: "Ben", image: null },
+      ],
+    });
+    expect(fake.queries[1].params).toEqual(["t1"]);
+    for (const { sql } of fake.queries) expect(sql).not.toContain("email");
+    expect(fake.queries[1].sql).not.toContain("invite_code");
   });
 });

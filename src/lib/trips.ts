@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, exists } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import { user } from "@/db/auth-schema";
@@ -11,6 +11,13 @@ import type { TripInput } from "@/lib/trip-input";
 // of the trip inside the same database query, so a stranger can never get a row.
 // Pages and actions must not query the trip tables any other way. Nothing returned
 // here ever includes an email address.
+//
+// The one other way in is a trip's invite code (in the invite link). The code is a secret
+// key: only members can read it (getInviteCodeForMember), and a visitor holding it can see
+// just the trip's public details and join (getTripByInviteCode, joinTripByInviteCode).
+// The list and detail functions never return the code.
+
+export type TripMemberSummary = { id: string; name: string; image: string | null };
 
 export type TripSummary = {
   id: string;
@@ -28,9 +35,13 @@ export type TripDetails = TripSummary & {
   ownerImage: string | null;
 };
 
-// Every trip the person belongs to, newest first.
-export async function listMyTrips(userId: string): Promise<TripSummary[]> {
-  return db
+export type TripListItem = TripSummary & { members: TripMemberSummary[] };
+
+// Every trip the person belongs to, newest first, each with the people in it (id, name,
+// photo, never email; oldest member first). Two queries in total, not one per trip: the
+// second only asks about trips the first one found, and those are the person's own.
+export async function listMyTrips(userId: string): Promise<TripListItem[]> {
+  const trips = await db
     .select({
       id: trip.id,
       name: trip.name,
@@ -44,6 +55,20 @@ export async function listMyTrips(userId: string): Promise<TripSummary[]> {
     .innerJoin(tripMember, eq(tripMember.tripId, trip.id))
     .where(eq(tripMember.userId, userId))
     .orderBy(desc(trip.createdAt));
+  if (trips.length === 0) return [];
+
+  const people = await db
+    .select({ tripId: tripMember.tripId, id: user.id, name: user.name, image: user.image })
+    .from(tripMember)
+    .innerJoin(user, eq(user.id, tripMember.userId))
+    .where(inArray(tripMember.tripId, trips.map((row) => row.id)))
+    .orderBy(asc(tripMember.joinedAt), asc(user.id));
+
+  const byTrip = new Map<string, TripMemberSummary[]>();
+  for (const { tripId, ...member } of people) {
+    byTrip.set(tripId, [...(byTrip.get(tripId) ?? []), member]);
+  }
+  return trips.map((row) => ({ ...row, members: byTrip.get(row.id) ?? [] }));
 }
 
 // The trip plus its owner's name and photo, or null when it does not exist or the
@@ -125,7 +150,6 @@ export async function updateTripForMember(
   return updated.length > 0;
 }
 
-export type TripMemberSummary = { id: string; name: string; image: string | null };
 
 // The invite code of a trip, but only for a member. Anyone else gets null.
 export async function getInviteCodeForMember(
@@ -171,10 +195,14 @@ export type InvitedTrip = {
   name: string;
   startDate: string;
   endDate: string;
+  destination: string | null;
   ownerName: string;
+  members: TripMemberSummary[];
 };
 
-// What the invite code opens: the trip and its owner's name. No email, no members, no code.
+// What the invite code opens: the trip's name, destination, dates and owner's name, plus
+// who is going (id, name, photo). The owner chose to show this to a visitor before sign-in;
+// pages must not print members' names to a signed-out visitor. Never email, never the code.
 export async function getTripByInviteCode(code: string): Promise<InvitedTrip | null> {
   if (!isInviteCode(code)) return null;
   const rows = await db
@@ -183,13 +211,23 @@ export async function getTripByInviteCode(code: string): Promise<InvitedTrip | n
       name: trip.name,
       startDate: trip.startDate,
       endDate: trip.endDate,
+      destination: trip.destination,
       ownerName: user.name,
     })
     .from(trip)
     .innerJoin(user, eq(user.id, trip.ownerId))
     .where(eq(trip.inviteCode, code.toLowerCase()))
     .limit(1);
-  return rows[0] ?? null;
+  const found = rows[0];
+  if (!found) return null;
+
+  const members = await db
+    .select({ id: user.id, name: user.name, image: user.image })
+    .from(tripMember)
+    .innerJoin(user, eq(user.id, tripMember.userId))
+    .where(eq(tripMember.tripId, found.id))
+    .orderBy(asc(tripMember.joinedAt), asc(user.id));
+  return { ...found, members };
 }
 
 export async function isTripMember(tripId: string, userId: string): Promise<boolean> {
