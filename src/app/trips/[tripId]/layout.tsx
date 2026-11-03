@@ -37,7 +37,7 @@ async function TripShell({
         <Band>
           <Link
             href="/trips"
-            className={`${linkClass} justify-self-start text-band-muted no-underline focus-visible:outline-on-band`}
+            className={`${linkClass} justify-self-start text-band-muted! no-underline focus-visible:outline-on-band`}
           >
             <CaretLeft size={20} weight="bold" aria-hidden="true" />
             My trips
