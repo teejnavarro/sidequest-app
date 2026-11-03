@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Plus } from "@phosphor-icons/react/dist/ssr";
+import { MapPin, Plus } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { listMyTrips } from "@/lib/trips";
 import { formatTripDates } from "@/lib/trip-dates";
@@ -52,7 +52,10 @@ async function TripsContent() {
                 >
                   <h2 className="text-[19px] break-words">{trip.name}</h2>
                   {trip.destination ? (
-                    <p className="text-[13px] break-words text-muted">{trip.destination}</p>
+                    <p className="text-[13px] text-muted flex items-start gap-1.5">
+                      <MapPin size={16} weight="bold" aria-hidden="true" className="mt-0.5 shrink-0" />
+                      <span className="min-w-0 break-words">{trip.destination}</span>
+                    </p>
                   ) : null}
                   <RouteLine start={dates.start} end={dates.end} />
                   <span className="flex items-center justify-between gap-3">

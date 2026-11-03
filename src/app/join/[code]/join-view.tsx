@@ -1,4 +1,4 @@
-import { GoogleLogo } from "@phosphor-icons/react/dist/ssr";
+import { GoogleLogo, MapPin } from "@phosphor-icons/react/dist/ssr";
 import type { InvitedTrip } from "@/lib/trips";
 import { formatTripDates } from "@/lib/trip-dates";
 import { FaceStack } from "@/components/face-stack";
@@ -28,7 +28,10 @@ export function JoinView({
           {signedIn ? invited.name : `You're invited to ${invited.name}`}
         </h1>
         {invited.destination ? (
-          <p className="text-[17px] break-words">{invited.destination}</p>
+          <p className="text-[17px] flex items-start gap-1.5">
+            <MapPin size={20} weight="bold" aria-hidden="true" className="mt-0.5 shrink-0" />
+            <span className="min-w-0 break-words">{invited.destination}</span>
+          </p>
         ) : null}
       </div>
 

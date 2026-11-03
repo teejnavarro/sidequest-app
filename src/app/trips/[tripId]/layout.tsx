@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CaretLeft } from "@phosphor-icons/react/dist/ssr";
+import { CaretLeft, MapPin } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember, listTripMembers } from "@/lib/trips";
 import { formatTripRange } from "@/lib/trip-dates";
@@ -44,7 +44,10 @@ async function TripShell({
           </Link>
           <h1 className="text-[30px]">{trip.name}</h1>
           {trip.destination ? (
-            <p className="text-[15px] break-words text-band-muted">{trip.destination}</p>
+            <p className="text-[15px] text-band-muted flex items-start gap-1.5">
+              <MapPin size={18} weight="bold" aria-hidden="true" className="mt-0.5 shrink-0" />
+              <span className="min-w-0 break-words">{trip.destination}</span>
+            </p>
           ) : null}
           <p className="text-[13px] text-band-muted">
             {formatTripRange(trip.startDate, trip.endDate)}. Times are {place} time.
