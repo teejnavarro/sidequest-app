@@ -55,12 +55,20 @@ async function TripShell({
                 Owner: <span className="font-bold text-on-band">{trip.ownerName}</span>
               </span>
             </span>
-            <Link
-              href={`/trips/${trip.id}/edit`}
-              className="inline-flex min-h-11 items-center rounded-full bg-on-band/15 px-4 text-sm font-bold text-on-band focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-band"
-            >
-              Edit trip
-            </Link>
+            <span className="flex flex-wrap gap-2">
+              <Link
+                href={`/trips/${trip.id}/invite`}
+                className="inline-flex min-h-11 items-center rounded-full bg-on-band/15 px-4 text-sm font-bold text-on-band focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-band"
+              >
+                Invite people
+              </Link>
+              <Link
+                href={`/trips/${trip.id}/edit`}
+                className="inline-flex min-h-11 items-center rounded-full bg-on-band/15 px-4 text-sm font-bold text-on-band focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-band"
+              >
+                Edit trip
+              </Link>
+            </span>
           </div>
         </Band>
       </div>
