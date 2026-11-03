@@ -7,7 +7,7 @@ import { validateTripInput } from "@/lib/trip-input";
 import type { TripFormState, TripFormValues } from "@/lib/trip-form-state";
 import { createTrip, updateTripForMember } from "@/lib/trips";
 
-// Only these five fields are ever read from the form. Anything else a visitor
+// Only these six fields are ever read from the form. Anything else a visitor
 // adds (an ownerId, say) is never looked at.
 function readValues(formData: FormData): TripFormValues {
   const text = (key: keyof TripFormValues) => {
@@ -20,6 +20,7 @@ function readValues(formData: FormData): TripFormValues {
     endDate: text("endDate"),
     timeZone: text("timeZone"),
     currency: text("currency"),
+    destination: text("destination"),
   };
 }
 

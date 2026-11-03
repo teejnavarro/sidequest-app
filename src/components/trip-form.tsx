@@ -81,6 +81,19 @@ export function TripForm(props: TripFormProps) {
         />
       </Field>
 
+      <Field id="destination" label="Destination (optional)" error={errors.destination}>
+        <input
+          id="destination"
+          name="destination"
+          type="text"
+          defaultValue={values.destination}
+          autoComplete="off"
+          aria-invalid={errors.destination ? true : undefined}
+          aria-describedby={describedBy("destination", errors.destination)}
+          className={inputClass}
+        />
+      </Field>
+
       <Field id="startDate" label="Start date" error={errors.startDate}>
         <input
           id="startDate"

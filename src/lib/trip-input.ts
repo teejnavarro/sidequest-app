@@ -7,6 +7,7 @@ export type TripInput = {
   endDate: string; // YYYY-MM-DD
   timeZone: string;
   currency: string;
+  destination: string | null; // optional; blank is saved as null
 };
 
 export type TripField = keyof TripInput;
@@ -17,6 +18,7 @@ export type TripInputResult =
   | { ok: false; errors: TripErrors };
 
 const NAME_MAX = 60;
+const DESTINATION_MAX = 60;
 const MIN_YEAR = 2000;
 const MAX_YEAR = 2100;
 
@@ -59,6 +61,14 @@ export function validateTripInput(raw: Record<string, unknown>): TripInputResult
     errors.name = `Keep it to ${NAME_MAX} characters or fewer.`;
   }
 
+  // Destination: optional. Tidied like the name; blank or blank-looking means none.
+  const rawDestination = typeof raw.destination === "string" ? raw.destination : "";
+  const tidyDestination = rawDestination.trim().replace(/\s+/g, " ");
+  const destination = isBlankLooking(tidyDestination) ? null : tidyDestination;
+  if (destination !== null && Array.from(destination).length > DESTINATION_MAX) {
+    errors.destination = `Keep it to ${DESTINATION_MAX} characters or fewer.`;
+  }
+
   const start = checkDate(raw.startDate, "start");
   const end = checkDate(raw.endDate, "end");
   if (!start.ok) errors.startDate = start.error;
@@ -83,6 +93,13 @@ export function validateTripInput(raw: Record<string, unknown>): TripInputResult
   }
   return {
     ok: true,
-    value: { name, startDate: start.date, endDate: end.date, timeZone, currency },
+    value: {
+      name,
+      startDate: start.date,
+      endDate: end.date,
+      timeZone,
+      currency,
+      destination,
+    },
   };
 }

@@ -28,6 +28,7 @@ const good = {
   endDate: "2027-03-15",
   timeZone: "Asia/Ho_Chi_Minh",
   currency: "VND",
+  destination: "Đà Nẵng, Việt Nam",
 };
 
 function formWith(fields: Record<string, string>) {
@@ -130,5 +131,38 @@ describe("updateTripAction", () => {
     const form = formWith({ ...good, tripId: "trip-1", ownerId: "someone-else" });
     await expect(updateTripAction(initial, form)).rejects.toThrow("redirect:");
     expect(mocks.updateTripForMember).toHaveBeenCalledWith("trip-1", "u1", good);
+  });
+
+  it("clears the destination when the box is emptied on edit", async () => {
+    const form = formWith({ ...good, destination: "", tripId: "trip-1" });
+    await expect(updateTripAction(initial, form)).rejects.toThrow("redirect:/trips/trip-1");
+    expect(mocks.updateTripForMember).toHaveBeenCalledWith("trip-1", "u1", {
+      ...good,
+      destination: null,
+    });
+  });
+
+  it("saves nothing when the destination is too long, and keeps what was typed", async () => {
+    const typed = { ...good, destination: "x".repeat(61), tripId: "trip-1" };
+    const state = await updateTripAction(initial, formWith(typed));
+    expect(state.errors.destination).toBe("Keep it to 60 characters or fewer.");
+    expect(state.values.destination).toBe("x".repeat(61));
+    expect(mocks.updateTripForMember).not.toHaveBeenCalled();
+  });
+});
+
+describe("destination on create", () => {
+  it("is optional: a trip without one is created with none", async () => {
+    const { destination: _unused, ...withoutDestination } = good;
+    void _unused;
+    await expect(createTripAction(initial, formWith(withoutDestination))).rejects.toThrow(
+      "redirect:/trips/trip-1",
+    );
+    expect(mocks.createTrip).toHaveBeenCalledWith("u1", { ...withoutDestination, destination: null });
+  });
+
+  it("keeps the accents in the destination exactly", async () => {
+    await expect(createTripAction(initial, formWith(good))).rejects.toThrow("redirect:");
+    expect(mocks.createTrip.mock.calls[0][1].destination).toBe("Đà Nẵng, Việt Nam");
   });
 });

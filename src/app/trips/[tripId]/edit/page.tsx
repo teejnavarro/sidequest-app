@@ -25,6 +25,7 @@ export default async function EditTripPage({
             endDate: trip.endDate,
             timeZone: trip.timeZone,
             currency: trip.currency,
+            destination: trip.destination ?? "",
           }}
         />
       </div>

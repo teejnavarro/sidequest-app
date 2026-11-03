@@ -7,6 +7,7 @@ const valid = {
   endDate: "2027-03-15",
   timeZone: "Asia/Ho_Chi_Minh",
   currency: "VND",
+  destination: "Đà Nẵng, Việt Nam",
 };
 
 function errorsFor(overrides: Record<string, unknown>) {
@@ -135,5 +136,36 @@ describe("validateTripInput", () => {
   it("ignores fields it does not know", () => {
     const result = validateTripInput({ ...valid, ownerId: "someone-else", id: "abc" });
     expect(result).toEqual({ ok: true, value: valid });
+  });
+});
+
+describe("destination", () => {
+  it("keeps accents exactly and tidies spaces", () => {
+    const result = validateTripInput({ ...valid, destination: "  Hội   An  " });
+    expect(result).toMatchObject({ ok: true, value: { destination: "Hội An" } });
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["empty", ""],
+    ["spaces", "    "],
+    ["zero-width", "​‍"],
+    ["blank braille", "⠀"],
+    ["not text", 42],
+  ])("saves %s as no destination", (_label, destination) => {
+    const result = validateTripInput({ ...valid, destination });
+    expect(result).toMatchObject({ ok: true, value: { destination: null } });
+  });
+
+  it("allows 60 characters and rejects 61 with a plain message", () => {
+    expect(validateTripInput({ ...valid, destination: "ñ".repeat(60) }).ok).toBe(true);
+    expect(errorsFor({ destination: "ñ".repeat(61) }).destination).toBe(
+      "Keep it to 60 characters or fewer.",
+    );
+  });
+
+  it("counts letters, not code units", () => {
+    expect(validateTripInput({ ...valid, destination: "😀".repeat(60) }).ok).toBe(true);
+    expect(errorsFor({ destination: "😀".repeat(61) }).destination).toBeDefined();
   });
 });

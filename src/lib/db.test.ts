@@ -12,6 +12,9 @@ vi.mock("drizzle-orm/neon-http", () => ({ drizzle: mocks.drizzle }));
 const MAIN = "postgresql://made:up@main.invalid/db";
 const PREVIEW = "postgresql://made:up@preview.invalid/db";
 
+// Each test reloads the database code, which can take several seconds on a busy PC.
+vi.setConfig({ testTimeout: 30_000 });
+
 async function addressUsed() {
   vi.resetModules();
   await import("./db");

@@ -15,6 +15,20 @@
       "when": 1793599807939,
       "tag": "0001_past_human_torch",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793663735911,
+      "tag": "0002_silky_giant_girl",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793666132456,
+      "tag": "0003_even_ted_forrester",
+      "breakpoints": true
     }
   ]
 }
