@@ -69,7 +69,7 @@ describe("DeleteTripPage", () => {
     mocks.listTripMembers.mockResolvedValue(people(4));
     const html = renderToStaticMarkup(await DeleteTripPage(props));
     expect(html).toContain("Delete Hội An long weekend?");
-    expect(html).toContain("This removes it for everyone in the trip, 4 people, and can&#x27;t be undone.");
+    expect(html).toContain("This deletes it for all 4 people in the trip. You can&#x27;t undo this.");
     expect(html).toContain("Keep trip");
     expect(html).toContain('href="/trips/trip-1/edit"');
     expect(html).toContain("Delete trip");
@@ -79,7 +79,7 @@ describe("DeleteTripPage", () => {
     mocks.getTripForMember.mockResolvedValue(trip("u1"));
     mocks.listTripMembers.mockResolvedValue(people(1));
     const html = renderToStaticMarkup(await DeleteTripPage(props));
-    expect(html).toContain("This removes it for good, and can&#x27;t be undone.");
-    expect(html).not.toContain("everyone");
+    expect(html).toContain("This deletes it for good. You can&#x27;t undo this.");
+    expect(html).not.toContain("people");
   });
 });

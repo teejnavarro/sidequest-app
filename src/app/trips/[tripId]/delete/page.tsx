@@ -26,8 +26,8 @@ export default async function DeleteTripPage({
         </h2>
         <p>
           {count > 1
-            ? `This removes it for everyone in the trip, ${count} people, and can't be undone.`
-            : "This removes it for good, and can't be undone."}
+            ? `This deletes it for all ${count} people in the trip. You can't undo this.`
+            : "This deletes it for good. You can't undo this."}
         </p>
         <div className="grid gap-3">
           <Link href={`/trips/${trip.id}/edit`} className={`${primaryButton} w-full`}>
