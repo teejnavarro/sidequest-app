@@ -22,6 +22,13 @@
       "when": 1793663735911,
       "tag": "0002_silky_giant_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793666132456,
+      "tag": "0003_even_ted_forrester",
+      "breakpoints": true
     }
   ]
 }

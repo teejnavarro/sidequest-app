@@ -47,6 +47,7 @@ const input = {
   endDate: "2027-03-15",
   timeZone: "Asia/Ho_Chi_Minh",
   currency: "VND",
+  destination: null,
 };
 
 beforeEach(() => {

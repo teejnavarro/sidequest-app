@@ -29,6 +29,7 @@ const input = {
   endDate: "2027-03-15",
   timeZone: "Asia/Ho_Chi_Minh",
   currency: "VND",
+  destination: null,
 };
 
 function devDatabaseAddress(): string {
@@ -139,6 +140,7 @@ describe("privacy layer on the dev database", () => {
       endDate: "2027-04-01",
       timeZone: "Asia/Manila",
       currency: "PHP",
+      destination: null,
     };
     await expect(trips.updateTripForMember(tripId, MEMBER, edited)).resolves.toBe(true);
 

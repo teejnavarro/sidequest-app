@@ -19,6 +19,7 @@ export type TripSummary = {
   endDate: string;
   timeZone: string;
   currency: string;
+  destination: string | null;
 };
 
 export type TripDetails = TripSummary & {
@@ -37,6 +38,7 @@ export async function listMyTrips(userId: string): Promise<TripSummary[]> {
       endDate: trip.endDate,
       timeZone: trip.timeZone,
       currency: trip.currency,
+      destination: trip.destination,
     })
     .from(trip)
     .innerJoin(tripMember, eq(tripMember.tripId, trip.id))
@@ -58,6 +60,7 @@ export async function getTripForMember(
       endDate: trip.endDate,
       timeZone: trip.timeZone,
       currency: trip.currency,
+      destination: trip.destination,
       ownerId: trip.ownerId,
       ownerName: user.name,
       ownerImage: user.image,
@@ -82,6 +85,7 @@ export async function createTrip(userId: string, input: TripInput): Promise<stri
       endDate: input.endDate,
       timeZone: input.timeZone,
       currency: input.currency,
+      destination: input.destination,
       ownerId: userId,
     }),
     db.insert(tripMember).values({ tripId: id, userId }),
@@ -104,6 +108,7 @@ export async function updateTripForMember(
       endDate: input.endDate,
       timeZone: input.timeZone,
       currency: input.currency,
+      destination: input.destination,
     })
     .where(
       and(

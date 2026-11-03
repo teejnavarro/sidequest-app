@@ -19,6 +19,8 @@ export const trip = pgTable("trip", {
   endDate: date("end_date", { mode: "string" }).notNull(),
   timeZone: text("time_zone").notNull(),
   currency: text("currency").notNull(),
+  // Where the trip goes (optional), for example a city. Empty is stored as null.
+  destination: text("destination"),
   // The secret in the invite link. The database fills it with 122 random bits, also
   // for trips that already exist. Never sent to anyone who is not a member.
   inviteCode: text("invite_code")
