@@ -36,6 +36,16 @@ describe("FaceStack", () => {
     expect(html).toContain("+3");
   });
 
+  it("keeps account ids out of the page source when decorative", () => {
+    const keys = (decorative: boolean) => {
+      const stack = FaceStack({ people: people(3), borderClass: "border-card", decorative });
+      const [faces] = stack!.props.children as [{ key: string }[]];
+      return faces.map((face) => face.key);
+    };
+    expect(keys(true)).toEqual(["0", "1", "2"]);
+    expect(keys(false)).toEqual(["u0", "u1", "u2"]);
+  });
+
   it("renders nothing for nobody", () => {
     expect(renderToStaticMarkup(<FaceStack people={[]} borderClass="border-card" />)).toBe("");
   });

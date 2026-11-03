@@ -23,8 +23,9 @@ export function FaceStack({ people, size = 32, borderClass, decorative = false }
 
   return (
     <span className="inline-flex items-center" {...(decorative ? { "aria-hidden": true } : {})}>
-      {shown.map((person) => (
-        <span key={person.id} className={ring}>
+      {shown.map((person, index) => (
+        // React keys reach the page source, so decorative circles don't use account ids.
+        <span key={decorative ? index : person.id} className={ring}>
           <Face
             userId={person.id}
             name={person.name}
