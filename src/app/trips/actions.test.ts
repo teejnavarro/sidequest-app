@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTripAction, updateTripAction } from "./actions";
+import { createTripAction, deleteTripAction, updateTripAction } from "./actions";
 import { emptyTripValues } from "@/lib/trip-form-state";
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   createTrip: vi.fn(),
   updateTripForMember: vi.fn(),
+  deleteTripForOwner: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw new Error(`redirect:${url}`);
@@ -18,6 +19,7 @@ vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("@/lib/trips", () => ({
   createTrip: mocks.createTrip,
   updateTripForMember: mocks.updateTripForMember,
+  deleteTripForOwner: mocks.deleteTripForOwner,
 }));
 
 const initial = { errors: {}, values: emptyTripValues };
@@ -164,5 +166,59 @@ describe("destination on create", () => {
   it("keeps the accents in the destination exactly", async () => {
     await expect(createTripAction(initial, formWith(good))).rejects.toThrow("redirect:");
     expect(mocks.createTrip.mock.calls[0][1].destination).toBe("Đà Nẵng, Việt Nam");
+  });
+});
+
+describe("deleteTripAction", () => {
+  const none = {};
+
+  beforeEach(() => {
+    mocks.deleteTripForOwner.mockResolvedValue(true);
+  });
+
+  it("deletes nothing when signed out", async () => {
+    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    await expect(deleteTripAction(none, formWith({ tripId: "trip-1" }))).rejects.toThrow(
+      "redirect:/",
+    );
+    expect(mocks.deleteTripForOwner).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["missing", {}],
+    ["empty", { tripId: "" }],
+  ])("deletes nothing when the trip id is %s", async (_label, fields) => {
+    await expect(deleteTripAction(none, formWith(fields))).rejects.toThrow("redirect:/trips");
+    expect(mocks.deleteTripForOwner).not.toHaveBeenCalled();
+  });
+
+  it("deletes as the signed-in person and goes to My trips", async () => {
+    await expect(deleteTripAction(none, formWith({ tripId: "trip-1" }))).rejects.toThrow(
+      "redirect:/trips",
+    );
+    expect(mocks.deleteTripForOwner).toHaveBeenCalledWith("trip-1", "u1");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips");
+  });
+
+  it("ignores extra form fields such as userId and ownerId", async () => {
+    const form = formWith({ tripId: "trip-1", userId: "the-owner", ownerId: "the-owner" });
+    await expect(deleteTripAction(none, form)).rejects.toThrow("redirect:/trips");
+    expect(mocks.deleteTripForOwner).toHaveBeenCalledWith("trip-1", "u1");
+  });
+
+  it("ends in the same place when nothing was deleted (a member, a stranger or a repeat)", async () => {
+    mocks.deleteTripForOwner.mockResolvedValue(false);
+    await expect(deleteTripAction(none, formWith({ tripId: "someone-elses" }))).rejects.toThrow(
+      "redirect:/trips",
+    );
+  });
+
+  it("shows a plain message and stays on the page when the delete fails", async () => {
+    mocks.deleteTripForOwner.mockRejectedValue(new Error("database down"));
+    await expect(deleteTripAction(none, formWith({ tripId: "trip-1" }))).resolves.toEqual({
+      error: "Could not delete the trip. Please try again.",
+    });
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });
