@@ -266,3 +266,42 @@ A trip date such as 12 March is a day on the calendar, not a moment in time. If 
 treats it as a moment, then in another part of the world 12 March can turn into 11
 March. So we store dates as plain text days and format them without looking at the
 viewer's own time zone. The test even changes the computer's time zone to prove it.
+
+---
+
+## Chapter 4: Invite links
+
+### An invite code is a key
+
+Every trip now has a long random code, for example a string of letters and numbers
+that nobody could guess. The invite link is just that code written into a web address.
+Whoever holds the link holds the key: they can see the trip's name and who owns it, and
+after signing in they can join. That is why the invite page tells you to share the link
+only with your group. The code is made by the database itself, from a strong source of
+randomness, so it is not something a person (or our own code) invents. Only members of
+a trip can see its code. The trip list and trip pages never include it.
+
+### Opening a page must never change anything
+
+Chat apps, browsers and phones often open a link in the background to show a little
+preview, or to load it faster before you tap. If simply opening the invite page added
+you to the trip, a preview could add people who never asked to join. So the invite page
+only shows information. Joining happens only when you tap **Join trip**, which sends a
+separate request to the server. The same habit applies everywhere: looking is safe,
+and changing something needs a deliberate tap.
+
+### Coming back to the right page after signing in
+
+When a friend opens the link without being signed in, they must sign in with Google
+first. Google sends them back afterwards, and we tell Google where: the same invite
+page. We build that return address ourselves from the code, after checking the code
+looks like a real one. We never take a return address from the web page, because a
+tricky link could try to send people to a fake site after signing in.
+
+### How a default fills in old rows
+
+Trips already existed before this step, and they had no code. We added the code column
+with a **default**: "when nothing is given, let the database make a random code".
+When the database applied that to the table, it filled in a different random code for
+each existing trip, all at once. It also means the live site keeps working while the
+new column is being added, because the old code never needs to supply one.

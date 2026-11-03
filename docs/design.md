@@ -76,6 +76,7 @@ Rules:
 - **Trip card:** name, route line, the person's own balance, and overlapping faces. The whole card taps.
 - **Faces:** the Google photo when there is one, otherwise initials on a `face` color. A
   person's color stays the same everywhere.
+- **Invite and join:** the invite page is a card with the link, Share link (main button, only where the phone can share) and Copy link, then a Who's in list. The join page is one card: trip name, "Trip owner", and one main button (Continue with Google, then Join trip).
 - **Review step:** a sheet from the bottom with a plain sentence ("Bea paid ₱3,000, split 4
   ways = ₱750 each.") plus Go back and Save.
 - **Forms:** the label sits above the box, help text below it, errors below that in `owe`.
