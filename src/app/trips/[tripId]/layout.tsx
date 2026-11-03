@@ -5,7 +5,7 @@ import { CaretLeft, MapPin } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember, listTripMembers } from "@/lib/trips";
 import { formatTripRange } from "@/lib/trip-dates";
-import { timeZonePlace } from "@/lib/trip-options";
+import { timeZoneLabel } from "@/lib/trip-options";
 import { Band } from "@/components/band";
 import { FaceStack } from "@/components/face-stack";
 import { TripTabs } from "@/components/trip-tabs";
@@ -29,7 +29,7 @@ async function TripShell({
   ]);
   if (!trip) notFound();
 
-  const place = timeZonePlace(trip.timeZone) ?? trip.timeZone;
+  const zone = timeZoneLabel(trip.timeZone, trip.startDate);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -50,7 +50,7 @@ async function TripShell({
             </p>
           ) : null}
           <p className="text-[13px] text-band-muted">
-            {formatTripRange(trip.startDate, trip.endDate)}. Times are {place} time.
+            {formatTripRange(trip.startDate, trip.endDate)} · {zone}
           </p>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
             <span className="flex min-w-0 items-center gap-2 text-[13px] text-band-muted">

@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   CURRENCIES,
   DEFAULT_CURRENCY,
   DEFAULT_TIME_ZONE,
   TIME_ZONES,
   TIME_ZONE_GROUPS,
+  timeZoneLabel,
   timeZonePlace,
 } from "./trip-options";
 
@@ -37,7 +38,7 @@ describe("time zone list", () => {
     }
   });
 
-  it("names the place for 'Times are ... time'", () => {
+  it("names just the place, without the cities", () => {
     expect(timeZonePlace("Asia/Manila")).toBe("Philippines");
     expect(timeZonePlace("Asia/Singapore")).toBe("Singapore");
     expect(timeZonePlace("Not/AZone")).toBeNull();
@@ -55,5 +56,65 @@ describe("currency list", () => {
     for (const currency of CURRENCIES) {
       expect(currency.label.startsWith(`${currency.value}, `)).toBe(true);
     }
+  });
+});
+
+describe("timeZoneLabel for the trip header", () => {
+  it("shows the offset and the place for Manila", () => {
+    expect(timeZoneLabel("Asia/Manila", "2027-03-12")).toBe("GMT+8 Philippines");
+  });
+
+  it("shows other everyday zones", () => {
+    expect(timeZoneLabel("Asia/Ho_Chi_Minh", "2027-05-10")).toBe("GMT+7 Vietnam");
+    expect(timeZoneLabel("Asia/Tokyo", "2027-05-10")).toBe("GMT+9 Japan");
+  });
+
+  it("shows half-hour zones with the minutes", () => {
+    expect(timeZoneLabel("Asia/Kolkata", "2027-03-12")).toBe("GMT+5:30 India");
+    expect(timeZoneLabel("Asia/Kathmandu", "2027-03-12")).toBe("GMT+5:45 Nepal");
+  });
+
+  it("measures daylight saving on the trip's own date", () => {
+    expect(timeZoneLabel("Europe/Paris", "2027-01-15")).toBe("GMT+1 France");
+    expect(timeZoneLabel("Europe/Paris", "2027-07-15")).toBe("GMT+2 France");
+    expect(timeZoneLabel("America/New_York", "2027-01-15")).toBe("GMT-5 US East");
+    expect(timeZoneLabel("America/New_York", "2027-07-15")).toBe("GMT-4 US East");
+    expect(timeZoneLabel("Australia/Sydney", "2027-01-15")).toBe("GMT+11 Australia");
+    expect(timeZoneLabel("Australia/Sydney", "2027-07-15")).toBe("GMT+10 Australia");
+  });
+
+  it("shows plain GMT when the offset is zero", () => {
+    expect(timeZoneLabel("Europe/London", "2027-01-15")).toBe("GMT UK and Ireland");
+    expect(timeZoneLabel("Europe/London", "2027-07-15")).toBe("GMT+1 UK and Ireland");
+  });
+
+  it("falls back to the raw name for a zone that is not in the list", () => {
+    expect(timeZoneLabel("Not/AZone", "2027-03-12")).toBe("Not/AZone");
+    expect(timeZoneLabel("Europe/Lisbon", "2027-03-12")).toBe("Europe/Lisbon");
+  });
+
+  it("gives every zone in the list a label that starts with GMT", () => {
+    for (const zone of TIME_ZONES) {
+      expect(timeZoneLabel(zone.value, "2027-03-12")).toMatch(/^GMT([+-]\d{1,2}(:\d{2})?)? \S/);
+    }
+  });
+
+  describe("does not depend on the computer's own time zone", () => {
+    const original = process.env.TZ;
+    afterEach(() => {
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
+    });
+
+    it.each(["Pacific/Auckland", "America/Los_Angeles", "Pacific/Kiritimati", "Etc/GMT+12"])(
+      "gives the same text when the computer's zone is %s",
+      (zone) => {
+        process.env.TZ = zone;
+        expect(timeZoneLabel("Asia/Manila", "2027-03-12")).toBe("GMT+8 Philippines");
+        expect(timeZoneLabel("Asia/Kolkata", "2027-03-12")).toBe("GMT+5:30 India");
+        expect(timeZoneLabel("Europe/Paris", "2027-07-15")).toBe("GMT+2 France");
+        expect(timeZoneLabel("America/New_York", "2027-01-15")).toBe("GMT-5 US East");
+      },
+    );
   });
 });
