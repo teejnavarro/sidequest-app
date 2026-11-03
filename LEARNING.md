@@ -317,3 +317,33 @@ names stay out of the page (their photos and initials show, but nothing a screen
 a text search would pick up as a name); and the page tells you to share the link only with
 your group. Privacy is rarely all or nothing. It helps to write down what is shown, to
 whom, and why, so the choice is deliberate and can be changed later.
+
+---
+
+## Chapter 5: Deleting a trip
+
+### Deleting for good
+
+Some deletes can be undone (a "trash" that keeps things for 30 days). This one cannot: once
+the owner taps Delete trip, the trip is gone from the database. We chose that on purpose
+because it is simpler and the data is truly gone, so a deleted trip can't come back by
+accident. Because it can't be undone, the app first shows a separate confirmation page that
+says who is affected, and the safe choice, Keep trip, is the big main button.
+
+### A cascade removes linked rows
+
+Chapter 3 explained that a trip and its guest list are two tables pointing at each other.
+When we created the guest list table we told the database: "if a trip is removed, remove
+its guest list rows too". That rule is called a **cascade**. So the app deletes one row,
+the trip, and the database cleans up the rest by itself. The invite link needs no cleanup,
+because its secret code is stored on the trip row and disappears with it. That is why the
+old link now says "This invite link isn't working".
+
+### Check the owner inside the delete
+
+Hiding the Delete trip link from other members is just good manners; it is not security,
+because anyone can type an address or send a forged request. The real check is inside the
+delete itself: "remove this trip, but only if this person is its owner". If someone who is
+not the owner tries, the database matches nothing and nothing is deleted. The same happens
+when a delete is repeated, so pressing the button twice, or a second try from a forged
+request, does no harm and tells the person nothing about which trips exist.

@@ -28,7 +28,7 @@ Use these as named tokens in `src/app/globals.css`. Don't write other colors int
 | `blue-text` | `#24607A` | `#7FCFE0` | Times, selected tab, selected chip, tags |
 | `blue-soft` | `#DCEBF0` | `#234956` | Selected chips, tags, the estimate card |
 | `owed` | `#1F7A3D` | `#7EDB9A` | "You're owed" only |
-| `owe` | `#B4321B` | `#FF9A8B` | "You owe" and errors only |
+| `owe` | `#B4321B` | `#FF9A8B` | "You owe", errors, and the text of a destructive button such as Delete trip (always with words) |
 | `face-1` to `face-4` | `#FBDDBD`, `#CFE3EA`, `#CDEBDD`, `#D8DEF7` | `#6A4A24`, `#2C5364`, `#24574A`, `#38406E` | Initials circles |
 
 Rules:

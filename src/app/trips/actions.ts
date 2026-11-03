@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { validateTripInput } from "@/lib/trip-input";
 import type { TripFormState, TripFormValues } from "@/lib/trip-form-state";
-import { createTrip, updateTripForMember } from "@/lib/trips";
+import { createTrip, deleteTripForOwner, updateTripForMember } from "@/lib/trips";
 
 // Only these six fields are ever read from the form. Anything else a visitor
 // adds (an ownerId, say) is never looked at.
@@ -78,4 +78,30 @@ export async function updateTripAction(
   revalidatePath("/trips");
   revalidatePath(`/trips/${tripId}`, "layout");
   redirect(`/trips/${tripId}`);
+}
+
+export type DeleteTripState = { error?: string };
+
+// Permanently deletes a trip, for its owner only. Whether or not a trip was removed, the
+// person ends up on My trips: a repeated or forged request changes nothing and reveals
+// nothing about which trips exist.
+export async function deleteTripAction(
+  _prev: DeleteTripState,
+  formData: FormData,
+): Promise<DeleteTripState> {
+  const user = await getCurrentUser(); // never trust the client: re-check the session
+
+  const tripIdField = formData.get("tripId");
+  const tripId = typeof tripIdField === "string" ? tripIdField : "";
+  if (tripId === "") redirect("/trips");
+
+  try {
+    // Who may delete is decided only in here, never by the form or by a hidden link.
+    await deleteTripForOwner(tripId, user.id);
+  } catch {
+    return { error: "Could not delete the trip. Please try again." };
+  }
+
+  revalidatePath("/trips");
+  redirect("/trips"); // redirect works by throwing: keep it outside try/catch
 }

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createTrip,
+  deleteTripForOwner,
   getInviteCodeForMember,
   getTripByInviteCode,
   getTripForMember,
@@ -273,5 +274,23 @@ describe("people in the list and on the invite", () => {
     expect(fake.queries[1].params).toEqual(["t1"]);
     for (const { sql } of fake.queries) expect(sql).not.toContain("email");
     expect(fake.queries[1].sql).not.toContain("invite_code");
+  });
+});
+
+describe("deleteTripForOwner", () => {
+  it("puts ownership inside the delete itself, on the trip table only", async () => {
+    await deleteTripForOwner("trip-1", "u1");
+    const [{ sql, params }] = fake.queries;
+    expect(sql).toMatch(/^delete from "trip" where/);
+    expect(sql).toContain('"trip"."id" = $1');
+    expect(sql).toContain('"trip"."owner_id" = $2');
+    expect(params).toEqual(["trip-1", "u1"]);
+    expect(fake.queries).toHaveLength(1);
+  });
+
+  it("says false when nothing was removed and true when a trip went", async () => {
+    await expect(deleteTripForOwner("trip-1", "not-the-owner")).resolves.toBe(false);
+    fake.rows = [["trip-1"]];
+    await expect(deleteTripForOwner("trip-1", "u1")).resolves.toBe(true);
   });
 });

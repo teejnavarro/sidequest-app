@@ -96,12 +96,30 @@ export const CURRENCIES: CurrencyOption[] = [
 
 export const DEFAULT_CURRENCY = "PHP";
 
-export function timeZoneLabel(value: string): string | null {
+// The label as it appears in the picker, or null for a zone that is not in the list.
+function listLabel(value: string): string | null {
   return TIME_ZONES.find((zone) => zone.value === value)?.label ?? null;
 }
 
-// "Philippines (Manila, Cebu, Davao)" -> "Philippines": the place name for "Times are Philippines time".
+// "Philippines (Manila, Cebu, Davao)" -> "Philippines": just the place name.
 export function timeZonePlace(value: string): string | null {
-  const label = timeZoneLabel(value);
+  const label = listLabel(value);
   return label ? label.replace(/\s*\(.*\)\s*$/, "") : null;
+}
+
+// For the trip header: "GMT+8 Philippines". The offset is measured on the given day
+// ("YYYY-MM-DD", the trip's start date), so places with daylight saving show the offset the
+// trip will actually have. Half-hour zones read "GMT+5:30" and UTC reads "GMT". A zone that
+// is not in the list falls back to its raw name. Never depends on the computer's own zone.
+export function timeZoneLabel(value: string, onDate: string): string {
+  const place = timeZonePlace(value);
+  if (!place) return value;
+  const [year, month, day] = onDate.split("-").map(Number);
+  const noonUtc = new Date(Date.UTC(year, month - 1, day, 12));
+  const offset = new Intl.DateTimeFormat("en", { timeZone: value, timeZoneName: "shortOffset" })
+    .formatToParts(noonUtc)
+    .find((part) => part.type === "timeZoneName")?.value;
+  // Some systems write a zero offset as "GMT+0"; plain "GMT" reads better.
+  const plain = offset === "GMT+0" || offset === "GMT-0" ? "GMT" : offset;
+  return plain ? `${plain} ${place}` : place;
 }
