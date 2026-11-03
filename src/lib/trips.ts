@@ -257,3 +257,15 @@ export async function joinTripByInviteCode(
   await db.insert(tripMember).values({ tripId, userId }).onConflictDoNothing();
   return tripId;
 }
+
+// Deletes the trip for good, but only for its owner. Ownership is part of the delete's own
+// condition, so a member or a stranger deletes nothing. The member rows go with it (the
+// database cascades), and so does the invite code, which lives on the trip. Returns true
+// only when a trip was removed, so repeating the delete is harmless.
+export async function deleteTripForOwner(tripId: string, userId: string): Promise<boolean> {
+  const deleted = await db
+    .delete(trip)
+    .where(and(eq(trip.id, tripId), eq(trip.ownerId, userId)))
+    .returning({ id: trip.id });
+  return deleted.length > 0;
+}

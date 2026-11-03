@@ -329,4 +329,66 @@ describe("privacy layer on the dev database", () => {
       expect(text).not.toContain("inviteCode");
     });
   });
+  describe("deleting a trip", () => {
+    // Only trips made here, by made-up people with the test prefix, are ever deleted.
+    let doomed: string;
+    let kept: string;
+    let doomedCode: string;
+
+    async function memberRows(forTrip: string) {
+      return dbModule.db
+        .select()
+        .from(schema.tripMember)
+        .where(orm.eq(schema.tripMember.tripId, forTrip));
+    }
+
+    beforeAll(async () => {
+      doomed = await trips.createTrip(OWNER, { ...input, name: "Trip to delete" });
+      kept = await trips.createTrip(OWNER, { ...input, name: "Trip to keep" });
+      doomedCode = (await trips.getInviteCodeForMember(doomed, OWNER))!;
+      await trips.joinTripByInviteCode(doomedCode, JOINER);
+      await trips.joinTripByInviteCode((await trips.getInviteCodeForMember(kept, OWNER))!, JOINER);
+    });
+
+    it("lets a member delete nothing", async () => {
+      await expect(trips.deleteTripForOwner(doomed, JOINER)).resolves.toBe(false);
+      await expect(trips.getTripForMember(doomed, OWNER)).resolves.toMatchObject({ id: doomed });
+      expect(await memberRows(doomed)).toHaveLength(2);
+    });
+
+    it("lets a stranger delete nothing, and a made-up id is the same answer", async () => {
+      await expect(trips.deleteTripForOwner(doomed, STRANGER)).resolves.toBe(false);
+      await expect(trips.deleteTripForOwner(`${ID_PREFIX}no-such-trip`, OWNER)).resolves.toBe(false);
+      await expect(trips.getTripForMember(doomed, OWNER)).resolves.toMatchObject({ id: doomed });
+      expect(await memberRows(doomed)).toHaveLength(2);
+    });
+
+    it("removes the trip, its member rows and its invite for the owner, and nothing else", async () => {
+      await expect(trips.deleteTripForOwner(doomed, OWNER)).resolves.toBe(true);
+
+      // Gone for everyone.
+      await expect(trips.getTripForMember(doomed, OWNER)).resolves.toBeNull();
+      await expect(trips.getTripForMember(doomed, JOINER)).resolves.toBeNull();
+      expect((await trips.listMyTrips(OWNER)).map((row) => row.id)).not.toContain(doomed);
+      expect((await trips.listMyTrips(JOINER)).map((row) => row.id)).not.toContain(doomed);
+      expect(await memberRows(doomed)).toEqual([]);
+      const rows = await dbModule.db.select().from(schema.trip).where(orm.eq(schema.trip.id, doomed));
+      expect(rows).toEqual([]);
+
+      // The old invite link opens nothing and joins nobody.
+      await expect(trips.getTripByInviteCode(doomedCode)).resolves.toBeNull();
+      await expect(trips.joinTripByInviteCode(doomedCode, OUTSIDER)).resolves.toBeNull();
+      await expect(trips.isTripMember(doomed, OUTSIDER)).resolves.toBe(false);
+
+      // Another trip, with the same people, is untouched.
+      await expect(trips.getTripForMember(kept, OWNER)).resolves.toMatchObject({ id: kept });
+      expect((await memberRows(kept)).map((row) => row.userId).sort()).toEqual([JOINER, OWNER].sort());
+    });
+
+    it("says false the second time, harmlessly", async () => {
+      await expect(trips.deleteTripForOwner(doomed, OWNER)).resolves.toBe(false);
+      await expect(trips.getTripForMember(kept, OWNER)).resolves.toMatchObject({ id: kept });
+    });
+  });
+
 });
