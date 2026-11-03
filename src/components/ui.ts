@@ -23,3 +23,7 @@ export const pressCard = `${press} ${focus}`;
 // A single phone-width column, 640px from 768px up, 16px side gutter.
 export const screenClass =
   "mx-auto grid w-full max-w-[480px] content-start gap-4 px-4 pt-6 pb-8 md:max-w-[640px]";
+
+// For a destructive button such as Delete trip: the quiet look with the "owe" red text.
+// Always used with words, never color alone.
+export const dangerButton = `${button} min-h-12 bg-chip px-[22px] text-owe`;

@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { TripForm } from "@/components/trip-form";
-import { cardClass, screenClass } from "@/components/ui";
+import { cardClass, linkClass, screenClass } from "@/components/ui";
 
 export default async function EditTripPage({
   params,
@@ -29,6 +30,14 @@ export default async function EditTripPage({
           }}
         />
       </div>
+      {trip.ownerId === user.id ? (
+        <Link
+          href={`/trips/${trip.id}/delete`}
+          className={`${linkClass} justify-self-start text-owe`}
+        >
+          Delete trip
+        </Link>
+      ) : null}
     </main>
   );
 }
