@@ -68,7 +68,7 @@ describe("createTripAction", () => {
 
   it("creates the trip for the signed-in person and goes to it", async () => {
     await expect(createTripAction(initial, formWith(good))).rejects.toThrow(
-      "redirect:/trips/trip-1",
+      "redirect:/trips/trip-1/schedule",
     );
     expect(mocks.createTrip).toHaveBeenCalledWith("u1", good);
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips");
@@ -109,7 +109,7 @@ describe("updateTripAction", () => {
   it("updates through the privacy layer as the signed-in person and goes to the trip", async () => {
     await expect(
       updateTripAction(initial, formWith({ ...good, tripId: "trip-1" })),
-    ).rejects.toThrow("redirect:/trips/trip-1");
+    ).rejects.toThrow("redirect:/trips/trip-1/schedule");
     expect(mocks.updateTripForMember).toHaveBeenCalledWith("trip-1", "u1", good);
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1", "layout");
   });
@@ -137,7 +137,7 @@ describe("updateTripAction", () => {
 
   it("clears the destination when the box is emptied on edit", async () => {
     const form = formWith({ ...good, destination: "", tripId: "trip-1" });
-    await expect(updateTripAction(initial, form)).rejects.toThrow("redirect:/trips/trip-1");
+    await expect(updateTripAction(initial, form)).rejects.toThrow("redirect:/trips/trip-1/schedule");
     expect(mocks.updateTripForMember).toHaveBeenCalledWith("trip-1", "u1", {
       ...good,
       destination: null,
@@ -158,7 +158,7 @@ describe("destination on create", () => {
     const { destination: _unused, ...withoutDestination } = good;
     void _unused;
     await expect(createTripAction(initial, formWith(withoutDestination))).rejects.toThrow(
-      "redirect:/trips/trip-1",
+      "redirect:/trips/trip-1/schedule",
     );
     expect(mocks.createTrip).toHaveBeenCalledWith("u1", { ...withoutDestination, destination: null });
   });

@@ -15,15 +15,15 @@ export function TripCard({ trip, now }: { trip: TripListItem; now: Date }) {
   const others = trip.members.length - 1;
 
   return (
-    <Link href={`/trips/${trip.id}`} className={`${cardClass} ${pressCard}`}>
+    <Link href={`/trips/${trip.id}/schedule`} className={`${cardClass} ${pressCard}`}>
       <span className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-        <h2 className="min-w-0 text-[19px] break-words">{trip.name}</h2>
+        <h2 className="min-w-0 text-[19px] wrap-anywhere">{trip.name}</h2>
         <span className={softTag}>{timeTag}</span>
       </span>
       {trip.destination ? (
         <p className="flex items-start gap-1.5 text-[13px] text-muted">
           <MapPin size={16} weight="bold" aria-hidden="true" className="mt-0.5 shrink-0" />
-          <span className="min-w-0 break-words">{trip.destination}</span>
+          <span className="min-w-0 wrap-anywhere">{trip.destination}</span>
         </p>
       ) : null}
       <RouteLine start={dates.start} end={dates.end} />

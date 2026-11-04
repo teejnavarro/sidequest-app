@@ -18,7 +18,7 @@ async function EditTripContent({ params }: { params: Promise<{ tripId: string }>
 
   return (
     <>
-      <TaskBand backHref={`/trips/${trip.id}`} backLabel={trip.name} title="Edit trip" />
+      <TaskBand backHref={`/trips/${trip.id}/schedule`} backLabel={trip.name} title="Edit trip" />
       <main className={screenClass}>
         <div className={`${cardClass} gap-4`}>
           <TripForm

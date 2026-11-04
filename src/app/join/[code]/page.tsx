@@ -25,7 +25,7 @@ async function JoinContent({ params }: { params: Promise<{ code: string }> }) {
 
   if (!user) return <JoinView invited={invited} code={lowerCode} signedIn={false} />;
 
-  if (await isTripMember(invited.id, user.id)) redirect(`/trips/${invited.id}`);
+  if (await isTripMember(invited.id, user.id)) redirect(`/trips/${invited.id}/schedule`);
   return <JoinView invited={invited} code={lowerCode} signedIn />;
 }
 

@@ -81,6 +81,7 @@ describe("DeleteTripPage", () => {
     expect(html).toContain("This deletes it for all 4 people in the trip. You can&#x27;t undo this.");
     expect(html).toContain("Keep trip");
     expect(html).toContain('href="/trips/trip-1/edit"');
+    expect(html).toContain('href="/trips/trip-1/schedule"'); // back link
     expect(html).toContain("Delete trip");
   });
 

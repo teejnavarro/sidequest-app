@@ -83,7 +83,7 @@ describe("opening an invite", () => {
   it("sends an existing member straight to the trip", async () => {
     mocks.getOptionalUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
     mocks.isTripMember.mockResolvedValue(true);
-    await expect(openInvite(CODE)).rejects.toThrow("redirect:/trips/trip-1");
+    await expect(openInvite(CODE)).rejects.toThrow("redirect:/trips/trip-1/schedule");
     expect(mocks.isTripMember).toHaveBeenCalledWith("trip-1", "u1");
   });
 

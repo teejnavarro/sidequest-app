@@ -24,7 +24,7 @@ describe("TripCard", () => {
   it("is one link to the trip, with the name and the soft blue time tag", () => {
     const card = html();
     expect(card.match(/<a /g)).toHaveLength(1);
-    expect(card).toContain('href="/trips/trip-1"');
+    expect(card).toContain('href="/trips/trip-1/schedule"');
     expect(card).toContain("Hội An long weekend");
     expect(card).toContain("In 11 days");
     expect(card).toContain("bg-blue-soft");
@@ -59,7 +59,7 @@ describe("TripCard", () => {
   });
 
   it("lets a long name wrap", () => {
-    expect(html({ name: "A".repeat(80) })).toMatch(/<h2 class="[^"]*break-words/);
+    expect(html({ name: "A".repeat(80) })).toMatch(/<h2 class="[^"]*wrap-anywhere/);
   });
 
   it("shows the dates as a route line", () => {

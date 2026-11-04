@@ -94,6 +94,7 @@ describe("EditTripPage delete link", () => {
     mocks.getTripForMember.mockResolvedValue(trip("u1"));
     const page = show(await renderContent());
     expect(page).toContain("/trips/trip-1/delete");
+    expect(page).toContain('/trips/trip-1/schedule'); // back link goes straight to the trip's first tab
     expect(page).toContain("Delete trip");
   });
 

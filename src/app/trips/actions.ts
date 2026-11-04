@@ -45,7 +45,7 @@ export async function createTripAction(
   }
 
   revalidatePath("/trips");
-  redirect(`/trips/${tripId}`); // redirect works by throwing: keep it outside try/catch
+  redirect(`/trips/${tripId}/schedule`); // redirect works by throwing: keep it outside try/catch
 }
 
 export async function updateTripAction(
@@ -77,7 +77,7 @@ export async function updateTripAction(
 
   revalidatePath("/trips");
   revalidatePath(`/trips/${tripId}`, "layout");
-  redirect(`/trips/${tripId}`);
+  redirect(`/trips/${tripId}/schedule`);
 }
 
 export type DeleteTripState = { error?: string };

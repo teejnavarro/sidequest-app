@@ -70,7 +70,7 @@ describe("InvitePage", () => {
   it("gives a member the short band, the whole link and who is in", async () => {
     const html = await renderFor([member("u1", "Maya"), member("u2", "Ben")]);
     expect(html).toContain("Invite people");
-    expect(html).toContain('href="/trips/trip-1"'); // back link goes to the trip
+    expect(html).toContain('href="/trips/trip-1/schedule"'); // back link goes to the trip
     expect(html).toContain("Hội An"); // and names it
     expect(html).toContain(`http://localhost:3000/join/${CODE}`); // the whole link stays in the page
     expect(html).toMatch(/<p class="truncate[^"]*select-all">http/); // shown on one shortened line

@@ -22,10 +22,10 @@ async function DeleteTripContent({ params }: { params: Promise<{ tripId: string 
 
   return (
     <>
-      <TaskBand backHref={`/trips/${trip.id}`} backLabel={trip.name} title="Delete trip" />
+      <TaskBand backHref={`/trips/${trip.id}/schedule`} backLabel={trip.name} title="Delete trip" />
       <main className={screenClass}>
         <section className={`${cardClass} gap-4 px-5 py-6`} aria-labelledby="delete-title">
-          <h2 id="delete-title" className="text-[19px] break-words">
+          <h2 id="delete-title" className="text-[19px] wrap-anywhere">
             Delete {trip.name}?
           </h2>
           <p>
