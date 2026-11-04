@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import Link from "next/link";
-import { CaretLeft, SignOut } from "@phosphor-icons/react/dist/ssr";
+import { SignOut } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { signOut } from "@/app/actions";
 import { Face } from "@/components/face";
-import { cardClass, linkClass, quietButton, screenClass, skeleton } from "@/components/ui";
+import { TaskBand } from "@/components/task-band";
+import { cardClass, quietButton, screenClass, skeleton } from "@/components/ui";
 import { NameForm } from "./name-form";
 
 async function ProfileContent() {
@@ -37,15 +37,13 @@ function ProfileLoading() {
 
 export default function ProfilePage() {
   return (
-    <main className={screenClass}>
-      <Link href="/trips" className={`${linkClass} justify-self-start no-underline`}>
-        <CaretLeft size={20} weight="bold" aria-hidden="true" />
-        My trips
-      </Link>
-      <h1 className="text-[30px]">Profile</h1>
-      <Suspense fallback={<ProfileLoading />}>
-        <ProfileContent />
-      </Suspense>
-    </main>
+    <>
+      <TaskBand backHref="/trips" backLabel="My trips" title="Profile" />
+      <main className={screenClass}>
+        <Suspense fallback={<ProfileLoading />}>
+          <ProfileContent />
+        </Suspense>
+      </main>
+    </>
   );
 }

@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import InvitePage from "./page";
 
@@ -26,6 +28,14 @@ const props = {
   params: Promise.resolve({ tripId: "trip-1" }),
 } as Parameters<typeof InvitePage>[0];
 
+// The page keeps its data in a component inside Suspense, so run that component directly.
+async function renderContent() {
+  const page = InvitePage(props) as ReactElement<{ children: ReactElement<{ params: Promise<{ tripId: string }> }> }>;
+  const content = page.props.children;
+  const render = content.type as (props: typeof content.props) => Promise<ReactElement>;
+  return render(content.props);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
@@ -36,7 +46,7 @@ beforeEach(() => {
 describe("InvitePage", () => {
   it("shows not found to someone who is not a member, and reads nothing else", async () => {
     mocks.getInviteCodeForMember.mockResolvedValue(null);
-    await expect(InvitePage(props)).rejects.toThrow("not-found");
+    await expect(renderContent()).rejects.toThrow("not-found");
     expect(mocks.getInviteCodeForMember).toHaveBeenCalledWith("trip-1", "u1");
     expect(mocks.getTripForMember).not.toHaveBeenCalled();
     expect(mocks.listTripMembers).not.toHaveBeenCalled();
@@ -44,22 +54,38 @@ describe("InvitePage", () => {
 
   it("sends a signed-out visitor away before looking anything up", async () => {
     mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
-    await expect(InvitePage(props)).rejects.toThrow("redirect:/");
+    await expect(renderContent()).rejects.toThrow("redirect:/");
     expect(mocks.getInviteCodeForMember).not.toHaveBeenCalled();
   });
 
-  it("gives a member the link and the list of who is in", async () => {
+  const member = (id: string, name: string) => ({ id, name, image: null });
+
+  async function renderFor(members: ReturnType<typeof member>[]) {
     mocks.getInviteCodeForMember.mockResolvedValue(CODE);
     mocks.getTripForMember.mockResolvedValue({ id: "trip-1", name: "Hội An", ownerId: "u1" });
-    mocks.listTripMembers.mockResolvedValue([
-      { id: "u1", name: "Maya", image: null },
-      { id: "u2", name: "Ben", image: null },
-    ]);
-    const page = JSON.stringify(await InvitePage(props));
-    expect(page).toContain(`http://localhost:3000/join/${CODE}`);
-    expect(page).toContain("Who");
-    expect(page).toContain("Maya");
-    expect(page).toContain("Ben");
-    expect(page).toContain("(owner)");
+    mocks.listTripMembers.mockResolvedValue(members);
+    return renderToStaticMarkup(await renderContent());
+  }
+
+  it("gives a member the short band, the whole link and who is in", async () => {
+    const html = await renderFor([member("u1", "Maya"), member("u2", "Ben")]);
+    expect(html).toContain("Invite people");
+    expect(html).toContain('href="/trips/trip-1"'); // back link goes to the trip
+    expect(html).toContain("Hội An"); // and names it
+    expect(html).toContain(`http://localhost:3000/join/${CODE}`); // the whole link stays in the page
+    expect(html).toMatch(/<p class="truncate[^"]*select-all">http/); // shown on one shortened line
+    expect(html).toContain("2 people are in");
+    expect(html).toContain("Maya");
+    expect(html).toContain("Ben");
+  });
+
+  it("marks only the owner with a quiet Owner tag, not (owner)", async () => {
+    const html = await renderFor([member("u1", "Maya"), member("u2", "Ben")]);
+    expect(html.match(/>Owner</g)).toHaveLength(1);
+    expect(html).not.toContain("(owner)");
+  });
+
+  it("says 1 person is in when it is just the owner", async () => {
+    expect(await renderFor([member("u1", "Maya")])).toContain("1 person is in");
   });
 });
