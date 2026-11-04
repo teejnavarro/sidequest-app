@@ -47,7 +47,7 @@ describe("the invite page for a signed-out visitor", () => {
   it("still shows the circles, as initials, and offers no join button yet", () => {
     expect(html).toContain("MO");
     expect(html).toContain("BS");
-    expect(html).not.toContain("Join trip");
+    expect(html).not.toContain("<button>Join trip</button>");
   });
 
   it("says one person, not one people", () => {
@@ -93,9 +93,13 @@ describe("the invite page's explanation", () => {
     expect(inn).toContain("Trip owner: Maya Owner");
   });
 
-  it("tells a signed-out visitor they will join right after signing in", () => {
-    expect(out).toContain("You&#x27;ll join the trip right after signing in.");
-    expect(inn).not.toContain("right after signing in");
+  it("lets a long word wrap in the trip owner line instead of widening the page", () => {
+    expect(out).toMatch(/<p class="[^"]*wrap-anywhere[^"]*">Trip owner:/);
+  });
+
+  it("tells a signed-out visitor to tap Join trip after signing in", () => {
+    expect(out).toContain("After signing in, tap Join trip.");
+    expect(inn).not.toContain("After signing in, tap Join trip.");
   });
 
   it("still shows no name beyond the owner's when signed out", () => {

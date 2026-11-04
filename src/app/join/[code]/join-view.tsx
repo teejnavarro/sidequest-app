@@ -62,7 +62,7 @@ export function JoinView({
             Continue with Google
           </button>
           <p className="mt-3 text-center text-[13px] text-muted">
-            You&apos;ll join the trip right after signing in.
+            After signing in, tap Join trip.
           </p>
         </form>
       )}
