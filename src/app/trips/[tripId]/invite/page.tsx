@@ -29,7 +29,7 @@ async function InviteContent({ params }: { params: Promise<{ tripId: string }> }
 
   return (
     <>
-      <TaskBand backHref={`/trips/${trip.id}`} backLabel={trip.name} title="Invite people" />
+      <TaskBand backHref={`/trips/${trip.id}/schedule`} backLabel={trip.name} title="Invite people" />
       <main className={screenClass}>
         <section className={`${cardClass} gap-4 px-5 py-6`} aria-label="Invite link">
           <p className={helpClass}>
@@ -48,7 +48,7 @@ async function InviteContent({ params }: { params: Promise<{ tripId: string }> }
             {members.map((member) => (
               <li key={member.id} className="flex min-w-0 items-center gap-3">
                 <Face userId={member.id} name={member.name} image={member.image} size={40} />
-                <span className="min-w-0 break-words">{member.name}</span>
+                <span className="min-w-0 wrap-anywhere">{member.name}</span>
                 {member.id === trip.ownerId ? <span className={softTag}>Owner</span> : null}
               </li>
             ))}

@@ -17,7 +17,7 @@ describe("TaskBand", () => {
   it("keeps the light back-link color and wraps or shortens long text instead of overflowing", () => {
     expect(html).toContain("text-band-muted!");
     expect(html).toContain("truncate");
-    expect(html).toContain("break-words");
+    expect(html).toContain("wrap-anywhere");
   });
 
   it("has no tab bar", () => {

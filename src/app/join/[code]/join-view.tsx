@@ -24,11 +24,11 @@ export function JoinView({
   return (
     <div className={`${cardClass} gap-4 px-5 py-6`}>
       <div className="grid gap-1">
-        <h1 className="text-[30px] break-words">You&apos;re invited to {invited.name}</h1>
+        <h1 className="text-[30px] wrap-anywhere">You&apos;re invited to {invited.name}</h1>
         {invited.destination ? (
           <p className="text-[17px] flex items-start gap-1.5">
             <MapPin size={20} weight="bold" aria-hidden="true" className="mt-0.5 shrink-0" />
-            <span className="min-w-0 break-words">{invited.destination}</span>
+            <span className="min-w-0 wrap-anywhere">{invited.destination}</span>
           </p>
         ) : null}
       </div>
@@ -47,7 +47,7 @@ export function JoinView({
         </p>
       </div>
 
-      <p className="text-[13px] text-muted">Trip owner: {invited.ownerName}</p>
+      <p className="text-[13px] wrap-anywhere text-muted">Trip owner: {invited.ownerName}</p>
       <p className="text-[13px] text-muted">
         Sidequest keeps your group&apos;s plans and shared costs in one place.
       </p>

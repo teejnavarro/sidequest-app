@@ -63,12 +63,12 @@ async function TripShell({
               <PencilSimple size={20} weight="bold" aria-hidden="true" />
             </Link>
           </div>
-          <h1 className="text-[30px] break-words">{trip.name}</h1>
+          <h1 className="text-[30px] wrap-anywhere">{trip.name}</h1>
           <p className="flex items-start gap-1.5 text-[15px] text-band-muted">
             {trip.destination ? (
               <MapPin size={18} weight="bold" aria-hidden="true" className="mt-0.5 shrink-0" />
             ) : null}
-            <span className="min-w-0 break-words">
+            <span className="min-w-0 wrap-anywhere">
               {trip.destination ? `${trip.destination} · ${range} · ${zone}` : `${range} · ${zone}`}
             </span>
           </p>

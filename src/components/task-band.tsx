@@ -18,12 +18,12 @@ export function TaskBand({
     <Band>
       <Link
         href={backHref}
-        className={`${linkClass} max-w-full justify-self-start text-band-muted! no-underline focus-visible:outline-on-band`}
+        className={`${linkClass} max-w-full min-w-0 justify-self-start text-band-muted! no-underline focus-visible:outline-on-band`}
       >
         <CaretLeft size={20} weight="bold" aria-hidden="true" className="shrink-0" />
         <span className="min-w-0 truncate">{backLabel}</span>
       </Link>
-      <h1 className="text-[30px] break-words">{title}</h1>
+      <h1 className="text-[30px] wrap-anywhere">{title}</h1>
     </Band>
   );
 }

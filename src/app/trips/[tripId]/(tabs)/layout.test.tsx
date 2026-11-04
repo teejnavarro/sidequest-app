@@ -89,7 +89,7 @@ describe("the trip header", () => {
     expect(html).toContain("Mar 12–15, 2027 · GMT+8 Philippines");
     expect(html).not.toContain("lucide");
     // The pin is a Phosphor icon: no destination means no icon next to the supporting line.
-    expect(html).not.toMatch(/<svg[^>]*>[^]*?<\/svg>\s*<span class="min-w-0 break-words">Mar/);
+    expect(html).not.toMatch(/<svg[^>]*>[^]*?<\/svg>\s*<span class="min-w-0 wrap-anywhere">Mar/);
   });
 
   it("with a destination shows it with the offset only, after a pin", async () => {
@@ -97,7 +97,7 @@ describe("the trip header", () => {
     const html = await renderHeader();
     expect(html).toContain("Hội An · Mar 12–15, 2027 · GMT+8");
     expect(html).not.toContain("GMT+8 Philippines");
-    expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*>[^]*?<\/svg>\s*<span class="min-w-0 break-words">Hội An/);
+    expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*>[^]*?<\/svg>\s*<span class="min-w-0 wrap-anywhere">Hội An/);
   });
 
   it("shows a zone it does not know as its raw name, with no offset", async () => {
@@ -136,7 +136,7 @@ describe("the trip header", () => {
   it("wraps a long trip name instead of overflowing", async () => {
     mocks.getTripForMember.mockResolvedValue({ ...baseTrip, name: "A".repeat(80) });
     const html = await renderHeader();
-    expect(html).toMatch(/<h1 class="[^"]*break-words[^"]*">A{80}<\/h1>/);
+    expect(html).toMatch(/<h1 class="[^"]*wrap-anywhere[^"]*">A{80}<\/h1>/);
   });
 
   it("shows not found to someone who is not a member", async () => {
