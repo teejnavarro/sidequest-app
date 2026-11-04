@@ -76,3 +76,30 @@ describe("the invite page for a signed-in person", () => {
     expect(html).not.toContain("Continue with Google");
   });
 });
+
+describe("the invite page's explanation", () => {
+  const out = renderToStaticMarkup(<JoinView invited={invited} code={CODE} signedIn={false} />);
+  const inn = renderToStaticMarkup(<JoinView invited={invited} code={CODE} signedIn />);
+
+  it("says what Sidequest is, signed out and signed in", () => {
+    expect(out).toContain("Sidequest keeps your group&#x27;s plans and shared costs in one place.");
+    expect(inn).toContain("Sidequest keeps your group&#x27;s plans and shared costs in one place.");
+  });
+
+  it("keeps You're invited to in both views, and the Trip owner line", () => {
+    expect(out).toContain("You&#x27;re invited to Hội An long weekend");
+    expect(inn).toContain("You&#x27;re invited to Hội An long weekend");
+    expect(out).toContain("Trip owner: Maya Owner");
+    expect(inn).toContain("Trip owner: Maya Owner");
+  });
+
+  it("tells a signed-out visitor they will join right after signing in", () => {
+    expect(out).toContain("You&#x27;ll join the trip right after signing in.");
+    expect(inn).not.toContain("right after signing in");
+  });
+
+  it("still shows no name beyond the owner's when signed out", () => {
+    expect(out).not.toContain("Benedict");
+    expect(out).not.toContain("Corazon");
+  });
+});

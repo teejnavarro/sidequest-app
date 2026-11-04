@@ -40,8 +40,9 @@ type JoinViewProps = { invited: typeof invited; code: string; signedIn: boolean 
 async function openInvite(code: string) {
   const page = JoinPage({
     params: Promise.resolve({ code }),
-  } as Parameters<typeof JoinPage>[0]) as ReactElement<{ children: ReactElement<{ children: ReactElement }> }>;
-  const content = page.props.children.props.children as ReactElement<{ params: Promise<{ code: string }> }>;
+  } as Parameters<typeof JoinPage>[0]) as ReactElement<{ children: [ReactElement, ReactElement<{ children: ReactElement }>] }>;
+  // The page is the Sidequest wordmark, then the Suspense that holds the content.
+  const content = page.props.children[1].props.children as ReactElement<{ params: Promise<{ code: string }> }>;
   const render = content.type as (props: { params: Promise<{ code: string }> }) => Promise<ReactElement<JoinViewProps>>;
   return render(content.props);
 }

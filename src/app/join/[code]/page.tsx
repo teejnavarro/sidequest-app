@@ -42,6 +42,7 @@ function JoinLoading() {
 export default function JoinPage({ params }: PageProps<"/join/[code]">) {
   return (
     <main className={screenClass}>
+      <p className="font-display text-[19px] font-bold">Sidequest</p>
       <Suspense fallback={<JoinLoading />}>
         <JoinContent params={params} />
       </Suspense>

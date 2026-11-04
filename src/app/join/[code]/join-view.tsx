@@ -24,9 +24,7 @@ export function JoinView({
   return (
     <div className={`${cardClass} gap-4 px-5 py-6`}>
       <div className="grid gap-1">
-        <h1 className="text-[30px] break-words">
-          {signedIn ? invited.name : `You're invited to ${invited.name}`}
-        </h1>
+        <h1 className="text-[30px] break-words">You&apos;re invited to {invited.name}</h1>
         {invited.destination ? (
           <p className="text-[17px] flex items-start gap-1.5">
             <MapPin size={20} weight="bold" aria-hidden="true" className="mt-0.5 shrink-0" />
@@ -50,6 +48,9 @@ export function JoinView({
       </div>
 
       <p className="text-[13px] text-muted">Trip owner: {invited.ownerName}</p>
+      <p className="text-[13px] text-muted">
+        Sidequest keeps your group&apos;s plans and shared costs in one place.
+      </p>
 
       {signedIn ? (
         <JoinForm code={code} />
@@ -60,6 +61,9 @@ export function JoinView({
             <GoogleLogo size={20} weight="bold" aria-hidden="true" />
             Continue with Google
           </button>
+          <p className="mt-3 text-center text-[13px] text-muted">
+            You&apos;ll join the trip right after signing in.
+          </p>
         </form>
       )}
     </div>
