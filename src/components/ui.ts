@@ -12,6 +12,9 @@ export const quietButton = `${button} min-h-12 bg-chip px-[22px] text-ink`;
 export const smallQuietButton = `${button} min-h-11 bg-chip px-4 text-sm text-ink`;
 
 export const inputClass = `min-h-12 w-full rounded-field border border-muted bg-card px-3.5 text-base text-ink ${focus}`;
+// A dropdown: the same box as an input, with the native arrow removed. Put it in a
+// `relative` wrapper with a caret icon that ignores pointer events, and leave room for it.
+export const selectClass = `${inputClass} appearance-none pr-10`;
 export const labelClass = "text-sm font-bold";
 export const helpClass = "text-[13px] text-muted";
 export const errorClass = "text-[13px] font-bold text-owe";
@@ -20,10 +23,22 @@ export const cardClass = "grid min-w-0 gap-2 rounded-card border border-line bg-
 export const linkClass = `inline-flex min-h-11 items-center gap-1 font-medium text-muted underline-offset-2 hover:underline ${focus}`;
 export const pressCard = `${press} ${focus}`;
 
-// A single phone-width column, 640px from 768px up, 16px side gutter.
-export const screenClass =
-  "mx-auto grid w-full max-w-[480px] content-start gap-4 px-4 pt-6 pb-8 md:max-w-[640px]";
+// A single phone-width column, 640px from 768px up, 16px side gutter. screenBase has no
+// top padding, for a first card that overlaps the band; screenClass adds the usual 24px.
+export const screenBase =
+  "mx-auto grid w-full max-w-[480px] content-start gap-4 px-4 pb-8 md:max-w-[640px]";
+export const screenClass = `${screenBase} pt-6`;
 
 // For a destructive button such as Delete trip: the quiet look with the "owe" red text.
 // Always used with words, never color alone.
 export const dangerButton = `${button} min-h-12 bg-chip px-[22px] text-owe`;
+
+// Small tags. Amber is only for the trip time on the trip header; the soft blue one is for
+// trip cards and the Owner mark.
+export const amberTag =
+  "inline-flex items-center rounded-full bg-amber px-3 py-1 text-xs font-bold whitespace-nowrap text-on-amber";
+export const softTag =
+  "inline-flex items-center rounded-full bg-blue-soft px-2.5 py-0.5 text-xs font-bold whitespace-nowrap text-blue-text";
+
+// Grey loading shape. It only pulses when the phone has not asked for less motion.
+export const skeleton = "motion-safe:animate-pulse";

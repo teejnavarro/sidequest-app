@@ -9,7 +9,7 @@ import { timeZoneLabel } from "@/lib/trip-options";
 import { Band } from "@/components/band";
 import { FaceStack } from "@/components/face-stack";
 import { TripTabs } from "@/components/trip-tabs";
-import { linkClass } from "@/components/ui";
+import { linkClass, skeleton } from "@/components/ui";
 
 // Checks the person belongs to this trip before showing the trip's header and tabs.
 // This does not protect the pages inside: Next.js can run them and send their data
@@ -87,13 +87,13 @@ function TripShellLoading() {
     <div aria-hidden="true" className="flex flex-1 flex-col">
       <div className="bg-band">
         <div className="mx-auto grid max-w-[480px] gap-3 px-4 pt-5 pb-5 md:max-w-[640px]">
-          <div className="h-5 w-24 animate-pulse rounded-full bg-on-band/20" />
-          <div className="h-9 w-56 animate-pulse rounded-full bg-on-band/20" />
-          <div className="h-4 w-64 animate-pulse rounded-full bg-on-band/20" />
+          <div className={`h-5 w-24 ${skeleton} rounded-full bg-on-band/20`} />
+          <div className={`h-9 w-56 ${skeleton} rounded-full bg-on-band/20`} />
+          <div className={`h-4 w-64 ${skeleton} rounded-full bg-on-band/20`} />
         </div>
       </div>
       <div className="mx-auto grid w-full max-w-[480px] gap-4 px-4 pt-4 md:max-w-[640px]">
-        <div className="h-32 animate-pulse rounded-card bg-chip" />
+        <div className={`h-32 ${skeleton} rounded-card bg-chip`} />
       </div>
     </div>
   );

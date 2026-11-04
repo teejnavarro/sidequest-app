@@ -4,7 +4,7 @@ import { CaretLeft, SignOut } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { signOut } from "@/app/actions";
 import { Face } from "@/components/face";
-import { cardClass, linkClass, quietButton, screenClass } from "@/components/ui";
+import { cardClass, linkClass, quietButton, screenClass, skeleton } from "@/components/ui";
 import { NameForm } from "./name-form";
 
 async function ProfileContent() {
@@ -29,8 +29,8 @@ async function ProfileContent() {
 function ProfileLoading() {
   return (
     <div aria-hidden="true" className="grid gap-4">
-      <div className="h-64 animate-pulse rounded-card bg-chip" />
-      <div className="h-12 animate-pulse rounded-full bg-chip" />
+      <div className={`h-64 ${skeleton} rounded-card bg-chip`} />
+      <div className={`h-12 ${skeleton} rounded-full bg-chip`} />
     </div>
   );
 }

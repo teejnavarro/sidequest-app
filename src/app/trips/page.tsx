@@ -8,7 +8,7 @@ import { Band } from "@/components/band";
 import { Face } from "@/components/face";
 import { FaceStack } from "@/components/face-stack";
 import { RouteLine } from "@/components/route-line";
-import { cardClass, pressCard, primaryButton, screenClass } from "@/components/ui";
+import { cardClass, pressCard, primaryButton, screenBase, skeleton } from "@/components/ui";
 
 async function TripsContent() {
   const user = await getCurrentUser();
@@ -28,7 +28,7 @@ async function TripsContent() {
           </Link>
         </div>
       </Band>
-      <main className={`${screenClass} -mt-5 pt-0`}>
+      <main className={`${screenBase} -mt-5`}>
         {trips.length === 0 ? (
           <div className={`${cardClass} gap-3 px-5 py-6`}>
             <h2 className="text-[19px]">Start your first trip</h2>
@@ -88,12 +88,12 @@ function TripsLoading() {
     <div aria-hidden="true">
       <div className="bg-band">
         <div className="mx-auto max-w-[480px] px-4 pt-5 pb-9 md:max-w-[640px]">
-          <div className="h-9 w-32 animate-pulse rounded-full bg-on-band/20" />
+          <div className={`h-9 w-32 ${skeleton} rounded-full bg-on-band/20`} />
         </div>
       </div>
-      <div className={`${screenClass} -mt-5 pt-0`}>
-        <div className="h-24 animate-pulse rounded-card bg-chip" />
-        <div className="h-24 animate-pulse rounded-card bg-chip" />
+      <div className={`${screenBase} -mt-5`}>
+        <div className={`h-24 ${skeleton} rounded-card bg-chip`} />
+        <div className={`h-24 ${skeleton} rounded-card bg-chip`} />
       </div>
     </div>
   );

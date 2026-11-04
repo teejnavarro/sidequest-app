@@ -4,7 +4,7 @@ import { CaretLeft } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { emptyTripValues } from "@/lib/trip-form-state";
 import { TripForm } from "@/components/trip-form";
-import { cardClass, linkClass, screenClass } from "@/components/ui";
+import { cardClass, linkClass, screenClass, skeleton } from "@/components/ui";
 
 async function NewTripContent() {
   await getCurrentUser(); // signed-out visitors go home
@@ -24,7 +24,7 @@ export default function NewTripPage() {
       </Link>
       <h1 className="text-[30px]">New trip</h1>
       <Suspense
-        fallback={<div aria-hidden="true" className="h-96 animate-pulse rounded-card bg-chip" />}
+        fallback={<div aria-hidden="true" className={`h-96 ${skeleton} rounded-card bg-chip`} />}
       >
         <NewTripContent />
       </Suspense>
