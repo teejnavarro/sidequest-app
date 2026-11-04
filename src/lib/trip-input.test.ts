@@ -73,11 +73,11 @@ describe("validateTripInput", () => {
     ["empty", ""],
     ["wrong shape", "12/03/2027"],
   ])("asks for a start date when it is %s", (_label, startDate) => {
-    expect(errorsFor({ startDate }).startDate).toBe("Pick a start date.");
+    expect(errorsFor({ startDate }).startDate).toBe("Pick the day you leave.");
   });
 
   it("asks for an end date when it is missing", () => {
-    expect(errorsFor({ endDate: "" }).endDate).toBe("Pick an end date.");
+    expect(errorsFor({ endDate: "" }).endDate).toBe("Pick the day you're back.");
   });
 
   it("limits years to 2000-2100", () => {
@@ -90,7 +90,7 @@ describe("validateTripInput", () => {
 
   it("rejects an end before the start", () => {
     expect(errorsFor({ startDate: "2027-03-15", endDate: "2027-03-12" }).endDate).toBe(
-      "The end date can't be before the start date.",
+      "The day you're back can't be before the day you leave.",
     );
   });
 

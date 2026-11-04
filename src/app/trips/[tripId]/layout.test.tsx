@@ -61,7 +61,7 @@ describe("the trip header", () => {
   });
 
   it("shows the dates with the GMT offset and place", async () => {
-    expect(await renderHeader()).toContain("Mar 12-15, 2027 · GMT+8 Philippines");
+    expect(await renderHeader()).toContain("Mar 12–15, 2027 · GMT+8 Philippines");
   });
 
   it("shows not found to someone who is not a member", async () => {

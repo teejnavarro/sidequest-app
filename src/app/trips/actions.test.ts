@@ -60,7 +60,7 @@ describe("createTripAction", () => {
     const typed = { ...good, name: "   ", endDate: "2027-03-01" };
     const state = await createTripAction(initial, formWith(typed));
     expect(state.errors.name).toBe("Please enter a trip name.");
-    expect(state.errors.endDate).toBe("The end date can't be before the start date.");
+    expect(state.errors.endDate).toBe("The day you're back can't be before the day you leave.");
     expect(state.values).toEqual(typed);
     expect(mocks.createTrip).not.toHaveBeenCalled();
     expect(mocks.redirect).not.toHaveBeenCalled();

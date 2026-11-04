@@ -27,8 +27,10 @@ type DateCheck = { ok: true; date: string } | { ok: false; error: string };
 // A real calendar day written as YYYY-MM-DD. Checked by hand, never through the
 // user's local time, so no day can shift.
 function checkDate(raw: unknown, which: "start" | "end"): DateCheck {
-  const article = which === "start" ? "a" : "an";
-  const missing = { ok: false, error: `Pick ${article} ${which} date.` } as const;
+  const missing = {
+    ok: false,
+    error: which === "start" ? "Pick the day you leave." : "Pick the day you're back.",
+  } as const;
   const text = typeof raw === "string" ? raw.trim() : "";
 
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
@@ -75,7 +77,7 @@ export function validateTripInput(raw: Record<string, unknown>): TripInputResult
   if (!end.ok) errors.endDate = end.error;
   // YYYY-MM-DD sorts correctly as plain text. Same-day trips are fine.
   if (start.ok && end.ok && end.date < start.date) {
-    errors.endDate = "The end date can't be before the start date.";
+    errors.endDate = "The day you're back can't be before the day you leave.";
   }
 
   const timeZone = typeof raw.timeZone === "string" ? raw.timeZone : "";
