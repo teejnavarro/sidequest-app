@@ -1,18 +1,22 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { MapPin, Plus } from "@phosphor-icons/react/dist/ssr";
+import { Plus } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { listMyTrips } from "@/lib/trips";
-import { formatTripDates } from "@/lib/trip-dates";
 import { Band } from "@/components/band";
 import { Face } from "@/components/face";
-import { FaceStack } from "@/components/face-stack";
-import { RouteLine } from "@/components/route-line";
-import { cardClass, pressCard, primaryButton, screenBase, skeleton } from "@/components/ui";
+import { TripCard } from "@/components/trip-card";
+import {
+  cardClass,
+  primaryButton,
+  screenBase,
+  skeleton,
+} from "@/components/ui";
 
 async function TripsContent() {
   const user = await getCurrentUser();
   const trips = await listMyTrips(user.id);
+  const now = new Date(); // after the session was read, so it is request-time
 
   return (
     <>
@@ -42,36 +46,9 @@ async function TripsContent() {
           </div>
         ) : (
           <>
-            {trips.map((trip) => {
-              const dates = formatTripDates(trip.startDate, trip.endDate);
-              return (
-                <Link
-                  key={trip.id}
-                  href={`/trips/${trip.id}`}
-                  className={`${cardClass} ${pressCard}`}
-                >
-                  <h2 className="text-[19px] break-words">{trip.name}</h2>
-                  {trip.destination ? (
-                    <p className="text-[13px] text-muted flex items-start gap-1.5">
-                      <MapPin size={16} weight="bold" aria-hidden="true" className="mt-0.5 shrink-0" />
-                      <span className="min-w-0 break-words">{trip.destination}</span>
-                    </p>
-                  ) : null}
-                  <RouteLine start={dates.start} end={dates.end} />
-                  <span className="flex items-center justify-between gap-3">
-                    <FaceStack
-                      people={trip.members}
-                      size={32}
-                      borderClass="border-card"
-                      decorative
-                    />
-                    <span className="sr-only">
-                      {trip.members.length === 1 ? "1 person" : `${trip.members.length} people`}
-                    </span>
-                  </span>
-                </Link>
-              );
-            })}
+            {trips.map((trip) => (
+              <TripCard key={trip.id} trip={trip} now={now} />
+            ))}
             <Link href="/trips/new" className={`${primaryButton} w-full`}>
               <Plus size={20} weight="bold" aria-hidden="true" />
               New trip
@@ -92,8 +69,13 @@ function TripsLoading() {
         </div>
       </div>
       <div className={`${screenBase} -mt-5`}>
-        <div className={`h-24 ${skeleton} rounded-card bg-chip`} />
-        <div className={`h-24 ${skeleton} rounded-card bg-chip`} />
+        {[0, 1].map((n) => (
+          <div key={n} className={`${cardClass} gap-3`}>
+            <div className={`h-6 w-2/3 ${skeleton} rounded-full bg-chip`} />
+            <div className={`h-4 w-full ${skeleton} rounded-full bg-chip`} />
+            <div className={`h-8 w-40 ${skeleton} rounded-full bg-chip`} />
+          </div>
+        ))}
       </div>
     </div>
   );

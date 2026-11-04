@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { formatTripDates, formatTripRange, todayInZone, tripTimeLabel } from "./trip-dates";
+import {
+  formatTripDates,
+  formatTripRange,
+  isCalendarDay,
+  todayInZone,
+  tripTimeLabel,
+} from "./trip-dates";
 
 describe("formatTripRange", () => {
   it("shortens a trip inside one month", () => {
@@ -140,6 +146,20 @@ describe("todayInZone", () => {
         if (original === undefined) delete process.env.TZ;
         else process.env.TZ = original;
       }
+    },
+  );
+});
+
+describe("isCalendarDay", () => {
+  it("accepts real days, including a leap day", () => {
+    expect(isCalendarDay("2027-03-12")).toBe(true);
+    expect(isCalendarDay("2028-02-29")).toBe(true);
+  });
+
+  it.each(["", "2027-02-30", "2027-02-29", "2027-13-01", "27-03-12", "2027-3-12", "12/03/2027", "2027-03-12x"])(
+    "rejects %j",
+    (value) => {
+      expect(isCalendarDay(value)).toBe(false);
     },
   );
 });
