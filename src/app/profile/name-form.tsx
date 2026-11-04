@@ -21,7 +21,7 @@ export function NameForm({ currentName }: { currentName: string }) {
     <form action={formAction} className="grid gap-4">
       <div className="grid gap-1.5">
         <label htmlFor="name" className={labelClass}>
-          Display name
+          Your name
         </label>
         <input
           id="name"
@@ -43,7 +43,7 @@ export function NameForm({ currentName }: { currentName: string }) {
       <p
         id="name-message"
         aria-live="polite"
-        className={`min-h-5 text-[13px] font-bold ${state.ok ? "text-owed" : "text-owe"}`}
+        className={`text-[13px] font-bold empty:sr-only ${state.ok ? "text-owed" : "text-owe"}`}
       >
         {state.message}
       </p>

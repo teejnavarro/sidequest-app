@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/current-user";
 import { emptyTripValues } from "@/lib/trip-form-state";
 import { TripForm } from "@/components/trip-form";
@@ -13,6 +14,8 @@ async function NewTripContent() {
     </div>
   );
 }
+
+export const metadata: Metadata = { title: "New trip | Sidequest" };
 
 export default function NewTripPage() {
   return (

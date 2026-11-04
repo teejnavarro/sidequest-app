@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
@@ -56,6 +57,8 @@ function EditTripLoading() {
     </>
   );
 }
+
+export const metadata: Metadata = { title: "Edit trip | Sidequest" };
 
 export default function EditTripPage({ params }: PageProps<"/trips/[tripId]/edit">) {
   return (

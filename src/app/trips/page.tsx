@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
@@ -80,6 +81,8 @@ function TripsLoading() {
     </div>
   );
 }
+
+export const metadata: Metadata = { title: "My trips | Sidequest" };
 
 export default function TripsPage() {
   return (

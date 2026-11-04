@@ -1,10 +1,13 @@
+import type { Metadata } from "next";
 import { ComingSoon } from "@/components/coming-soon";
+
+export const metadata: Metadata = { title: "Schedule | Sidequest" };
 
 export default function SchedulePage() {
   return (
     <ComingSoon
       title="Schedule"
-      text="Your day-by-day plan will live here, with the time of each stop shown in the trip's own time zone."
+      text='One card per day, so nobody has to ask what time.'
     />
   );
 }

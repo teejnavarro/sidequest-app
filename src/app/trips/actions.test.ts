@@ -83,7 +83,7 @@ describe("createTripAction", () => {
   it("shows a plain message and keeps the values when saving fails", async () => {
     mocks.createTrip.mockRejectedValue(new Error("database down"));
     const state = await createTripAction(initial, formWith(good));
-    expect(state.errors.form).toBe("Could not save the trip. Please try again.");
+    expect(state.errors.form).toBe("Couldn't save the trip. Please try again.");
     expect(state.values).toEqual(good);
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
@@ -216,7 +216,7 @@ describe("deleteTripAction", () => {
   it("shows a plain message and stays on the page when the delete fails", async () => {
     mocks.deleteTripForOwner.mockRejectedValue(new Error("database down"));
     await expect(deleteTripAction(none, formWith({ tripId: "trip-1" }))).resolves.toEqual({
-      error: "Could not delete the trip. Please try again.",
+      error: "Couldn't delete the trip. Please try again.",
     });
     expect(mocks.redirect).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();

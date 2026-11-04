@@ -23,7 +23,7 @@ export async function updateDisplayName(
       headers: await headers(),
     });
   } catch {
-    return { ok: false, message: "Could not save your name. Please try again." };
+    return { ok: false, message: "Couldn't save your name. Please try again." };
   }
 
   revalidatePath("/profile");

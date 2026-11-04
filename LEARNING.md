@@ -347,3 +347,24 @@ delete itself: "remove this trip, but only if this person is its owner". If some
 not the owner tries, the database matches nothing and nothing is deleted. The same happens
 when a delete is repeated, so pressing the button twice, or a second try from a forged
 request, does no harm and tells the person nothing about which trips exist.
+
+---
+
+## Chapter 6: Tidying the screens
+
+### Route groups: two kinds of trip page
+
+A trip has two kinds of pages. The four tabs (Schedule, Ideas, Bookings, Costs) share one big
+header and a tab bar. The pages where you do one job (Edit, Invite, Delete) should be quieter,
+with a short header and no tab bar. In Next.js you can put the four tab pages in a folder whose
+name is wrapped in brackets, like `(tabs)`. The brackets mean the folder is only for organising:
+it does not appear in the web address, so every link keeps working. The shared header and tab bar
+are attached to that folder, so only the tab pages get them.
+
+### Why a trip's "today" uses the trip's own time zone
+
+The little tag on a trip ("In 12 days", "Day 2 of 4", "Trip's over") counts days. But what day is
+it right now? For someone in Manila it might already be tomorrow while it is still today in Los
+Angeles. A trip to Manila starts when it is that day in Manila, so we work out "today" in the
+trip's own time zone, then count whole days from the dates we stored. Days are plain calendar
+dates, never moments in time, so nobody's phone can move a date by a day.

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { SignOut } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { signOut } from "@/app/actions";
@@ -34,6 +35,8 @@ function ProfileLoading() {
     </div>
   );
 }
+
+export const metadata: Metadata = { title: "Profile | Sidequest" };
 
 export default function ProfilePage() {
   return (

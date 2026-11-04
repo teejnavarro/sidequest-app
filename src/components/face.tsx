@@ -22,7 +22,7 @@ export function Face({ userId, name, image, size = 32, decorative = false }: Fac
         width={size}
         height={size}
         style={box}
-        className="shrink-0 rounded-full object-cover"
+        className="shrink-0 rounded-full bg-chip object-cover"
       />
     );
   }

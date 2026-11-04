@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { getInviteCodeForMember, getTripForMember, listTripMembers } from "@/lib/trips";
@@ -69,6 +70,8 @@ function InviteLoading() {
     </>
   );
 }
+
+export const metadata: Metadata = { title: "Invite people | Sidequest" };
 
 export default function InvitePage({ params }: PageProps<"/trips/[tripId]/invite">) {
   return (

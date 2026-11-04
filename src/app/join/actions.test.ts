@@ -82,7 +82,7 @@ describe("joinTripAction", () => {
   it("shows a plain message when the save fails", async () => {
     mocks.joinTripByInviteCode.mockRejectedValue(new Error("database down"));
     await expect(joinTripAction(initial, formWith({ code: CODE }))).resolves.toEqual({
-      message: "Could not join the trip. Please try again.",
+      message: "Couldn't join the trip. Please try again.",
     });
     expect(mocks.redirect).not.toHaveBeenCalled();
   });

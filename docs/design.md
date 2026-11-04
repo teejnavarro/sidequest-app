@@ -97,7 +97,7 @@ same on every phone.
 Short and plain. Buttons start with a verb ("Log a cost"). Sentence case. Say "You're owed" and
 "You owe", never "balance: +1400". No exclamation marks on system messages.
 
-## Approved refinements (2026-11-04, not built yet)
+## Approved refinements (2026-11-04)
 
 The screens should feel specific to friends planning a trip, not like a generic app. The owner approved these in Lavish, including the build details on 2026-11-04, and the color table above already shows the new header and amber values. Layouts stay fluid and are checked on a real iPhone and Samsung.
 

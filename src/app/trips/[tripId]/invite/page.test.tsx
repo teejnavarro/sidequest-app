@@ -79,10 +79,10 @@ describe("InvitePage", () => {
     expect(html).toContain("Ben");
   });
 
-  it("marks only the owner with a quiet Owner tag, not (owner)", async () => {
+  it("marks only the owner with a quiet Owner tag, with no brackets", async () => {
     const html = await renderFor([member("u1", "Maya"), member("u2", "Ben")]);
     expect(html.match(/>Owner</g)).toHaveLength(1);
-    expect(html).not.toContain("(owner)");
+    expect(html).not.toMatch(/\(\s*owner\s*\)/i);
   });
 
   it("says 1 person is in when it is just the owner", async () => {

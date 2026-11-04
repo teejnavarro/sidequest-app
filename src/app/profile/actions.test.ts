@@ -63,7 +63,7 @@ describe("updateDisplayName", () => {
     mocks.updateUser.mockRejectedValue(new Error("database down"));
     await expect(updateDisplayName(initial, formWith("Maya Cruz"))).resolves.toEqual({
       ok: false,
-      message: "Could not save your name. Please try again.",
+      message: "Couldn't save your name. Please try again.",
     });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });

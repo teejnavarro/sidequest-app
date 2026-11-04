@@ -39,7 +39,7 @@ export async function createTripAction(
     tripId = await createTrip(user.id, result.value);
   } catch {
     return {
-      errors: { form: "Could not save the trip. Please try again." },
+      errors: { form: "Couldn't save the trip. Please try again." },
       values,
     };
   }
@@ -67,7 +67,7 @@ export async function updateTripAction(
     saved = tripId !== "" && (await updateTripForMember(tripId, user.id, result.value));
   } catch {
     return {
-      errors: { form: "Could not save the trip. Please try again." },
+      errors: { form: "Couldn't save the trip. Please try again." },
       values,
     };
   }
@@ -99,7 +99,7 @@ export async function deleteTripAction(
     // Who may delete is decided only in here, never by the form or by a hidden link.
     await deleteTripForOwner(tripId, user.id);
   } catch {
-    return { error: "Could not delete the trip. Please try again." };
+    return { error: "Couldn't delete the trip. Please try again." };
   }
 
   revalidatePath("/trips");

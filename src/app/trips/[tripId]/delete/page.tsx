@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
@@ -54,6 +55,8 @@ function DeleteTripLoading() {
     </>
   );
 }
+
+export const metadata: Metadata = { title: "Delete trip | Sidequest" };
 
 export default function DeleteTripPage({ params }: PageProps<"/trips/[tripId]/delete">) {
   return (
