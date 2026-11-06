@@ -6,6 +6,7 @@ import {
   TIME_ZONES,
   TIME_ZONE_GROUPS,
   timeZoneLabel,
+  timeZoneOffset,
   timeZonePlace,
 } from "./trip-options";
 
@@ -52,10 +53,21 @@ describe("currency list", () => {
     expect(new Set(CURRENCIES.map((c) => c.value)).size).toBe(CURRENCIES.length);
   });
 
-  it("shows each as 'CODE, name'", () => {
+  it("shows each as the name and its symbol, with no code in front", () => {
     for (const currency of CURRENCIES) {
-      expect(currency.label.startsWith(`${currency.value}, `)).toBe(true);
+      expect(currency.label).toMatch(/^[A-Z][A-Za-z ]+ \(\S+\)$/);
+      expect(currency.label.startsWith(`${currency.value},`)).toBe(false);
     }
+    expect(CURRENCIES.find((c) => c.value === "PHP")?.label).toBe("Philippine peso (₱)");
+    expect(CURRENCIES.find((c) => c.value === "VND")?.label).toBe("Vietnamese dong (₫)");
+    expect(CURRENCIES.find((c) => c.value === "EUR")?.label).toBe("Euro (€)");
+    expect(CURRENCIES.find((c) => c.value === "AED")?.label).toBe("UAE dirham (AED)");
+  });
+
+  it("keeps the saved values unchanged", () => {
+    expect(CURRENCIES.map((c) => c.value)).toEqual([
+      "PHP", "VND", "THB", "SGD", "MYR", "IDR", "JPY", "KRW", "TWD", "HKD", "CNY", "AUD", "NZD", "USD", "EUR", "GBP", "AED",
+    ]);
   });
 });
 
@@ -116,5 +128,23 @@ describe("timeZoneLabel for the trip header", () => {
         expect(timeZoneLabel("America/New_York", "2027-01-15")).toBe("GMT-5 US East");
       },
     );
+  });
+});
+
+describe("timeZoneOffset", () => {
+  it("gives just the offset", () => {
+    expect(timeZoneOffset("Asia/Manila", "2027-03-12")).toBe("GMT+8");
+    expect(timeZoneOffset("Asia/Kolkata", "2027-03-12")).toBe("GMT+5:30");
+    expect(timeZoneOffset("Europe/London", "2027-01-15")).toBe("GMT");
+  });
+
+  it("measures daylight saving on the given day", () => {
+    expect(timeZoneOffset("Europe/Paris", "2027-01-15")).toBe("GMT+1");
+    expect(timeZoneOffset("Europe/Paris", "2027-07-15")).toBe("GMT+2");
+  });
+
+  it("is null for a zone that is not in the list", () => {
+    expect(timeZoneOffset("Not/AZone", "2027-03-12")).toBeNull();
+    expect(timeZoneOffset("Europe/Lisbon", "2027-03-12")).toBeNull();
   });
 });

@@ -75,23 +75,23 @@ export const DEFAULT_TIME_ZONE = "Asia/Manila";
 export type CurrencyOption = { value: string; label: string };
 
 export const CURRENCIES: CurrencyOption[] = [
-  { value: "PHP", label: "PHP, Philippine peso" },
-  { value: "VND", label: "VND, Vietnamese dong" },
-  { value: "THB", label: "THB, Thai baht" },
-  { value: "SGD", label: "SGD, Singapore dollar" },
-  { value: "MYR", label: "MYR, Malaysian ringgit" },
-  { value: "IDR", label: "IDR, Indonesian rupiah" },
-  { value: "JPY", label: "JPY, Japanese yen" },
-  { value: "KRW", label: "KRW, South Korean won" },
-  { value: "TWD", label: "TWD, New Taiwan dollar" },
-  { value: "HKD", label: "HKD, Hong Kong dollar" },
-  { value: "CNY", label: "CNY, Chinese yuan" },
-  { value: "AUD", label: "AUD, Australian dollar" },
-  { value: "NZD", label: "NZD, New Zealand dollar" },
-  { value: "USD", label: "USD, US dollar" },
-  { value: "EUR", label: "EUR, Euro" },
-  { value: "GBP", label: "GBP, British pound" },
-  { value: "AED", label: "AED, UAE dirham" },
+  { value: "PHP", label: "Philippine peso (₱)" },
+  { value: "VND", label: "Vietnamese dong (₫)" },
+  { value: "THB", label: "Thai baht (฿)" },
+  { value: "SGD", label: "Singapore dollar (S$)" },
+  { value: "MYR", label: "Malaysian ringgit (RM)" },
+  { value: "IDR", label: "Indonesian rupiah (Rp)" },
+  { value: "JPY", label: "Japanese yen (¥)" },
+  { value: "KRW", label: "South Korean won (₩)" },
+  { value: "TWD", label: "New Taiwan dollar (NT$)" },
+  { value: "HKD", label: "Hong Kong dollar (HK$)" },
+  { value: "CNY", label: "Chinese yuan (CN¥)" },
+  { value: "AUD", label: "Australian dollar (A$)" },
+  { value: "NZD", label: "New Zealand dollar (NZ$)" },
+  { value: "USD", label: "US dollar (US$)" },
+  { value: "EUR", label: "Euro (€)" },
+  { value: "GBP", label: "British pound (£)" },
+  { value: "AED", label: "UAE dirham (AED)" },
 ];
 
 export const DEFAULT_CURRENCY = "PHP";
@@ -107,19 +107,27 @@ export function timeZonePlace(value: string): string | null {
   return label ? label.replace(/\s*\(.*\)\s*$/, "") : null;
 }
 
-// For the trip header: "GMT+8 Philippines". The offset is measured on the given day
-// ("YYYY-MM-DD", the trip's start date), so places with daylight saving show the offset the
-// trip will actually have. Half-hour zones read "GMT+5:30" and UTC reads "GMT". A zone that
-// is not in the list falls back to its raw name. Never depends on the computer's own zone.
-export function timeZoneLabel(value: string, onDate: string): string {
-  const place = timeZonePlace(value);
-  if (!place) return value;
+// The offset from GMT on a given day ("YYYY-MM-DD"), such as "GMT+8" or "GMT+5:30". It is
+// measured on that day, so places with daylight saving show the offset the trip will have.
+// A zero offset reads plain "GMT". Null for a zone that is not in the list. Never depends
+// on the computer's own zone.
+export function timeZoneOffset(value: string, onDate: string): string | null {
+  if (!listLabel(value)) return null;
   const [year, month, day] = onDate.split("-").map(Number);
   const noonUtc = new Date(Date.UTC(year, month - 1, day, 12));
   const offset = new Intl.DateTimeFormat("en", { timeZone: value, timeZoneName: "shortOffset" })
     .formatToParts(noonUtc)
     .find((part) => part.type === "timeZoneName")?.value;
+  if (!offset) return null;
   // Some systems write a zero offset as "GMT+0"; plain "GMT" reads better.
-  const plain = offset === "GMT+0" || offset === "GMT-0" ? "GMT" : offset;
-  return plain ? `${plain} ${place}` : place;
+  return offset === "GMT+0" || offset === "GMT-0" ? "GMT" : offset;
+}
+
+// For a trip header with no destination: "GMT+8 Philippines". A zone that is not in the
+// list falls back to its raw name.
+export function timeZoneLabel(value: string, onDate: string): string {
+  const place = timeZonePlace(value);
+  if (!place) return value;
+  const offset = timeZoneOffset(value, onDate);
+  return offset ? `${offset} ${place}` : place;
 }

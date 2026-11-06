@@ -47,7 +47,7 @@ describe("the invite page for a signed-out visitor", () => {
   it("still shows the circles, as initials, and offers no join button yet", () => {
     expect(html).toContain("MO");
     expect(html).toContain("BS");
-    expect(html).not.toContain("Join trip");
+    expect(html).not.toContain("<button>Join trip</button>");
   });
 
   it("says one person, not one people", () => {
@@ -74,5 +74,36 @@ describe("the invite page for a signed-in person", () => {
     expect(html).toContain('aria-label="Benedict Secretname"');
     expect(html).toContain("Join trip");
     expect(html).not.toContain("Continue with Google");
+  });
+});
+
+describe("the invite page's explanation", () => {
+  const out = renderToStaticMarkup(<JoinView invited={invited} code={CODE} signedIn={false} />);
+  const inn = renderToStaticMarkup(<JoinView invited={invited} code={CODE} signedIn />);
+
+  it("says what Sidequest is, signed out and signed in", () => {
+    expect(out).toContain("Sidequest keeps your group&#x27;s plans and shared costs in one place.");
+    expect(inn).toContain("Sidequest keeps your group&#x27;s plans and shared costs in one place.");
+  });
+
+  it("keeps You're invited to in both views, and the Trip owner line", () => {
+    expect(out).toContain("You&#x27;re invited to Hội An long weekend");
+    expect(inn).toContain("You&#x27;re invited to Hội An long weekend");
+    expect(out).toContain("Trip owner: Maya Owner");
+    expect(inn).toContain("Trip owner: Maya Owner");
+  });
+
+  it("lets a long word wrap in the trip owner line instead of widening the page", () => {
+    expect(out).toMatch(/<p class="[^"]*wrap-anywhere[^"]*">Trip owner:/);
+  });
+
+  it("tells a signed-out visitor to tap Join trip after signing in", () => {
+    expect(out).toContain("After signing in, tap Join trip.");
+    expect(inn).not.toContain("After signing in, tap Join trip.");
+  });
+
+  it("still shows no name beyond the owner's when signed out", () => {
+    expect(out).not.toContain("Benedict");
+    expect(out).not.toContain("Corazon");
   });
 });

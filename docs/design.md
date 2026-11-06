@@ -1,6 +1,6 @@
 # Sidequest design guide: Barkada with Open Road colors
 
-Direction and colors picked by the owner on 2026-11-02. The Architect and Builder use this guide for
+Direction and colors picked by the owner on 2026-11-02, refined on 2026-11-04. The Architect and Builder use this guide for
 every screen. The clickable reference is `assets/mockups/barkada.html` (sample data only).
 
 **Feel:** warm, friendly and ready to set off, like a group of friends planning a trip together. Money stays exact and
@@ -19,11 +19,11 @@ Use these as named tokens in `src/app/globals.css`. Don't write other colors int
 | `muted` | `#4F6475` | `#A9BAC6` | Supporting text |
 | `line` | `#DDE6EB` | `#2E3D48` | Card edges and dividers |
 | `chip` | `#EAF0F3` | `#25343F` | Quiet buttons and filters |
-| `band` | `#304C64` | `#22384A` | Top header band |
+| `band` | `#1F5A78` | `#1B4A63` | Top header band |
 | `on-band` | `#FFFFFF` | `#EEF4F7` | Text on the band |
-| `band-muted` | `#C9DDE4` | `#BCD0DA` | Supporting text on the band |
-| `amber` | `#F2A65A` | `#F2A65A` | Main button background only |
-| `on-amber` | `#14232F` | `#14232F` | Text on the main button |
+| `band-muted` | `#D3E8EF` | `#C4DBE5` | Supporting text on the band |
+| `amber` | `#F2A65A` | `#F2A65A` | Main button background, and the trip time tag on the trip header |
+| `on-amber` | `#14232F` | `#14232F` | Text on the main button and trip time tag |
 | `pin` | `#E08A2E` | `#F2A65A` | Route line plane only (decoration) |
 | `blue-text` | `#24607A` | `#7FCFE0` | Times, selected tab, selected chip, tags |
 | `blue-soft` | `#DCEBF0` | `#234956` | Selected chips, tags, the estimate card |
@@ -96,6 +96,19 @@ same on every phone.
 
 Short and plain. Buttons start with a verb ("Log a cost"). Sentence case. Say "You're owed" and
 "You owe", never "balance: +1400". No exclamation marks on system messages.
+
+## Approved refinements (2026-11-04)
+
+The screens should feel specific to friends planning a trip, not like a generic app. The owner approved these in Lavish, including the build details on 2026-11-04, and the color table above already shows the new header and amber values. Layouts stay fluid and are checked on a real iPhone and Samsung.
+
+- **U1 Trip header:** about 205px tall on a phone. Back link and a small pencil for Edit trip, the trip name, then a pin icon with "China · Nov 3–6, 2026 · GMT+8" (with no destination: no pin, and "Nov 3–6, 2026 · GMT+8 Philippines"). Faces with "3 going", or "Just you so far" when alone. These replace the Owner line. Invite people is the one pill.
+- **U2 Trip time:** a tag saying "In 12 days", "Tomorrow", "Day 2 of 4", "Today" (one-day trips) or "Trip's over", worked out from the stored dates in the trip's own time zone. Amber on the trip header, soft blue on trip cards.
+- **U3 My trips card:** the first card really overlaps the band, as Parts says. "You + 2", or "Just you so far", sits beside the faces.
+- **U4 New trip form:** fields grouped as The trip, When and Details. Trip name shows example hint text. Dates are labelled Leaving and Back, and sit side by side from 360px wide (stacked below that). Destination is labelled "Where to? (optional)". A live route line appears once dates are set. New trip and Profile get the band.
+- **U5 Task pages:** Edit, Invite and Delete use a short band whose back link returns to the trip, with no tab bar. The invite link shows on one shortened line, and the full link is what gets copied. "3 people are in" and a quiet Owner tag replace "Who's in (3)" and "(owner)".
+- **U6 Join page:** a small Sidequest wordmark, one line saying what Sidequest is, and "After signing in, tap Join trip." under the button. Keep "You're invited to" when signed in, and keep the "Trip owner" line. The privacy rule stands: no names beyond the owner before sign-in.
+- **U7 Words:** Schedule: "One card per day, so nobody has to ask what time." Ideas: "Every "we should totally go here" in one place." Bookings: "Flights and stays, so no one digs through the group chat at the airport." Costs: "Who paid, who owes, and no awkward chats about it." "Display name" becomes "Your name". Time zone help: "Times in the plan use this place's clock." All 17 currencies read as name and symbol, such as "Philippine peso (₱)". Date errors: "Pick the day you leave." and "Pick the day you're back." Date ranges use an en dash. Errors use "couldn't" throughout.
+- **U8 Polish:** loading shapes match the real content and respect reduced motion; dropdown text lines up with other boxes, with more room for the arrow; no empty reserved space under Save; each page has its own browser title; photos get a `chip` background while loading and a sharper image size.
 
 ## Open for the Architect
 

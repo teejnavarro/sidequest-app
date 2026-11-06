@@ -3,7 +3,7 @@ import Link from "next/link";
 import { GoogleLogo } from "@phosphor-icons/react/dist/ssr";
 import { getOptionalUser } from "@/lib/current-user";
 import { signInWithGoogle } from "@/app/actions";
-import { primaryButton } from "@/components/ui";
+import { primaryButton, skeleton } from "@/components/ui";
 
 const DEMO_FACES = [
   { initials: "BA", color: "bg-face-1" },
@@ -54,7 +54,7 @@ export default function Home() {
         fallback={
           <div
             aria-hidden="true"
-            className="min-h-12 w-full animate-pulse rounded-full bg-chip"
+            className={`min-h-12 w-full ${skeleton} rounded-full bg-chip`}
           />
         }
       >

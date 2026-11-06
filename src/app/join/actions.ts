@@ -45,10 +45,10 @@ export async function joinTripAction(
   try {
     tripId = await joinTripByInviteCode(code, user.id);
   } catch {
-    return { message: "Could not join the trip. Please try again." };
+    return { message: "Couldn't join the trip. Please try again." };
   }
   if (!tripId) return { message: "This invite link isn't working." };
 
   revalidatePath("/trips");
-  redirect(`/trips/${tripId}`); // redirect works by throwing: keep it outside try/catch
+  redirect(`/trips/${tripId}/schedule`); // redirect works by throwing: keep it outside try/catch
 }

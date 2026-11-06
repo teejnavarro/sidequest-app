@@ -57,7 +57,7 @@ export function InviteActions({ url, tripName }: { url: string; tripName: string
         <Copy size={20} weight="bold" aria-hidden="true" />
         Copy link
       </button>
-      <p aria-live="polite" className={`min-h-5 ${message.problem ? errorClass : helpClass}`}>
+      <p aria-live="polite" className={`empty:sr-only ${message.problem ? errorClass : helpClass}`}>
         {message.text}
       </p>
     </div>

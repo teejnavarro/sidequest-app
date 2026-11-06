@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getOptionalUser } from "@/lib/current-user";
 import { isInviteCode } from "@/lib/invite-code";
 import { getTripByInviteCode, isTripMember } from "@/lib/trips";
-import { screenClass } from "@/components/ui";
+import { screenClass, skeleton } from "@/components/ui";
 import { JoinView } from "./join-view";
 
 // Fixed text only: chat apps build link previews from this, and nothing about the trip
@@ -25,16 +25,16 @@ async function JoinContent({ params }: { params: Promise<{ code: string }> }) {
 
   if (!user) return <JoinView invited={invited} code={lowerCode} signedIn={false} />;
 
-  if (await isTripMember(invited.id, user.id)) redirect(`/trips/${invited.id}`);
+  if (await isTripMember(invited.id, user.id)) redirect(`/trips/${invited.id}/schedule`);
   return <JoinView invited={invited} code={lowerCode} signedIn />;
 }
 
 function JoinLoading() {
   return (
     <div aria-hidden="true" className="grid gap-4 rounded-card border border-line bg-card px-5 py-6">
-      <div className="h-9 w-3/4 animate-pulse rounded-full bg-chip" />
-      <div className="h-4 w-1/2 animate-pulse rounded-full bg-chip" />
-      <div className="h-12 w-full animate-pulse rounded-full bg-chip" />
+      <div className={`h-9 w-3/4 ${skeleton} rounded-full bg-chip`} />
+      <div className={`h-4 w-1/2 ${skeleton} rounded-full bg-chip`} />
+      <div className={`h-12 w-full ${skeleton} rounded-full bg-chip`} />
     </div>
   );
 }
@@ -42,6 +42,7 @@ function JoinLoading() {
 export default function JoinPage({ params }: PageProps<"/join/[code]">) {
   return (
     <main className={screenClass}>
+      <p className="font-display text-[19px] font-bold">Sidequest</p>
       <Suspense fallback={<JoinLoading />}>
         <JoinContent params={params} />
       </Suspense>

@@ -58,7 +58,7 @@ describe("joinTripAction", () => {
 
   it("joins as the signed-in person and goes to the trip", async () => {
     await expect(joinTripAction(initial, formWith({ code: CODE }))).rejects.toThrow(
-      "redirect:/trips/trip-1",
+      "redirect:/trips/trip-1/schedule",
     );
     expect(mocks.joinTripByInviteCode).toHaveBeenCalledWith(CODE, "u1");
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips");
@@ -66,7 +66,7 @@ describe("joinTripAction", () => {
 
   it("ignores extra fields such as userId and callbackURL", async () => {
     const form = formWith({ code: CODE, userId: "someone-else", callbackURL: "https://evil.test" });
-    await expect(joinTripAction(initial, form)).rejects.toThrow("redirect:/trips/trip-1");
+    await expect(joinTripAction(initial, form)).rejects.toThrow("redirect:/trips/trip-1/schedule");
     expect(mocks.joinTripByInviteCode).toHaveBeenCalledWith(CODE, "u1");
   });
 
@@ -82,7 +82,7 @@ describe("joinTripAction", () => {
   it("shows a plain message when the save fails", async () => {
     mocks.joinTripByInviteCode.mockRejectedValue(new Error("database down"));
     await expect(joinTripAction(initial, formWith({ code: CODE }))).resolves.toEqual({
-      message: "Could not join the trip. Please try again.",
+      message: "Couldn't join the trip. Please try again.",
     });
     expect(mocks.redirect).not.toHaveBeenCalled();
   });

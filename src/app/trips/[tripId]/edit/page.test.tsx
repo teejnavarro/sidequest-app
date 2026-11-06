@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import EditTripPage from "./page";
 
@@ -31,6 +32,14 @@ const props = {
   params: Promise.resolve({ tripId: "trip-1" }),
 } as Parameters<typeof EditTripPage>[0];
 
+// The page keeps its data in a component inside Suspense, so run that component directly.
+async function renderContent() {
+  const page = EditTripPage(props) as ReactElement<{ children: ReactElement<{ params: Promise<{ tripId: string }> }> }>;
+  const content = page.props.children;
+  const render = content.type as (props: typeof content.props) => Promise<ReactElement>;
+  return render(content.props);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
@@ -40,13 +49,13 @@ beforeEach(() => {
 describe("EditTripPage", () => {
   it("shows not found to someone who is not a member", async () => {
     mocks.getTripForMember.mockResolvedValue(null);
-    await expect(EditTripPage(props)).rejects.toThrow("not-found");
+    await expect(renderContent()).rejects.toThrow("not-found");
     expect(mocks.getTripForMember).toHaveBeenCalledWith("trip-1", "u1");
   });
 
   it("sends a signed-out visitor away before looking up the trip", async () => {
     mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
-    await expect(EditTripPage(props)).rejects.toThrow("redirect:/");
+    await expect(renderContent()).rejects.toThrow("redirect:/");
     expect(mocks.getTripForMember).not.toHaveBeenCalled();
   });
 
@@ -62,7 +71,7 @@ describe("EditTripPage", () => {
       ownerName: "Maya",
       ownerImage: null,
     });
-    const page = await EditTripPage(props);
+    const page = await renderContent();
     expect(show(page)).toContain("Hội An long weekend");
   });
 });
@@ -83,14 +92,15 @@ describe("EditTripPage delete link", () => {
 
   it("shows the Delete trip link to the owner", async () => {
     mocks.getTripForMember.mockResolvedValue(trip("u1"));
-    const page = show(await EditTripPage(props));
+    const page = show(await renderContent());
     expect(page).toContain("/trips/trip-1/delete");
+    expect(page).toContain('/trips/trip-1/schedule'); // back link goes straight to the trip's first tab
     expect(page).toContain("Delete trip");
   });
 
   it("shows no Delete trip link to a member who is not the owner", async () => {
     mocks.getTripForMember.mockResolvedValue(trip("someone-else"));
-    const page = show(await EditTripPage(props));
+    const page = show(await renderContent());
     expect(page).not.toContain("/delete");
     expect(page).not.toContain("Delete trip");
   });
