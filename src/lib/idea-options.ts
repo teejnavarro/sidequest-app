@@ -79,3 +79,18 @@ export function linkLabel(url: string): string {
     (GOOGLE_HOST.test(host) && path.startsWith("/maps"));
   return isMaps ? "Open in Google Maps" : "Open link";
 }
+
+// The short symbol for a currency, such as "₱" for PHP, to show before a cost box. Falls
+// back to the code itself.
+export function currencySymbol(currency: string): string {
+  try {
+    const parts = new Intl.NumberFormat("en", {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+    }).formatToParts(0);
+    return parts.find((part) => part.type === "currency")?.value ?? currency;
+  } catch {
+    return currency;
+  }
+}

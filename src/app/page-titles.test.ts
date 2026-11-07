@@ -14,6 +14,9 @@ const pages: [string, string][] = [
   ["src/app/trips/[tripId]/edit/page.tsx", "Edit trip | Sidequest"],
   ["src/app/trips/[tripId]/invite/page.tsx", "Invite people | Sidequest"],
   ["src/app/trips/[tripId]/delete/page.tsx", "Delete trip | Sidequest"],
+  ["src/app/trips/[tripId]/ideas/new/page.tsx", "Add an idea | Sidequest"],
+  ["src/app/trips/[tripId]/ideas/[ideaId]/edit/page.tsx", "Edit idea | Sidequest"],
+  ["src/app/trips/[tripId]/ideas/[ideaId]/delete/page.tsx", "Delete idea | Sidequest"],
   ["src/app/join/[code]/page.tsx", "You're invited | Sidequest"],
 ];
 

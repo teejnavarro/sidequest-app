@@ -82,3 +82,14 @@ describe("linkLabel", () => {
     expect(linkLabel(url)).toBe("Open link");
   });
 });
+
+describe("currencySymbol", () => {
+  it("gives the short symbol, or the code when there is none", async () => {
+    const { currencySymbol } = await import("./idea-options");
+    expect(currencySymbol("PHP")).toBe("₱");
+    expect(currencySymbol("VND")).toBe("₫");
+    expect(currencySymbol("USD")).toBe("$");
+    expect(currencySymbol("AED")).toBe("AED");
+    expect(currencySymbol("NOPE!")).toBe("NOPE!");
+  });
+});
