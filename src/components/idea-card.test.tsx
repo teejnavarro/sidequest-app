@@ -14,6 +14,11 @@ const base = {
   notes: null as string | null,
   createdAt: new Date("2027-01-01T00:00:00Z"),
   addedBy: { id: "u2", name: "Ben Reyes", image: null },
+  up: 0,
+  down: 0,
+  myVote: null as 1 | -1 | null,
+  approvedAt: null as Date | null,
+  approvedBy: null as { id: string; name: string } | null,
 };
 
 const html = (idea = {}, canChange = false) =>

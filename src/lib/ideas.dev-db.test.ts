@@ -67,7 +67,9 @@ describe("ideas privacy layer on the dev database", () => {
   async function cleanUp() {
     const { db } = dbModule;
     const { like } = orm;
-    // Deleting a trip also deletes its member rows and its ideas.
+    // Votes first: they point at test users. Deleting a trip also deletes its member rows,
+    // its ideas and their votes.
+    await db.delete(schema.ideaVote).where(like(schema.ideaVote.userId, `${ID_PREFIX}%`));
     await db.delete(schema.trip).where(like(schema.trip.ownerId, `${ID_PREFIX}%`));
     await db.delete(schema.tripMember).where(like(schema.tripMember.userId, `${ID_PREFIX}%`));
     await db.delete(schema.idea).where(like(schema.idea.createdBy, `${ID_PREFIX}%`));
@@ -109,6 +111,7 @@ describe("ideas privacy layer on the dev database", () => {
     expect(await db.select().from(schema.user).where(like(schema.user.id, `${ID_PREFIX}%`))).toEqual([]);
     expect(await db.select().from(schema.trip).where(like(schema.trip.ownerId, `${ID_PREFIX}%`))).toEqual([]);
     expect(await db.select().from(schema.idea).where(like(schema.idea.createdBy, `${ID_PREFIX}%`))).toEqual([]);
+    expect(await db.select().from(schema.ideaVote).where(like(schema.ideaVote.userId, `${ID_PREFIX}%`))).toEqual([]);
   });
 
   it("lets a member add an idea and keeps the accents and line breaks exactly", async () => {
@@ -252,6 +255,96 @@ describe("ideas privacy layer on the dev database", () => {
       .where(orm.eq(schema.idea.id, doomedIdea));
     expect(rows).toEqual([]);
     await expect(ideas.getIdeaForMember(tripB, survivor.id, OWNER_TWO)).resolves.not.toBeNull();
+  });
+
+  it("lets a member vote, take it back, switch, and keeps one vote per person", async () => {
+    const id = (await ideas.createIdea(tripA, ADDER, { ...ideaInput, name: "Vote me" }))!;
+    await expect(ideas.setVote(tripA, id, OTHER, 1)).resolves.toEqual({ up: 1, down: 0, myVote: 1 });
+    // The same thumb again takes it back.
+    await expect(ideas.setVote(tripA, id, OTHER, 1)).resolves.toEqual({ up: 0, down: 0, myVote: null });
+    await expect(ideas.setVote(tripA, id, OTHER, 1)).resolves.toEqual({ up: 1, down: 0, myVote: 1 });
+    // The other thumb switches it: still one vote.
+    await expect(ideas.setVote(tripA, id, OTHER, -1)).resolves.toEqual({ up: 0, down: 1, myVote: -1 });
+    // A second person adds to the counts; each sees only their own vote.
+    await expect(ideas.setVote(tripA, id, OWNER, 1)).resolves.toEqual({ up: 1, down: 1, myVote: 1 });
+    const rows = await dbModule.db.select().from(schema.ideaVote).where(orm.eq(schema.ideaVote.ideaId, id));
+    expect(rows).toHaveLength(2);
+    const asOther = (await ideas.listIdeasForMember(tripA, OTHER)).find((row) => row.id === id);
+    expect(asOther).toMatchObject({ up: 1, down: 1, myVote: -1 });
+    const asAdder = (await ideas.getIdeaForMember(tripA, id, ADDER))!;
+    expect(asAdder).toMatchObject({ up: 1, down: 1, myVote: null });
+    expect(JSON.stringify(asOther)).not.toContain(OWNER); // never who voted
+  });
+
+  it("does not let a stranger vote, or vote across trips", async () => {
+    const id = (await ideas.createIdea(tripA, ADDER, { ...ideaInput, name: "Stranger test" }))!;
+    await expect(ideas.setVote(tripA, id, STRANGER, 1)).resolves.toBeNull();
+    // Member of trip B, but the idea is in trip A, and the address says B.
+    await expect(ideas.setVote(tripB, id, OWNER_TWO, 1)).resolves.toBeNull();
+    await expect(ideas.setVote(tripA, id, OWNER_TWO, 1)).resolves.toBeNull();
+    const rows = await dbModule.db.select().from(schema.ideaVote).where(orm.eq(schema.ideaVote.ideaId, id));
+    expect(rows).toEqual([]);
+  });
+
+  it("approves and moves back for any member, and repeating is harmless", async () => {
+    const id = (await ideas.createIdea(tripA, ADDER, { ...ideaInput, name: "Approve me" }))!;
+    await expect(ideas.approveIdea(tripA, id, STRANGER)).resolves.toBe(false);
+    await expect(ideas.approveIdea(tripB, id, OWNER_TWO)).resolves.toBe(false);
+    await expect(ideas.approveIdea(tripA, id, OTHER)).resolves.toBe(true);
+    // Approving twice changes nothing: the first approver stays.
+    await expect(ideas.approveIdea(tripA, id, OWNER)).resolves.toBe(false);
+    const approved = await ideas.getIdeaForMember(tripA, id, ADDER);
+    expect(approved?.approvedAt).toBeInstanceOf(Date);
+    expect(approved?.approvedBy).toEqual({ id: OTHER, name: "Lia Test" });
+    // Voting continues on approved ideas.
+    await expect(ideas.setVote(tripA, id, ADDER, 1)).resolves.toMatchObject({ up: 1 });
+
+    await expect(ideas.unapproveIdea(tripA, id, STRANGER)).resolves.toBe(false);
+    await expect(ideas.unapproveIdea(tripA, id, ADDER)).resolves.toBe(true);
+    await expect(ideas.unapproveIdea(tripA, id, ADDER)).resolves.toBe(false);
+    const back = await ideas.getIdeaForMember(tripA, id, ADDER);
+    expect(back).toMatchObject({ approvedAt: null, approvedBy: null });
+  });
+
+  it("orders by score, then thumbs up, then newest", async () => {
+    const trip = await trips.createTrip(OWNER, { ...tripInput, name: "Order trip" });
+    await dbModule.db.insert(schema.tripMember).values([
+      { tripId: trip, userId: ADDER },
+      { tripId: trip, userId: OTHER },
+    ]);
+    const make = async (name: string) => {
+      const id = (await ideas.createIdea(trip, OWNER, { ...ideaInput, name }))!;
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      return id;
+    };
+    await make("oldest");
+    const plusOne = await make("plus one"); // +1 (1 up)
+    const twoUpOneDown = await make("two up one down"); // +1 (2 up)
+    await make("newest");
+    const minus = await make("minus"); // -1
+    await ideas.setVote(trip, plusOne, OWNER, 1);
+    await ideas.setVote(trip, twoUpOneDown, OWNER, 1);
+    await ideas.setVote(trip, twoUpOneDown, ADDER, 1);
+    await ideas.setVote(trip, twoUpOneDown, OTHER, -1);
+    await ideas.setVote(trip, minus, OWNER, -1);
+    const names = (await ideas.listIdeasForMember(trip, OWNER)).map((row) => row.name);
+    // Both +1 ideas first (more thumbs up wins the tie), then 0 votes newest first, then -1.
+    expect(names).toEqual(["two up one down", "plus one", "newest", "oldest", "minus"]);
+  }, 30_000);
+
+  it("removes an idea's votes when the idea or the trip is deleted", async () => {
+    const trip = await trips.createTrip(OWNER, { ...tripInput, name: "Votes go trip" });
+    const gone = (await ideas.createIdea(trip, OWNER, ideaInput))!;
+    const gone2 = (await ideas.createIdea(trip, OWNER, ideaInput))!;
+    await ideas.setVote(trip, gone, OWNER, 1);
+    await ideas.setVote(trip, gone2, OWNER, -1);
+    await ideas.deleteIdea(trip, gone, OWNER);
+    const votesOf = (id: string) =>
+      dbModule.db.select().from(schema.ideaVote).where(orm.eq(schema.ideaVote.ideaId, id));
+    await expect(votesOf(gone)).resolves.toEqual([]);
+    await expect(votesOf(gone2)).resolves.toHaveLength(1);
+    await trips.deleteTripForOwner(trip, OWNER);
+    await expect(votesOf(gone2)).resolves.toEqual([]);
   });
 
   it("round-trips emoji and unusual characters unchanged", async () => {

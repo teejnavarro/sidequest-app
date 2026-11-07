@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createIdea, deleteIdea, getIdeaForMember, listIdeasForMember, updateIdea } from "./ideas";
+import {
+  approveIdea,
+  createIdea,
+  deleteIdea,
+  getIdeaForMember,
+  listIdeasForMember,
+  setVote,
+  unapproveIdea,
+  updateIdea,
+} from "./ideas";
 
 // The real query builder with a stand-in for the database, so these tests read the exact SQL
 // the privacy layer sends. ideas.dev-db.test.ts runs it for real.
@@ -42,12 +51,16 @@ beforeEach(() => {
 });
 
 describe("listIdeasForMember", () => {
-  it("checks the trip and membership in the query, newest first, with no email", async () => {
+  it("checks the trip and membership in the query, most liked first, with no email", async () => {
     await listIdeasForMember("trip-1", "u1");
     const [{ sql, params }] = fake.queries;
-    expect(sql).toContain('"idea"."trip_id" = $1');
+    expect(sql).toContain('"idea"."trip_id" = $2');
     expect(sql).toContain("exists");
-    expect(sql).toMatch(/order by "idea"\."created_at" desc/i);
+    // Score, then thumbs up, then newest.
+    expect(sql).toMatch(/order by \(select coalesce\(sum\([^]*\) desc, \(select count\(\*\) filter[^]*\) desc, "idea"\."created_at" desc/i);
+    expect(sql).toContain("filter (where");
+    // Counts and the viewer's own vote only: never the voters' ids in the output.
+    expect(sql).not.toContain('"idea_vote"."user_id" as');
     expect(sql).not.toContain("email");
     expect(params).toEqual(expect.arrayContaining(["trip-1", "u1"]));
   });
@@ -61,11 +74,11 @@ describe("getIdeaForMember", () => {
   it("asks for the idea within its own trip and checks membership in the same query", async () => {
     await getIdeaForMember("trip-1", "idea-1", "u1");
     const [{ sql, params }] = fake.queries;
-    expect(sql).toContain('"idea"."id" = $1');
-    expect(sql).toContain('"idea"."trip_id" = $2');
+    expect(sql).toContain('"idea"."id" = $2');
+    expect(sql).toContain('"idea"."trip_id" = $3');
     expect(sql).toContain("exists");
     expect(sql).not.toContain("email");
-    expect(params.slice(0, 2)).toEqual(["idea-1", "trip-1"]);
+    expect(params.slice(0, 3)).toEqual(["u1", "idea-1", "trip-1"]);
   });
 
   it("gives null when no row comes back", async () => {
@@ -144,5 +157,80 @@ describe("deleteIdea", () => {
     await expect(deleteIdea("trip-1", "idea-1", "other")).resolves.toBe(false);
     fake.rows = [["idea-1"]];
     await expect(deleteIdea("trip-1", "idea-1", "u1")).resolves.toBe(true);
+  });
+});
+
+describe("setVote", () => {
+  const counts = [[2, 1, 1]];
+
+  it("takes the vote back when the same thumb is tapped again", async () => {
+    fake.rows = [["idea-1"]]; // the delete found the matching vote
+    const result = await setVote("trip-1", "idea-1", "u1", 1);
+    const [first] = fake.queries;
+    expect(first.sql).toMatch(/^delete from "idea_vote" where/);
+    expect(first.sql).toContain('"idea_vote"."value" =');
+    expect(first.sql).toContain("exists");
+    expect(first.sql).toContain("trip_member");
+    expect(fake.queries).toHaveLength(2); // delete, then the read; no insert
+    expect(fake.queries[1].sql).toMatch(/^select/);
+    expect(result).not.toBeUndefined();
+  });
+
+  it("adds or switches in one statement that checks the trip and membership", async () => {
+    await setVote("trip-1", "idea-1", "u1", -1);
+    expect(fake.queries).toHaveLength(3); // delete (nothing), insert, read
+    const insert = fake.queries[1];
+    expect(insert.sql).toMatch(/^insert into "idea_vote"/);
+    expect(insert.sql).toContain('from "idea"');
+    expect(insert.sql).toContain("exists");
+    expect(insert.sql).toContain("trip_member");
+    expect(insert.sql).toMatch(/on conflict \("idea_id","user_id"\) do update set "value" = /);
+    expect(insert.params).toEqual(expect.arrayContaining(["idea-1", "trip-1", "u1", -1]));
+  });
+
+  it("gives back null when the person may not vote (no row to read)", async () => {
+    await expect(setVote("trip-1", "idea-1", "stranger", 1)).resolves.toBeNull();
+  });
+
+  it("gives back the counts and the person's own vote", async () => {
+    fake.rows = counts;
+    await expect(setVote("trip-1", "idea-1", "u1", 1)).resolves.toEqual({ up: 2, down: 1, myVote: 1 });
+  });
+});
+
+describe("approveIdea", () => {
+  it("only approves a not-yet-approved idea of this trip, for a member", async () => {
+    await approveIdea("trip-1", "idea-1", "u1");
+    const [{ sql, params }] = fake.queries;
+    expect(sql).toMatch(/^update "idea" set "approved_at" = /);
+    expect(sql).toContain('"approved_by" =');
+    expect(sql).toContain('"idea"."trip_id" =');
+    expect(sql).toContain("exists");
+    expect(sql).toContain('"idea"."approved_at" is null');
+    expect(sql).not.toContain("created_by");
+    expect(params).toEqual(expect.arrayContaining(["idea-1", "trip-1", "u1"]));
+  });
+
+  it("says false when nothing changed and true when a row changed", async () => {
+    await expect(approveIdea("trip-1", "idea-1", "stranger")).resolves.toBe(false);
+    fake.rows = [["idea-1"]];
+    await expect(approveIdea("trip-1", "idea-1", "u1")).resolves.toBe(true);
+  });
+});
+
+describe("unapproveIdea", () => {
+  it("clears both approval columns, only on an approved idea of this trip, for a member", async () => {
+    await unapproveIdea("trip-1", "idea-1", "u1");
+    const [{ sql }] = fake.queries;
+    expect(sql).toMatch(/^update "idea" set "approved_at" = \$1, "approved_by" = \$2/);
+    expect(sql).toContain('"idea"."trip_id" =');
+    expect(sql).toContain("exists");
+    expect(sql).toContain('"idea"."approved_at" is not null');
+  });
+
+  it("says false when nothing changed and true when a row changed", async () => {
+    await expect(unapproveIdea("trip-1", "idea-1", "stranger")).resolves.toBe(false);
+    fake.rows = [["idea-1"]];
+    await expect(unapproveIdea("trip-1", "idea-1", "u1")).resolves.toBe(true);
   });
 });
