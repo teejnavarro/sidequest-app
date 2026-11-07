@@ -78,6 +78,7 @@ Rules:
   person's color stays the same everywhere.
 - **Invite and join:** the invite page is a card with the link, Share link (main button, only where the phone can share) and Copy link, then a Who's in list. The join page is one card: trip name, "Trip owner", and one main button (Continue with Google, then Join trip).
 - **Face stack:** overlapping photo or initials circles, at most five and then a "+n" circle. Used on the landing page, My trips cards (about 32px), the trip header and the join page. Before sign-in the circles on the join page are decoration only, with no names or alt text.
+- **Ideas:** filter chips on top (All with the total, then only the types in use with counts; the chosen one is soft blue), then one card per idea: name, a soft blue type tag with its icon, a meta row (clock and duration, coins and "about ₱120 each", pin and area) and a small face with "Added by <first name>". "Notes and link" opens inside the card with the notes, the link button and Edit idea. One main button, "Add an idea". The idea form is grouped as the idea, Type and How long as round radio choices, then an Optional group.
 - **Review step:** a sheet from the bottom with a plain sentence ("Bea paid ₱3,000, split 4
   ways = ₱750 each.") plus Go back and Save.
 - **Forms:** the label sits above the box, help text below it, errors below that in `owe`.

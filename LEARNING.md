@@ -368,3 +368,35 @@ it right now? For someone in Manila it might already be tomorrow while it is sti
 Angeles. A trip to Manila starts when it is that day in Manila, so we work out "today" in the
 trip's own time zone, then count whole days from the dates we stored. Days are plain calendar
 dates, never moments in time, so nobody's phone can move a date by a day.
+
+---
+
+## Chapter 7: The Ideas list
+
+### A new table needs a migration
+
+The Ideas list keeps its data in a new table, `idea`, so the database has to be told about it.
+A **migration** is a small file that says "add this shelf". We write it once, run it on the test
+copy of the database first, and only run it on the live one when the owner says so. Because
+this table is brand new and the live site doesn't use it yet, adding it early does no harm.
+
+### Deleting a trip deletes its ideas
+
+Every idea points at its trip, and we told the database: "if the trip goes, remove its ideas
+too". That rule is called a **cascade**, the same one that removes a trip's guest list. We never
+have to remember to clean up ideas by hand, and nothing is left behind pointing at a trip that
+no longer exists.
+
+### A filter can live in the web address
+
+When you tap Food on the Ideas list, the address becomes `.../ideas?type=food`. The filter is
+just a word in the address. That has a nice side effect: the Back button and refreshing the page
+keep the filter, and you could send that exact filtered view to a friend. The page reads the word,
+and if it is not one of the real types (or no idea uses it), it quietly shows everything.
+
+### Who may change what
+
+Anyone in the trip can add an idea and see them all. Only the person who added an idea, or the
+trip owner, can edit or delete it. As with deleting a trip, hiding the Edit button is just good
+manners. The real rule is inside the database request: "change this idea, but only if this
+person added it or owns the trip". If someone else tries, nothing changes.
