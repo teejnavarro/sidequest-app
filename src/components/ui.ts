@@ -42,3 +42,10 @@ export const softTag =
 
 // Grey loading shape. It only pulses when the phone has not asked for less motion.
 export const skeleton = "motion-safe:animate-pulse";
+
+// The keyboard focus ring on its own, for things that are not buttons (a summary, a radio).
+export const focusRing = focus;
+
+// A filter or choice chip: quiet by default, soft blue when it is the chosen one. 44px tall.
+export const chipClass = `inline-flex min-h-11 items-center gap-1.5 rounded-full bg-chip px-3.5 text-sm font-bold text-ink ${focus}`;
+export const chipSelectedClass = `inline-flex min-h-11 items-center gap-1.5 rounded-full bg-blue-soft px-3.5 text-sm font-bold text-blue-text ${focus}`;

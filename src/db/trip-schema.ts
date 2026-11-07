@@ -1,6 +1,7 @@
 import {
   date,
   index,
+  integer,
   pgTable,
   primaryKey,
   text,
@@ -53,4 +54,38 @@ export const tripMember = pgTable(
     primaryKey({ columns: [table.tripId, table.userId] }),
     index("trip_member_userId_idx").on(table.userId),
   ],
+);
+
+// Something the group might do on the trip. Ideas go with their trip when it is deleted.
+export const idea = pgTable(
+  "idea",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trip.id, { onDelete: "cascade" }),
+    // Saved exactly as typed, accents and all.
+    name: text("name").notNull(),
+    type: text("type").notNull(), // one of IDEA_TYPES
+    duration: text("duration").notNull(), // "short" | "half" | "full"
+    link: text("link"),
+    area: text("area"),
+    // Whole units of the trip's currency. Null when left blank.
+    costPerPerson: integer("cost_per_person"),
+    // The trip's currency at the time the cost was saved.
+    costCurrency: text("cost_currency"),
+    notes: text("notes"),
+    // No cascade from user: the account deletion story decides what happens here.
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("idea_tripId_idx").on(table.tripId)],
 );
