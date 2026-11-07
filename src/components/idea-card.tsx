@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   ArrowSquareOut,
-  ArrowUUpLeft,
   CaretDown,
   Check,
   Clock,
@@ -10,7 +9,7 @@ import {
   MapTrifold,
   PencilSimple,
 } from "@phosphor-icons/react/dist/ssr";
-import { approveAction, moveBackAction } from "@/app/trips/[tripId]/ideas/actions";
+import { ApproveButton } from "@/components/approve-button";
 import { Face } from "@/components/face";
 import { IdeaTypeIcon } from "@/components/idea-type";
 import { VoteButtons } from "@/components/vote-buttons";
@@ -120,18 +119,7 @@ export function IdeaCard({
           ideaId={idea.id}
           initial={{ up: idea.up, down: idea.down, myVote: idea.myVote }}
         />
-        <form action={approved ? moveBackAction : approveAction}>
-          <input type="hidden" name="tripId" value={tripId} />
-          <input type="hidden" name="ideaId" value={idea.id} />
-          <button type="submit" className={smallQuietButton}>
-            {approved ? (
-              <ArrowUUpLeft size={18} weight="bold" aria-hidden="true" />
-            ) : (
-              <Check size={18} weight="bold" aria-hidden="true" />
-            )}
-            {approved ? "Move back" : "Approve"}
-          </button>
-        </form>
+        <ApproveButton tripId={tripId} ideaId={idea.id} approved={approved} />
       </div>
 
       <p className="flex items-center gap-2 text-[13px] text-muted [overflow-wrap:anywhere]">

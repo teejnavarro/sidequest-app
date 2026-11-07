@@ -98,6 +98,8 @@ describe("IdeaCard", () => {
     expect(card).toContain('name="tripId" value="trip-1"');
     expect(card).toContain('name="ideaId" value="idea-1"');
     expect(card).not.toContain("border-blue-text");
+    // A message area for the vote and one for Approve, both read out politely.
+    expect(card.match(/aria-live="polite"/g)).toHaveLength(2);
   });
 
   it("shows an approved idea with 'Approved by' the first name, a blue edge and Move back", () => {

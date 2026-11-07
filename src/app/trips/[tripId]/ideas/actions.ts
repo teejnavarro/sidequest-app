@@ -139,22 +139,38 @@ export async function voteAction(formData: FormData): Promise<VoteActionResult> 
   }
 }
 
+export type ApproveState = { error?: string };
+
+const APPROVE_FAILED = "Couldn't approve the idea. Please try again.";
+const MOVE_BACK_FAILED = "Couldn't move the idea back. Please try again.";
+
 // Approve and Move back: any member. A false result (not a member, already done, no such
-// idea) changes nothing and says nothing; the page redraws either way.
-export async function approveAction(formData: FormData): Promise<void> {
+// idea) changes nothing and says nothing; the page redraws either way. Only a failed save
+// (the database could not be reached) shows a message.
+export async function approveAction(_prev: ApproveState, formData: FormData): Promise<ApproveState> {
   const user = await getCurrentUser();
   const tripId = readId(formData, "tripId");
   const ideaId = readId(formData, "ideaId");
-  if (tripId === "" || ideaId === "") return;
-  await approveIdea(tripId, ideaId, user.id);
+  if (tripId === "" || ideaId === "") return {};
+  try {
+    await approveIdea(tripId, ideaId, user.id);
+  } catch {
+    return { error: APPROVE_FAILED };
+  }
   revalidatePath(listAddress(tripId));
+  return {};
 }
 
-export async function moveBackAction(formData: FormData): Promise<void> {
+export async function moveBackAction(_prev: ApproveState, formData: FormData): Promise<ApproveState> {
   const user = await getCurrentUser();
   const tripId = readId(formData, "tripId");
   const ideaId = readId(formData, "ideaId");
-  if (tripId === "" || ideaId === "") return;
-  await unapproveIdea(tripId, ideaId, user.id);
+  if (tripId === "" || ideaId === "") return {};
+  try {
+    await unapproveIdea(tripId, ideaId, user.id);
+  } catch {
+    return { error: MOVE_BACK_FAILED };
+  }
   revalidatePath(listAddress(tripId));
+  return {};
 }

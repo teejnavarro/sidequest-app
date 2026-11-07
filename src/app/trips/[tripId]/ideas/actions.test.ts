@@ -269,34 +269,41 @@ describe("voteAction", () => {
 });
 
 describe.each([
-  ["approveAction", approveAction, mocks.approveIdea, mocks.unapproveIdea],
-  ["moveBackAction", moveBackAction, mocks.unapproveIdea, mocks.approveIdea],
-] as const)("%s", (_name, action, called, other) => {
+  ["approveAction", approveAction, mocks.approveIdea, mocks.unapproveIdea, "Couldn't approve the idea. Please try again."],
+  ["moveBackAction", moveBackAction, mocks.unapproveIdea, mocks.approveIdea, "Couldn't move the idea back. Please try again."],
+] as const)("%s", (_name, action, called, other, failMessage) => {
   const form = (fields: Record<string, string> = {}) =>
     formWith({ tripId: "trip-1", ideaId: "idea-1", ...fields });
+  const run = (formData: FormData) => action({}, formData);
 
   it("does nothing when signed out", async () => {
     mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
-    await expect(action(form())).rejects.toThrow("redirect:/");
+    await expect(run(form())).rejects.toThrow("redirect:/");
     expect(called).not.toHaveBeenCalled();
   });
 
   it("changes the idea with the signed-in person's id and redraws the Ideas tab", async () => {
-    await action(form({ userId: "someone-else" }));
+    await expect(run(form({ userId: "someone-else" }))).resolves.toEqual({});
     expect(called).toHaveBeenCalledWith("trip-1", "idea-1", "u1");
     expect(other).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1/ideas");
   });
 
-  it("returns nothing and reveals nothing when the change did not happen", async () => {
+  it("shows no message and reveals nothing when the change did not happen", async () => {
     called.mockResolvedValue(false);
-    await expect(action(form())).resolves.toBeUndefined();
+    await expect(run(form())).resolves.toEqual({});
   });
 
   it("does nothing without both ids", async () => {
-    await action(formWith({ tripId: "trip-1" }));
-    await action(formWith({ ideaId: "idea-1" }));
+    await run(formWith({ tripId: "trip-1" }));
+    await run(formWith({ ideaId: "idea-1" }));
     expect(called).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("gives a friendly message instead of an error page when the save fails", async () => {
+    called.mockRejectedValue(new Error("db down"));
+    await expect(run(form())).resolves.toEqual({ error: failMessage });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });
