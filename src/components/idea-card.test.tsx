@@ -1,6 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { IdeaCard } from "./idea-card";
+
+vi.mock("@/app/trips/[tripId]/ideas/actions", () => ({
+  voteAction: async () => ({ error: "unused" }),
+  approveAction: async () => {},
+  moveBackAction: async () => {},
+}));
 
 const base = {
   id: "idea-1",
@@ -75,5 +81,35 @@ describe("IdeaCard", () => {
     const card = html();
     expect(card).not.toContain("Reyes");
     expect(card).not.toContain("@");
+  });
+
+  it("shows the vote buttons with the counts and the person's own vote", () => {
+    const card = html({ up: 3, down: 1, myVote: 1 });
+    expect(card).toContain('aria-label="Thumbs up, 3 votes"');
+    expect(card).toContain('aria-label="Thumbs down, 1 vote"');
+    expect(card).toMatch(/aria-pressed="true"[^>]*aria-label="Thumbs up|aria-label="Thumbs up[^>]*aria-pressed="true"/);
+  });
+
+  it("offers Approve on an idea that is not approved, with the ids the action reads", () => {
+    const card = html();
+    expect(card).toContain("Approve");
+    expect(card).not.toContain("Move back");
+    expect(card).not.toContain("Approved by");
+    expect(card).toContain('name="tripId" value="trip-1"');
+    expect(card).toContain('name="ideaId" value="idea-1"');
+    expect(card).not.toContain("border-blue-text");
+  });
+
+  it("shows an approved idea with 'Approved by' the first name, a blue edge and Move back", () => {
+    const card = html({ approvedAt: new Date(), approvedBy: { id: "u3", name: "Bea Santos" } });
+    expect(card).toContain("Approved by Bea");
+    expect(card).not.toContain("Santos");
+    expect(card).toContain("Move back");
+    expect(card).not.toContain(">Approve<");
+    expect(card).toContain("border-blue-text");
+  });
+
+  it("still shows an approved idea if the approver is unknown", () => {
+    expect(html({ approvedAt: new Date() })).toContain(">Approved<");
   });
 });
