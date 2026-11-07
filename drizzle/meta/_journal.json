@@ -29,6 +29,13 @@
       "when": 1793666132456,
       "tag": "0003_even_ted_forrester",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794015601618,
+      "tag": "0004_boring_hitman",
+      "breakpoints": true
     }
   ]
 }
