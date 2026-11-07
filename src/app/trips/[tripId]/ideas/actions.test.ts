@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createIdeaAction, deleteIdeaAction, updateIdeaAction } from "./actions";
+import {
+  approveAction,
+  createIdeaAction,
+  deleteIdeaAction,
+  moveBackAction,
+  updateIdeaAction,
+  voteAction,
+} from "./actions";
 import { emptyIdeaValues } from "@/lib/idea-form-state";
 
 const mocks = vi.hoisted(() => ({
@@ -7,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   createIdea: vi.fn(),
   updateIdea: vi.fn(),
   deleteIdea: vi.fn(),
+  setVote: vi.fn(),
+  approveIdea: vi.fn(),
+  unapproveIdea: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw new Error(`redirect:${url}`);
@@ -20,6 +30,9 @@ vi.mock("@/lib/ideas", () => ({
   createIdea: mocks.createIdea,
   updateIdea: mocks.updateIdea,
   deleteIdea: mocks.deleteIdea,
+  setVote: mocks.setVote,
+  approveIdea: mocks.approveIdea,
+  unapproveIdea: mocks.unapproveIdea,
 }));
 
 const initial = { errors: {}, values: emptyIdeaValues };
@@ -51,6 +64,9 @@ beforeEach(() => {
   mocks.createIdea.mockResolvedValue("idea-1");
   mocks.updateIdea.mockResolvedValue(true);
   mocks.deleteIdea.mockResolvedValue(true);
+  mocks.setVote.mockResolvedValue({ up: 2, down: 0, myVote: 1 });
+  mocks.approveIdea.mockResolvedValue(true);
+  mocks.unapproveIdea.mockResolvedValue(true);
 });
 
 describe("createIdeaAction", () => {
@@ -201,6 +217,86 @@ describe("deleteIdeaAction", () => {
       error: "Couldn't delete the idea. Please try again.",
     });
     expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("voteAction", () => {
+  const form = (fields: Record<string, string> = {}) =>
+    formWith({ tripId: "trip-1", ideaId: "idea-1", choice: "up", ...fields });
+
+  it("does nothing when signed out", async () => {
+    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    await expect(voteAction(form())).rejects.toThrow("redirect:/");
+    expect(mocks.setVote).not.toHaveBeenCalled();
+  });
+
+  it("returns the saved counts and does not revalidate the page", async () => {
+    await expect(voteAction(form())).resolves.toEqual({ up: 2, down: 0, myVote: 1 });
+    expect(mocks.setVote).toHaveBeenCalledWith("trip-1", "idea-1", "u1", 1);
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("turns 'down' into -1", async () => {
+    await voteAction(form({ choice: "down" }));
+    expect(mocks.setVote).toHaveBeenCalledWith("trip-1", "idea-1", "u1", -1);
+  });
+
+  it.each(["", "1", "UP", "sideways"])("refuses the choice %j", async (choice) => {
+    await expect(voteAction(form({ choice }))).resolves.toEqual({
+      error: "Couldn't save your vote. Please try again.",
+    });
+    expect(mocks.setVote).not.toHaveBeenCalled();
+  });
+
+  it("refuses a missing trip or idea id", async () => {
+    await expect(voteAction(formWith({ ideaId: "idea-1", choice: "up" }))).resolves.toHaveProperty("error");
+    await expect(voteAction(formWith({ tripId: "trip-1", choice: "up" }))).resolves.toHaveProperty("error");
+    expect(mocks.setVote).not.toHaveBeenCalled();
+  });
+
+  it("ignores extra fields such as a user id", async () => {
+    await voteAction(form({ userId: "someone-else", value: "99" }));
+    expect(mocks.setVote).toHaveBeenCalledWith("trip-1", "idea-1", "u1", 1);
+  });
+
+  it("gives the error message when the person may not vote or the save fails", async () => {
+    mocks.setVote.mockResolvedValue(null);
+    await expect(voteAction(form())).resolves.toEqual({ error: "Couldn't save your vote. Please try again." });
+    mocks.setVote.mockRejectedValue(new Error("db down"));
+    await expect(voteAction(form())).resolves.toEqual({ error: "Couldn't save your vote. Please try again." });
+  });
+});
+
+describe.each([
+  ["approveAction", approveAction, mocks.approveIdea, mocks.unapproveIdea],
+  ["moveBackAction", moveBackAction, mocks.unapproveIdea, mocks.approveIdea],
+] as const)("%s", (_name, action, called, other) => {
+  const form = (fields: Record<string, string> = {}) =>
+    formWith({ tripId: "trip-1", ideaId: "idea-1", ...fields });
+
+  it("does nothing when signed out", async () => {
+    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    await expect(action(form())).rejects.toThrow("redirect:/");
+    expect(called).not.toHaveBeenCalled();
+  });
+
+  it("changes the idea with the signed-in person's id and redraws the Ideas tab", async () => {
+    await action(form({ userId: "someone-else" }));
+    expect(called).toHaveBeenCalledWith("trip-1", "idea-1", "u1");
+    expect(other).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1/ideas");
+  });
+
+  it("returns nothing and reveals nothing when the change did not happen", async () => {
+    called.mockResolvedValue(false);
+    await expect(action(form())).resolves.toBeUndefined();
+  });
+
+  it("does nothing without both ids", async () => {
+    await action(formWith({ tripId: "trip-1" }));
+    await action(formWith({ ideaId: "idea-1" }));
+    expect(called).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });
