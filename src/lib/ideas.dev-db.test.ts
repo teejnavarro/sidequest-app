@@ -306,6 +306,22 @@ describe("ideas privacy layer on the dev database", () => {
     expect(back).toMatchObject({ approvedAt: null, approvedBy: null });
   });
 
+  it("still shows who approved an idea after that person leaves the trip", async () => {
+    const trip = await trips.createTrip(OWNER, { ...tripInput, name: "Leaver trip" });
+    await dbModule.db.insert(schema.tripMember).values({ tripId: trip, userId: OTHER });
+    const id = (await ideas.createIdea(trip, OWNER, { ...ideaInput, name: "Approved then left" }))!;
+    await expect(ideas.approveIdea(trip, id, OTHER)).resolves.toBe(true);
+    // Leaving a trip (SQ-006) removes the member row; this does the same directly.
+    await dbModule.db
+      .delete(schema.tripMember)
+      .where(orm.and(orm.eq(schema.tripMember.tripId, trip), orm.eq(schema.tripMember.userId, OTHER)));
+    const row = (await ideas.listIdeasForMember(trip, OWNER)).find((item) => item.id === id);
+    expect(row?.approvedBy).toEqual({ id: OTHER, name: "Lia Test" });
+    // Having left, they can no longer move it back or vote on it.
+    await expect(ideas.unapproveIdea(trip, id, OTHER)).resolves.toBe(false);
+    await expect(ideas.setVote(trip, id, OTHER, 1)).resolves.toBeNull();
+  });
+
   it("orders by score, then thumbs up, then newest", async () => {
     const trip = await trips.createTrip(OWNER, { ...tripInput, name: "Order trip" });
     await dbModule.db.insert(schema.tripMember).values([
