@@ -1,9 +1,11 @@
 import {
+  check,
   date,
   index,
   integer,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
@@ -77,6 +79,10 @@ export const idea = pgTable(
     // The trip's currency at the time the cost was saved.
     costCurrency: text("cost_currency"),
     notes: text("notes"),
+    // Null means not approved. Any member can approve and move it back.
+    approvedAt: timestamp("approved_at"),
+    // No cascade, like createdBy: the account deletion story decides.
+    approvedBy: text("approved_by").references(() => user.id),
     // No cascade from user: the account deletion story decides what happens here.
     createdBy: text("created_by")
       .notNull()
@@ -88,4 +94,29 @@ export const idea = pgTable(
       .notNull(),
   },
   (table) => [index("idea_tripId_idx").on(table.tripId)],
+);
+
+// One thumbs up or down per person per idea. Votes go with their idea.
+export const ideaVote = pgTable(
+  "idea_vote",
+  {
+    ideaId: text("idea_id")
+      .notNull()
+      .references(() => idea.id, { onDelete: "cascade" }),
+    // No cascade from user: the account deletion story decides what happens here.
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+    value: smallint("value").notNull(), // 1 (up) or -1 (down)
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ideaId, table.userId] }),
+    index("idea_vote_userId_idx").on(table.userId),
+    check("idea_vote_value_check", sql`${table.value} in (1, -1)`),
+  ],
 );

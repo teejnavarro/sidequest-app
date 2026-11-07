@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
-import { listIdeasForMember } from "@/lib/ideas";
+import { listIdeasForMember, type IdeaItem } from "@/lib/ideas";
 import { IDEA_TYPES, isIdeaType } from "@/lib/idea-options";
 import { IdeaCard } from "@/components/idea-card";
 import { IdeaTypeIcon } from "@/components/idea-type";
@@ -21,6 +21,45 @@ import {
 export const metadata: Metadata = { title: "Ideas | Sidequest" };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+// A titled list of idea cards, with its count and an optional quiet note beside it.
+function IdeaList({
+  title,
+  note,
+  ideas,
+  tripId,
+  userId,
+  ownerId,
+}: {
+  title: string;
+  note?: string;
+  ideas: IdeaItem[];
+  tripId: string;
+  userId: string;
+  ownerId: string;
+}) {
+  return (
+    <section aria-label={title} className="grid gap-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-[15px]">{title}</h2>
+        <p className="text-[13px] text-muted">
+          <span className="tabular-nums">{ideas.length}</span>
+          {note ? ` · ${note}` : ""}
+        </p>
+      </div>
+      <div className="grid gap-4">
+        {ideas.map((idea) => (
+          <IdeaCard
+            key={idea.id}
+            idea={idea}
+            tripId={tripId}
+            canChange={idea.addedBy.id === userId || ownerId === userId}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
 
 // This page sits inside the trip layout, but that check does not protect it: it checks that
 // the person is in the trip for itself. The filter is just a word in the address
@@ -45,7 +84,11 @@ async function IdeasContent({
   for (const idea of ideas) counts.set(idea.type, (counts.get(idea.type) ?? 0) + 1);
   const requested = typeof typeParam === "string" ? typeParam : "";
   const selected = isIdeaType(requested) && counts.has(requested) ? requested : "all";
+  // The chips and their counts cover every idea; the type filter applies to both lists. The
+  // privacy layer already sorts most liked first, and filtering keeps that order.
   const shown = selected === "all" ? ideas : ideas.filter((idea) => idea.type === selected);
+  const approved = shown.filter((idea) => idea.approvedAt !== null);
+  const notApproved = shown.filter((idea) => idea.approvedAt === null);
 
   const base = `/trips/${tripId}/ideas`;
   const addHref = `${base}/new`;
@@ -92,16 +135,25 @@ async function IdeasContent({
         ))}
       </nav>
 
-      <div className="grid gap-4">
-        {shown.map((idea) => (
-          <IdeaCard
-            key={idea.id}
-            idea={idea}
-            tripId={tripId}
-            canChange={idea.addedBy.id === user.id || trip.ownerId === user.id}
-          />
-        ))}
-      </div>
+      {approved.length > 0 ? (
+        <IdeaList
+          title="Approved, not yet scheduled"
+          ideas={approved}
+          tripId={tripId}
+          userId={user.id}
+          ownerId={trip.ownerId}
+        />
+      ) : null}
+      {notApproved.length > 0 ? (
+        <IdeaList
+          title="Ideas"
+          note="most liked first"
+          ideas={notApproved}
+          tripId={tripId}
+          userId={user.id}
+          ownerId={trip.ownerId}
+        />
+      ) : null}
 
       {addButton}
     </main>
@@ -121,6 +173,10 @@ function IdeasLoading() {
           <div className={`h-6 w-2/3 ${skeleton} rounded-full bg-chip`} />
           <div className={`h-4 w-3/4 ${skeleton} rounded-full bg-chip`} />
           <div className={`h-4 w-1/3 ${skeleton} rounded-full bg-chip`} />
+          <div className="flex gap-2">
+            <div className={`h-11 w-14 ${skeleton} rounded-full bg-chip`} />
+            <div className={`h-11 w-14 ${skeleton} rounded-full bg-chip`} />
+          </div>
         </div>
       ))}
       <div className={`h-12 ${skeleton} rounded-full bg-chip`} />

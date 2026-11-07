@@ -2,14 +2,17 @@ import Link from "next/link";
 import {
   ArrowSquareOut,
   CaretDown,
+  Check,
   Clock,
   Coins,
   MapPin,
   MapTrifold,
   PencilSimple,
 } from "@phosphor-icons/react/dist/ssr";
+import { ApproveButton } from "@/components/approve-button";
 import { Face } from "@/components/face";
 import { IdeaTypeIcon } from "@/components/idea-type";
+import { VoteButtons } from "@/components/vote-buttons";
 import { cardClass, focusRing, smallQuietButton, softTag } from "@/components/ui";
 import { durationLabel, formatCost, ideaTypeOf, linkLabel } from "@/lib/idea-options";
 import type { IdeaItem } from "@/lib/ideas";
@@ -31,9 +34,10 @@ export function IdeaCard({
   const type = ideaTypeOf(idea.type);
   const hasMore = Boolean(idea.notes || idea.link || canChange);
   const onlyEdit = !idea.notes && !idea.link;
+  const approved = idea.approvedAt !== null;
 
   return (
-    <article className={`${cardClass} gap-3`}>
+    <article className={`${cardClass} gap-3 ${approved ? "border-blue-text" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
         <h3 className="min-w-0 text-[17px] [overflow-wrap:anywhere]">{idea.name}</h3>
         <span className={`${softTag} gap-1`}>
@@ -60,6 +64,14 @@ export function IdeaCard({
           </span>
         ) : null}
       </p>
+
+      {approved ? (
+        // text-card is white on the light blue-text and dark on the dark one, so it reads in both.
+        <span className="inline-flex items-center gap-1 justify-self-start rounded-full bg-blue-text px-2.5 py-0.5 text-xs font-bold text-card">
+          <Check size={14} weight="bold" aria-hidden="true" />
+          {idea.approvedBy ? `Approved by ${firstName(idea.approvedBy.name)}` : "Approved"}
+        </span>
+      ) : null}
 
       {hasMore ? (
         <details className="group grid gap-3">
@@ -100,6 +112,15 @@ export function IdeaCard({
           </div>
         </details>
       ) : null}
+
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <VoteButtons
+          tripId={tripId}
+          ideaId={idea.id}
+          initial={{ up: idea.up, down: idea.down, myVote: idea.myVote }}
+        />
+        <ApproveButton tripId={tripId} ideaId={idea.id} approved={approved} />
+      </div>
 
       <p className="flex items-center gap-2 text-[13px] text-muted [overflow-wrap:anywhere]">
         <Face userId={idea.addedBy.id} name={idea.addedBy.name} image={idea.addedBy.image} size={22} decorative />

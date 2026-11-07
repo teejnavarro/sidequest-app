@@ -16,6 +16,11 @@ vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("@/lib/ideas", () => ({ listIdeasForMember: mocks.listIdeasForMember }));
+vi.mock("@/app/trips/[tripId]/ideas/actions", () => ({
+  voteAction: async () => ({ error: "unused" }),
+  approveAction: async () => {},
+  moveBackAction: async () => {},
+}));
 
 type ContentProps = {
   params: Promise<{ tripId: string }>;
@@ -48,6 +53,11 @@ const idea = (id: string, name: string, type: string, addedBy = person("u1", "Ma
   notes: null,
   createdAt: new Date("2027-01-01T00:00:00Z"),
   addedBy,
+  up: 0,
+  down: 0,
+  myVote: null,
+  approvedAt: null,
+  approvedBy: null,
   ...extra,
 });
 
@@ -92,6 +102,80 @@ describe("the Ideas tab", () => {
     expect(html.indexOf("Newest idea")).toBeLessThan(html.indexOf("Middle idea"));
     expect(html.indexOf("Middle idea")).toBeLessThan(html.indexOf("Oldest idea"));
     expect(html.match(/Add an idea/g)).toHaveLength(1);
+  });
+
+  describe("approved and not approved lists", () => {
+    const ok = { approvedAt: new Date("2027-01-02T00:00:00Z"), approvedBy: { id: "u2", name: "Ben Reyes" } };
+    const mixed = [
+      idea("1", "Approved food", "food", person("u1", "Maya Cruz"), ok),
+      idea("2", "Open food", "food"),
+      idea("3", "Open nightlife", "nightlife"),
+      idea("4", "Approved nightlife", "nightlife", person("u1", "Maya Cruz"), ok),
+    ];
+    const sectionOf = (html: string, title: string) =>
+      html.match(new RegExp(`<section aria-label="${title}"[^>]*>[^]*?</section>`))?.[0] ?? "";
+
+    it("shows the approved list first, then Ideas with 'most liked first', each with its count", async () => {
+      mocks.listIdeasForMember.mockResolvedValue(mixed);
+      const html = await render();
+      expect(html.indexOf("Approved, not yet scheduled")).toBeGreaterThan(-1);
+      expect(html.indexOf("Approved, not yet scheduled")).toBeLessThan(html.indexOf(">Ideas<"));
+      const approvedSection = sectionOf(html, "Approved, not yet scheduled");
+      const ideasSection = sectionOf(html, "Ideas");
+      expect(approvedSection).toMatch(/<span class="tabular-nums">2<\/span>/);
+      expect(approvedSection).toContain("Approved food");
+      expect(approvedSection).toContain("Approved nightlife");
+      expect(approvedSection).not.toContain("Open food");
+      expect(approvedSection).toContain("Approved by Ben");
+      expect(ideasSection).toMatch(/<span class="tabular-nums">2<\/span>/);
+      expect(ideasSection).toContain("most liked first");
+      expect(ideasSection).toContain("Open food");
+      expect(ideasSection).toContain("Open nightlife");
+      expect(ideasSection).not.toContain("Approved food");
+    });
+
+    it("leaves the approved section out when nothing is approved", async () => {
+      mocks.listIdeasForMember.mockResolvedValue([idea("2", "Open food", "food")]);
+      const html = await render();
+      expect(html).not.toContain("Approved, not yet scheduled");
+      expect(html).toContain("most liked first");
+    });
+
+    it("leaves the Ideas section out when everything is approved", async () => {
+      mocks.listIdeasForMember.mockResolvedValue([mixed[0]]);
+      const html = await render();
+      expect(html).toContain("Approved, not yet scheduled");
+      expect(html).not.toContain("most liked first");
+      expect(html).not.toContain('aria-label="Ideas"');
+    });
+
+    it("applies the type filter to both lists while the chips count every idea", async () => {
+      mocks.listIdeasForMember.mockResolvedValue(mixed);
+      const html = await render({ type: "food" });
+      expect(html).toContain("Approved food");
+      expect(html).toContain("Open food");
+      expect(html).not.toContain("Approved nightlife");
+      expect(html).not.toContain("Open nightlife");
+      const nav = html.match(/<nav[^>]*>[^]*?<\/nav>/)?.[0] ?? "";
+      expect(nav).toMatch(/All\s*<span[^>]*>4<\/span>/);
+      expect(nav).toMatch(/Nightlife\s*<span[^>]*>2<\/span>/);
+    });
+
+    it("leaves a list out when the filter empties it", async () => {
+      mocks.listIdeasForMember.mockResolvedValue([mixed[0], mixed[2]]);
+      const html = await render({ type: "nightlife" });
+      expect(html).not.toContain("Approved, not yet scheduled");
+      expect(html).toContain("Open nightlife");
+    });
+
+    it("keeps the order the privacy layer gives (most liked first) inside each list", async () => {
+      mocks.listIdeasForMember.mockResolvedValue([
+        idea("a", "Top liked", "food", person("u1", "Maya"), { up: 5 }),
+        idea("b", "Less liked", "food", person("u1", "Maya"), { up: 1 }),
+      ]);
+      const html = await render();
+      expect(html.indexOf("Top liked")).toBeLessThan(html.indexOf("Less liked"));
+    });
   });
 
   it("shows names with accents exactly", async () => {

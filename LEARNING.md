@@ -400,3 +400,38 @@ Anyone in the trip can add an idea and see them all. Only the person who added a
 trip owner, can edit or delete it. As with deleting a trip, hiding the Edit button is just good
 manners. The real rule is inside the database request: "change this idea, but only if this
 person added it or owns the trip". If someone else tries, nothing changes.
+
+---
+
+## Chapter 8: Voting and approving ideas
+
+### A tap shows at once, then the saving catches up
+
+When you tap a thumb, the number changes on your screen straight away, before the phone has
+heard back from the server. That is called an **optimistic update**: we guess the save will
+work, show the result, and check afterwards. The server sends back the real counts, and we use
+those. If the save fails, the card goes back to how it was and a short message says so. Without
+this trick every tap would feel like waiting for a slow page.
+
+### Why the cards don't jump
+
+If every vote re-sorted the list, the card you just voted on could slide away from under your
+thumb. So the list keeps its order while you vote, and sorts itself (most liked first) the next
+time you open the tab.
+
+### One vote each, and the database enforces it
+
+A vote is a row with the idea and the person. The pair is the row's key, so the database itself
+refuses a second vote from the same person on the same idea. Tapping the same thumb again
+removes your row; tapping the other thumb changes its value. Two quick taps can't count twice.
+
+### Votes are advice, approval is a decision
+
+Anyone in the trip can approve an idea, and anyone can move it back. Approval is just two extra
+fields on the idea: when, and by whom. Votes never approve anything by themselves.
+
+### This one needs a live database update too
+
+Like the Ideas list, this adds a table (`idea_vote`) and two columns, so the live database
+needs a migration. The new columns can be empty and the live site doesn't use them yet, so it
+can run before the new code goes out, with the owner's OK.
