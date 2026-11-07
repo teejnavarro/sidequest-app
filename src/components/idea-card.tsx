@@ -101,7 +101,7 @@ export function IdeaCard({
         </details>
       ) : null}
 
-      <p className="flex items-center gap-2 text-[13px] text-muted">
+      <p className="flex items-center gap-2 text-[13px] text-muted [overflow-wrap:anywhere]">
         <Face userId={idea.addedBy.id} name={idea.addedBy.name} image={idea.addedBy.image} size={22} decorative />
         Added by {firstName(idea.addedBy.name)}
       </p>

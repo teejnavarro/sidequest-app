@@ -28,6 +28,10 @@ describe("IdeaCard", () => {
     expect(card).toContain("Added by Ben");
   });
 
+  it("lets a long name wrap in the Added by line instead of widening the page", () => {
+    expect(html()).toMatch(/<p class="[^"]*\[overflow-wrap:anywhere\][^"]*">.*Added by Ben/);
+  });
+
   it("shows the cost as 'about ... each' in the trip's currency, only when there is one", () => {
     expect(html({ costPerPerson: 120, costCurrency: "PHP" })).toContain("about ₱120 each");
     expect(html()).not.toContain("about");
