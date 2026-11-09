@@ -110,6 +110,24 @@ describe("ScheduleForm", () => {
     expect(html).toContain('checked="" value="morning"');
   });
 
+  it("picks no day for an item whose day is no longer in the trip", () => {
+    const html = renderToStaticMarkup(
+      <ScheduleForm
+        mode="move"
+        kind="new"
+        tripId="trip-1"
+        itemId="item-1"
+        days={days}
+        place="Vietnam"
+        values={{ ...emptyScheduleValues, kind: "new", name: "Airport transfer", day: "2027-05-20", slot: "morning" }}
+      />,
+    );
+    expect(html).not.toContain("2027-05-20");
+    for (const { day } of days) expect(html).not.toContain(`checked="" value="${day}"`);
+    expect(html).toContain(`value="${days[0].day}"`);
+    expect(html).toContain('checked="" value="morning"');
+  });
+
   it("moves an idea item with no name or notes box", () => {
     const html = renderToStaticMarkup(
       <ScheduleForm

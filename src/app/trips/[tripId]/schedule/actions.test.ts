@@ -226,6 +226,22 @@ describe("moveScheduleItemAction", () => {
     expect(mocks.moveScheduleItem).not.toHaveBeenCalled();
   });
 
+  it("asks for a day when an item from 'Needs a new day' is saved without one, and saves nothing", async () => {
+    // The trip was shortened to May 8-10, so this item's May 20 is no longer a trip day.
+    mocks.getScheduleItemForMember.mockResolvedValue({ id: "item-1", ideaId: null, fromIdea: false, day: "2027-05-20" });
+    for (const day of ["", "2027-05-20"]) {
+      const typed = { ...newItem, day };
+      const state = await moveScheduleItemAction(initial, form(typed));
+      expect(state.errors.day).toBe("Pick a day.");
+      expect(state.values).toEqual(typed);
+    }
+    expect(mocks.moveScheduleItem).not.toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    // Once a trip day is picked, it saves and goes to that day.
+    await expect(moveScheduleItemAction(initial, form())).rejects.toThrow(DAY_9);
+    expect(mocks.moveScheduleItem).toHaveBeenCalledTimes(1);
+  });
+
   it("ends in the same place when the move changed nothing", async () => {
     mocks.moveScheduleItem.mockResolvedValue(false);
     await expect(moveScheduleItemAction(initial, form())).rejects.toThrow(DAY_9);
