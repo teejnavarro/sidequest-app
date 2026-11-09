@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowSquareOut,
+  CalendarPlus,
   CaretDown,
   Check,
   Clock,
@@ -119,7 +120,15 @@ export function IdeaCard({
           ideaId={idea.id}
           initial={{ up: idea.up, down: idea.down, myVote: idea.myVote }}
         />
-        <ApproveButton tripId={tripId} ideaId={idea.id} approved={approved} />
+        <div className="flex flex-wrap items-start gap-2">
+          {approved ? (
+            <Link href={`/trips/${tripId}/schedule/add?idea=${idea.id}`} className={smallQuietButton}>
+              <CalendarPlus size={18} weight="bold" aria-hidden="true" />
+              Schedule it
+            </Link>
+          ) : null}
+          <ApproveButton tripId={tripId} ideaId={idea.id} approved={approved} />
+        </div>
       </div>
 
       <p className="flex items-center gap-2 text-[13px] text-muted [overflow-wrap:anywhere]">
