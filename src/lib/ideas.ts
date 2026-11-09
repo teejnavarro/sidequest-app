@@ -149,6 +149,18 @@ export async function listIdeasForMember(tripId: string, userId: string): Promis
   return rows.map(toItem);
 }
 
+// True when at least one of the trip's ideas is on the schedule, so an empty Ideas tab can
+// say "Every idea is on the schedule." instead of "No ideas yet". False for a stranger.
+export async function hasScheduledIdeas(tripId: string, userId: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: idea.id })
+    .from(idea)
+    .innerJoin(scheduleItem, eq(scheduleItem.ideaId, idea.id))
+    .where(and(eq(idea.tripId, tripId), isMemberOf(tripId, userId)))
+    .limit(1);
+  return rows.length > 0;
+}
+
 // One idea plus whether this person may change it, or null when it does not exist, belongs
 // to another trip, or the person is not in this trip. The cases look the same on purpose.
 export async function getIdeaForMember(

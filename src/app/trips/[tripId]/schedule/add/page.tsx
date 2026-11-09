@@ -52,7 +52,10 @@ async function AddToScheduleContent({
 
   const ideas = await listApprovedUnscheduled(tripId, user.id);
   const picked = typeof ideaParam === "string" && ideas.some((idea) => idea.id === ideaParam) ? ideaParam : "";
-  const kind = picked || from !== "new" ? "idea" : "new";
+  // With no ?from= or ?idea= in the address, start on Approved idea only when there is one to
+  // pick, otherwise on Something new. Both stay one tap away on the switch.
+  const asked = from === "idea" || from === "new" || ideaParam !== undefined;
+  const kind = picked || (asked ? from !== "new" : ideas.length > 0) ? "idea" : "new";
 
   return (
     <>

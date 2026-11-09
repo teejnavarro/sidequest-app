@@ -157,8 +157,31 @@ describe("Add to schedule page", () => {
 
   it("passes no ideas when none are approved, so the form can say so", async () => {
     mocks.listApprovedUnscheduled.mockResolvedValue([]);
-    const html = await run(AddToSchedulePage);
+    const html = await run(AddToSchedulePage, { search: { from: "idea" } });
+    expect(html).toContain('"kind":"idea"');
     expect(html).toContain('"ideas":[]');
+    expect(html).toMatch(/aria-current="page"[^>]*>Approved idea</);
+  });
+
+  it("starts on Something new when there are no approved ideas and nothing in the address", async () => {
+    mocks.listApprovedUnscheduled.mockResolvedValue([]);
+    const html = await run(AddToSchedulePage);
+    expect(html).toContain('"kind":"new"');
+    expect(html).toMatch(/aria-current="page"[^>]*>Something new</);
+    // Approved idea stays one tap away.
+    expect(html).toContain('href="/trips/trip-1/schedule/add?from=idea"');
+  });
+
+  it("stays on Approved idea for a Schedule it link whose idea is no longer free, to say so", async () => {
+    mocks.listApprovedUnscheduled.mockResolvedValue([]);
+    const html = await run(AddToSchedulePage, { search: { idea: "already-scheduled" } });
+    expect(html).toContain('"kind":"idea"');
+    expect(html).toContain('"ideaId":""');
+  });
+
+  it("keeps ?from=new on Something new even with an ?idea= that cannot be picked", async () => {
+    const html = await run(AddToSchedulePage, { search: { idea: "someone-elses-idea", from: "new" } });
+    expect(html).toContain('"kind":"new"');
   });
 });
 

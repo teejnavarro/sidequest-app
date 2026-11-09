@@ -4,6 +4,7 @@ import {
   createIdea,
   deleteIdea,
   getIdeaForMember,
+  hasScheduledIdeas,
   listIdeasForMember,
   setVote,
   unapproveIdea,
@@ -69,6 +70,24 @@ describe("listIdeasForMember", () => {
 
   it("gives an empty list when nothing comes back", async () => {
     await expect(listIdeasForMember("trip-1", "stranger")).resolves.toEqual([]);
+  });
+});
+
+describe("hasScheduledIdeas", () => {
+  it("looks only at this trip's ideas on the schedule, for a member, with no email", async () => {
+    await hasScheduledIdeas("trip-1", "u1");
+    const [{ sql, params }] = fake.queries;
+    expect(sql).toContain('inner join "schedule_item" on "schedule_item"."idea_id" = "idea"."id"');
+    expect(sql).toContain('"idea"."trip_id" = $');
+    expect(sql).toContain("trip_member");
+    expect(sql).not.toContain("email");
+    expect(params).toEqual(expect.arrayContaining(["trip-1", "u1"]));
+  });
+
+  it("says true only when a row comes back", async () => {
+    await expect(hasScheduledIdeas("trip-1", "stranger")).resolves.toBe(false);
+    fake.rows = [["idea-1"]];
+    await expect(hasScheduledIdeas("trip-1", "u1")).resolves.toBe(true);
   });
 });
 

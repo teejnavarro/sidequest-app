@@ -358,6 +358,19 @@ describe("schedule privacy layer on the dev database", () => {
     await expect(ideas.unapproveIdea(tripA, ideaId, OWNER)).resolves.toBe(true);
   });
 
+  it("knows when a trip's ideas are on the schedule, for members only", async () => {
+    const trip = await trips.createTrip(OWNER, { ...tripInput, name: "Every idea scheduled" });
+    await expect(ideas.hasScheduledIdeas(trip, OWNER)).resolves.toBe(false);
+    // A new item does not count, and neither does an approved idea that is not scheduled.
+    await schedule.addNewItem(trip, OWNER, { kind: "new", name: "Airport transfer", notes: null, ...morning });
+    const ideaId = await approvedIdea(trip, OWNER, "Bánh mì Huỳnh Hoa");
+    await expect(ideas.hasScheduledIdeas(trip, OWNER)).resolves.toBe(false);
+    await schedule.addIdeaToSchedule(trip, OWNER, { kind: "idea", ideaId, ...morning });
+    await expect(ideas.hasScheduledIdeas(trip, OWNER)).resolves.toBe(true);
+    await expect(ideas.hasScheduledIdeas(trip, STRANGER)).resolves.toBe(false);
+    await expect(ideaNames(trip, OWNER)).resolves.toEqual([]);
+  });
+
   it("removes an item when its idea is deleted, and all items when the trip is deleted", async () => {
     const trip = await trips.createTrip(OWNER, { ...tripInput, name: "Doomed trip" });
     const ideaId = await approvedIdea(trip, OWNER, "Doomed idea");

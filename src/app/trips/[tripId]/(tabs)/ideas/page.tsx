@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
-import { listIdeasForMember, type IdeaItem } from "@/lib/ideas";
+import { hasScheduledIdeas, listIdeasForMember, type IdeaItem } from "@/lib/ideas";
 import { IDEA_TYPES, isIdeaType } from "@/lib/idea-options";
 import { IdeaCard } from "@/components/idea-card";
 import { IdeaTypeIcon } from "@/components/idea-type";
@@ -98,6 +98,19 @@ async function IdeasContent({
       Add an idea
     </Link>
   );
+
+  // Every idea may be on the schedule already (they leave this tab), which is not the same
+  // as a trip with no ideas at all.
+  if (ideas.length === 0 && (await hasScheduledIdeas(tripId, user.id))) {
+    return (
+      <main className={`${screenClass} flex-1`}>
+        <section className={`${cardClass} gap-3 px-5 py-6`}>
+          <h2 className="text-[19px]">Every idea is on the schedule.</h2>
+          {addButton}
+        </section>
+      </main>
+    );
+  }
 
   if (ideas.length === 0) {
     return (
