@@ -59,6 +59,8 @@ describe("listIdeasForMember", () => {
     // Score, then thumbs up, then newest.
     expect(sql).toMatch(/order by \(select coalesce\(sum\([^]*\) desc, \(select count\(\*\) filter[^]*\) desc, "idea"\."created_at" desc/i);
     expect(sql).toContain("filter (where");
+    // Ideas already on the schedule are left out.
+    expect(sql).toContain('not exists (select "id" from "schedule_item" where "schedule_item"."idea_id" = "idea"."id"');
     // Counts and the viewer's own vote only: never the voters' ids in the output.
     expect(sql).not.toContain('"idea_vote"."user_id" as');
     expect(sql).not.toContain("email");
@@ -226,6 +228,12 @@ describe("unapproveIdea", () => {
     expect(sql).toContain('"idea"."trip_id" =');
     expect(sql).toContain("exists");
     expect(sql).toContain('"idea"."approved_at" is not null');
+  });
+
+  it("refuses an idea that is on the schedule", async () => {
+    await unapproveIdea("trip-1", "idea-1", "u1");
+    const [{ sql }] = fake.queries;
+    expect(sql).toContain('not exists (select "id" from "schedule_item" where "schedule_item"."idea_id" = "idea"."id"');
   });
 
   it("says false when nothing changed and true when a row changed", async () => {
