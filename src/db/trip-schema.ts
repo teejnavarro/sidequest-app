@@ -8,6 +8,7 @@ import {
   smallint,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { user } from "./auth-schema";
@@ -118,5 +119,50 @@ export const ideaVote = pgTable(
     primaryKey({ columns: [table.ideaId, table.userId] }),
     index("idea_vote_userId_idx").on(table.userId),
     check("idea_vote_value_check", sql`${table.value} in (1, -1)`),
+  ],
+);
+
+// One thing on the day-by-day schedule: either an approved idea (ideaId set, the name
+// comes from the idea) or a new item with its own name. Items go with their trip or idea.
+export const scheduleItem = pgTable(
+  "schedule_item",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trip.id, { onDelete: "cascade" }),
+    // Null for a new item. An idea is on the schedule at most once.
+    ideaId: text("idea_id").references(() => idea.id, { onDelete: "cascade" }),
+    // Only for new items; an idea item shows the idea's name.
+    name: text("name"),
+    notes: text("notes"),
+    // A trip day, "YYYY-MM-DD".
+    day: date("day", { mode: "string" }).notNull(),
+    slot: text("slot").notNull(), // "full" | "morning" | "afternoon" | "evening" | "time"
+    // Wall-clock "HH:MM" in the trip's own time zone, never converted. Only when slot is "time".
+    time: text("time"),
+    // No cascade from user: the account deletion story decides what happens here.
+    updatedBy: text("updated_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("schedule_item_tripId_idx").on(table.tripId),
+    uniqueIndex("schedule_item_ideaId_unique").on(table.ideaId),
+    check(
+      "schedule_item_kind_check",
+      sql`(${table.ideaId} is null) <> (${table.name} is null)`,
+    ),
+    check(
+      "schedule_item_time_check",
+      sql`(${table.slot} = 'time') = (${table.time} is not null)`,
+    ),
   ],
 );
