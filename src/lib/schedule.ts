@@ -18,6 +18,8 @@ export type ScheduleListItem = {
   name: string;
   // The idea's type when the item came from an idea, else null.
   ideaType: string | null;
+  // The idea this item came from, or null for a new item.
+  ideaId: string | null;
   fromIdea: boolean;
   notes: string | null;
   day: string; // "YYYY-MM-DD"
@@ -64,6 +66,7 @@ function toItem(row: ItemRow): ScheduleListItem {
     id: row.id,
     name: row.ideaName ?? row.ownName ?? "",
     ideaType: row.ideaType,
+    ideaId: row.ideaId,
     fromIdea: row.ideaId !== null,
     notes: row.notes,
     day: row.day,
