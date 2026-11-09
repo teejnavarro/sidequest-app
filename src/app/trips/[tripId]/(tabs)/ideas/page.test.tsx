@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getTripForMember: vi.fn(),
   listIdeasForMember: vi.fn(),
+  hasScheduledIdeas: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
   }),
@@ -15,7 +16,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
-vi.mock("@/lib/ideas", () => ({ listIdeasForMember: mocks.listIdeasForMember }));
+vi.mock("@/lib/ideas", () => ({
+  listIdeasForMember: mocks.listIdeasForMember,
+  hasScheduledIdeas: mocks.hasScheduledIdeas,
+}));
 vi.mock("@/app/trips/[tripId]/ideas/actions", () => ({
   voteAction: async () => ({ error: "unused" }),
   approveAction: async () => {},
@@ -66,6 +70,7 @@ beforeEach(() => {
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
   mocks.getTripForMember.mockResolvedValue(trip);
   mocks.listIdeasForMember.mockResolvedValue([]);
+  mocks.hasScheduledIdeas.mockResolvedValue(false);
 });
 
 describe("the Ideas tab", () => {
@@ -90,6 +95,17 @@ describe("the Ideas tab", () => {
     expect(html.match(/Add an idea/g)).toHaveLength(1);
     expect(html).toContain('href="/trips/trip-1/ideas/new"');
     expect(html).not.toContain("Filter by type");
+    expect(html).not.toContain("Every idea is on the schedule.");
+  });
+
+  it("says every idea is on the schedule when the trip has ideas but all are scheduled", async () => {
+    mocks.hasScheduledIdeas.mockResolvedValue(true);
+    const html = await render();
+    expect(mocks.hasScheduledIdeas).toHaveBeenCalledWith("trip-1", "u1");
+    expect(html).toContain("Every idea is on the schedule.");
+    expect(html).not.toContain("No ideas yet");
+    expect(html.match(/Add an idea/g)).toHaveLength(1);
+    expect(html).toContain('href="/trips/trip-1/ideas/new"');
   });
 
   it("lists ideas in the order the privacy layer gives them (newest first)", async () => {

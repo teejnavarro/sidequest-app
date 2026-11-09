@@ -1,9 +1,9 @@
 import "server-only";
-import { and, desc, eq, exists, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, exists, isNull, notExists, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import { user } from "@/db/auth-schema";
-import { idea, ideaVote, trip, tripMember } from "@/db/trip-schema";
+import { idea, ideaVote, scheduleItem, trip, tripMember } from "@/db/trip-schema";
 import type { IdeaInput } from "@/lib/idea-input";
 
 // The privacy layer for ideas, next to trips.ts. Same rules: every function checks that the
@@ -100,7 +100,7 @@ function toItem(row: IdeaRow): IdeaItem {
 }
 
 // True when the person is in the trip. Used inside the queries below, never on its own.
-function isMemberOf(tripId: string, userId: string) {
+export function isMemberOf(tripId: string, userId: string) {
   const viewer = alias(tripMember, "viewer");
   return exists(
     db
@@ -109,6 +109,12 @@ function isMemberOf(tripId: string, userId: string) {
       .where(and(eq(viewer.tripId, tripId), eq(viewer.userId, userId))),
   );
 }
+
+// True when the idea is not on the schedule yet. Scheduled ideas leave the Ideas tab, and
+// only an idea that is not scheduled can be added to the schedule or moved back.
+export const notScheduled = notExists(
+  db.select({ one: scheduleItem.id }).from(scheduleItem).where(eq(scheduleItem.ideaId, idea.id)),
+);
 
 // May this person change the idea: they added it, or they own the trip.
 function mayChange(userId: string) {
@@ -125,14 +131,15 @@ function mayChange(userId: string) {
 
 // The trip's ideas, most liked first (up minus down, then most thumbs up, then newest), each
 // with who added it (name and photo), its vote counts, the viewer's own vote and who approved
-// it. A person who is not in the trip gets an empty list.
+// it. Ideas already on the schedule are left out. A person who is not in the trip gets an
+// empty list.
 export async function listIdeasForMember(tripId: string, userId: string): Promise<IdeaItem[]> {
   const rows = await db
     .select({ ...ideaColumns, ...voteColumns(userId) })
     .from(idea)
     .innerJoin(user, eq(user.id, idea.createdBy))
     .leftJoin(approver, eq(approver.id, idea.approvedBy))
-    .where(and(eq(idea.tripId, tripId), isMemberOf(tripId, userId)))
+    .where(and(eq(idea.tripId, tripId), isMemberOf(tripId, userId), notScheduled))
     .orderBy(
       sql`(select coalesce(sum(${ideaVote.value}), 0) from ${ideaVote} where ${ideaVote.ideaId} = ${idea.id}) desc`,
       sql`(select count(*) filter (where ${ideaVote.value} = 1) from ${ideaVote} where ${ideaVote.ideaId} = ${idea.id}) desc`,
@@ -140,6 +147,18 @@ export async function listIdeasForMember(tripId: string, userId: string): Promis
       desc(idea.id),
     );
   return rows.map(toItem);
+}
+
+// True when at least one of the trip's ideas is on the schedule, so an empty Ideas tab can
+// say "Every idea is on the schedule." instead of "No ideas yet". False for a stranger.
+export async function hasScheduledIdeas(tripId: string, userId: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: idea.id })
+    .from(idea)
+    .innerJoin(scheduleItem, eq(scheduleItem.ideaId, idea.id))
+    .where(and(eq(idea.tripId, tripId), isMemberOf(tripId, userId)))
+    .limit(1);
+  return rows.length > 0;
 }
 
 // One idea plus whether this person may change it, or null when it does not exist, belongs
@@ -338,6 +357,7 @@ export async function approveIdea(
 }
 
 // Moves an approved idea back to the ideas list, for any member. True only when it changed.
+// An idea that is on the schedule is refused: take it off the schedule first.
 export async function unapproveIdea(
   tripId: string,
   ideaId: string,
@@ -352,6 +372,7 @@ export async function unapproveIdea(
         eq(idea.tripId, tripId),
         isMemberOf(tripId, userId),
         sql`${idea.approvedAt} is not null`,
+        notScheduled,
       ),
     )
     .returning({ id: idea.id });

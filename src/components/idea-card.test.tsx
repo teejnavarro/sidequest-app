@@ -111,6 +111,13 @@ describe("IdeaCard", () => {
     expect(card).toContain("border-blue-text");
   });
 
+  it("offers Schedule it, pre-picking the idea, only on an approved idea", () => {
+    const approved = html({ approvedAt: new Date() });
+    expect(approved).toMatch(/href="\/trips\/trip-1\/schedule\/add\?idea=idea-1"[^>]*>[^]*Schedule it/);
+    expect(approved.indexOf("Schedule it")).toBeLessThan(approved.indexOf("Move back"));
+    expect(html()).not.toContain("Schedule it");
+  });
+
   it("still shows an approved idea if the approver is unknown", () => {
     expect(html({ approvedAt: new Date() })).toContain(">Approved<");
   });

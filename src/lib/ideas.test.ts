@@ -4,6 +4,7 @@ import {
   createIdea,
   deleteIdea,
   getIdeaForMember,
+  hasScheduledIdeas,
   listIdeasForMember,
   setVote,
   unapproveIdea,
@@ -59,6 +60,8 @@ describe("listIdeasForMember", () => {
     // Score, then thumbs up, then newest.
     expect(sql).toMatch(/order by \(select coalesce\(sum\([^]*\) desc, \(select count\(\*\) filter[^]*\) desc, "idea"\."created_at" desc/i);
     expect(sql).toContain("filter (where");
+    // Ideas already on the schedule are left out.
+    expect(sql).toContain('not exists (select "id" from "schedule_item" where "schedule_item"."idea_id" = "idea"."id"');
     // Counts and the viewer's own vote only: never the voters' ids in the output.
     expect(sql).not.toContain('"idea_vote"."user_id" as');
     expect(sql).not.toContain("email");
@@ -67,6 +70,24 @@ describe("listIdeasForMember", () => {
 
   it("gives an empty list when nothing comes back", async () => {
     await expect(listIdeasForMember("trip-1", "stranger")).resolves.toEqual([]);
+  });
+});
+
+describe("hasScheduledIdeas", () => {
+  it("looks only at this trip's ideas on the schedule, for a member, with no email", async () => {
+    await hasScheduledIdeas("trip-1", "u1");
+    const [{ sql, params }] = fake.queries;
+    expect(sql).toContain('inner join "schedule_item" on "schedule_item"."idea_id" = "idea"."id"');
+    expect(sql).toContain('"idea"."trip_id" = $');
+    expect(sql).toContain("trip_member");
+    expect(sql).not.toContain("email");
+    expect(params).toEqual(expect.arrayContaining(["trip-1", "u1"]));
+  });
+
+  it("says true only when a row comes back", async () => {
+    await expect(hasScheduledIdeas("trip-1", "stranger")).resolves.toBe(false);
+    fake.rows = [["idea-1"]];
+    await expect(hasScheduledIdeas("trip-1", "u1")).resolves.toBe(true);
   });
 });
 
@@ -226,6 +247,12 @@ describe("unapproveIdea", () => {
     expect(sql).toContain('"idea"."trip_id" =');
     expect(sql).toContain("exists");
     expect(sql).toContain('"idea"."approved_at" is not null');
+  });
+
+  it("refuses an idea that is on the schedule", async () => {
+    await unapproveIdea("trip-1", "idea-1", "u1");
+    const [{ sql }] = fake.queries;
+    expect(sql).toContain('not exists (select "id" from "schedule_item" where "schedule_item"."idea_id" = "idea"."id"');
   });
 
   it("says false when nothing changed and true when a row changed", async () => {
