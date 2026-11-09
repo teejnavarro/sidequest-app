@@ -435,3 +435,40 @@ fields on the idea: when, and by whom. Votes never approve anything by themselve
 Like the Ideas list, this adds a table (`idea_vote`) and two columns, so the live database
 needs a migration. The new columns can be empty and the live site doesn't use them yet, so it
 can run before the new code goes out, with the owner's OK.
+
+## Chapter 9: The day-by-day schedule
+
+### One table for two kinds of item
+
+The Schedule holds two kinds of thing: an approved idea you put on a day, and something new that
+needs no vote, like "Airport transfer". Instead of two tables we use one, `schedule_item`. An
+item either points at an idea (and takes its name from the idea) or has a name of its own. Two
+rules in the database itself keep this honest: an item can't have both an idea and its own name,
+and can't have neither. A third rule says an item has a clock time exactly when its "when" is
+Exact time. The idea column is also unique, so one idea can't be on the schedule twice, even if
+two people tap Schedule it at the same moment.
+
+### Times are the clock on the wall, in the trip's own place
+
+"19:30" on a Ho Chi Minh City trip means 19:30 in Ho Chi Minh City, whoever is looking and
+wherever their phone is. We store the day and the time as plain text and never convert them. The
+time box says whose clock it is ("Time (Vietnam time)") so nobody has to guess.
+
+### Putting things in order inside a day
+
+Each item gets a number: Full day comes first, then Morning, Afternoon and Evening, each placed
+at the start of its range (Morning before 12:00, Afternoon 12:00 to 16:59, Evening from 17:00).
+An exact time sorts just after the part of day it falls in. So the order reads Full day,
+Morning, 09:30, Afternoon, 12:00, Evening, 19:30. Items with the same number keep the order they
+were added.
+
+### Taking something off the schedule
+
+For an idea, "Back to approved ideas" just removes its schedule item, so it shows in the Approved
+list again. For a new item, Delete removes it for good, after one question. Deleting an idea, or
+a whole trip, removes their schedule items too, because the database follows the links.
+
+### This one needs a live database update too
+
+Like Ideas and Voting, this adds a table, so the live database needs a migration. Nothing in the
+live code uses the table yet, so it can run before the new code goes out, with the owner's OK.
