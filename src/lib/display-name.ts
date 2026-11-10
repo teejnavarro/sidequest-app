@@ -26,3 +26,8 @@ export function validateDisplayName(raw: unknown): DisplayNameResult {
   }
   return { ok: true, name };
 }
+
+// The first word of a name, for short lines like "Added by Maya".
+export function firstNameOf(name: string): string {
+  return name.trim().split(/\s+/)[0] || name;
+}

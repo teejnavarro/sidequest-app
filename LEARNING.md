@@ -472,3 +472,36 @@ a whole trip, removes their schedule items too, because the database follows the
 
 Like Ideas and Voting, this adds a table, so the live database needs a migration. Nothing in the
 live code uses the table yet, so it can run before the new code goes out, with the owner's OK.
+
+## Chapter 10: Guests and spots
+
+### A spot, not just a person
+
+Until now a trip's member list was a list of accounts: one row per person who signed in. To let
+you add a friend who won't sign up, each row in that list is now a "spot". A spot is either a
+signed-in person or a guest, which is just a name that you typed in, with a note of who added
+it. A rule in the database says a spot is always exactly one of those two, never both and never
+neither. Every spot also has its own number, so we can point at it.
+
+### Why claiming a guest's spot moves nothing
+
+When your friend later opens the invite link and says "that's me", we don't create a new spot and
+copy things across. We fill in their account on the guest's own spot, in a single step, and clear
+the guest name. The spot keeps its number and its place in the list. That matters for money: when
+shared costs arrive, they will point at the spot, not at a person. So a cost that was split with
+"Lito" is still split with the same spot after Lito signs in, and every balance stays right.
+
+### The rules around guests
+
+A guest name can only be used once in a trip, and capital letters don't count (Lito and LITO are
+the same). Only the person who added a guest, or the trip owner, can rename or remove them, and
+the database checks that as part of the change itself. Someone who is just a guest, with no
+account, can't see or change anything, because trip access is always checked against a real
+signed-in account. A visitor who isn't signed in never sees a guest's name, only a circle in the
+count.
+
+### This one needs a live database update too
+
+This changes the member table, so the live database needs a migration. It is built so the live
+code keeps working before and after it: existing members just get their own spot numbers and
+nothing is deleted or rewritten. It can run before the new code goes out, with the owner's OK.

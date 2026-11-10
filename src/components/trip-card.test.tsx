@@ -2,7 +2,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TripCard } from "./trip-card";
 
-const person = (n: number) => ({ id: `u${n}`, name: `Person ${n}`, image: null });
+const person = (n: number) => ({
+  id: `u${n}`,
+  spotId: `s${n}`,
+  name: `Person ${n}`,
+  image: null,
+  isGuest: false,
+  addedById: null,
+  addedByName: null,
+});
 
 const trip = {
   id: "trip-1",
@@ -35,6 +43,14 @@ describe("TripCard", () => {
     expect(html()).toContain("You + 2");
     expect(html({ members: [person(1), person(2)] })).toContain("You + 1");
     expect(html()).not.toContain("sr-only");
+  });
+
+  it("counts a guest and draws them in plain gray, keeping people's colors", () => {
+    const guest = { ...person(2), id: "spot-2", isGuest: true, addedById: "u1", addedByName: "Person 1" };
+    const card = html({ members: [person(1), guest] });
+    expect(card).toContain("You + 1");
+    expect(card.match(/bg-chip text-ink/g)).toHaveLength(1);
+    expect(card.match(/text-on-face/g)).toHaveLength(1);
   });
 
   it("says Just you so far when alone", () => {

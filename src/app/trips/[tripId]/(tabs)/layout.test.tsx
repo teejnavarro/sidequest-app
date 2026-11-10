@@ -123,6 +123,19 @@ describe("the trip header", () => {
     expect(await renderHeader()).toContain("Just you so far");
   });
 
+  it("counts a guest as going, so you and one guest is not just you", async () => {
+    mocks.listTripMembers.mockResolvedValue([
+      { id: "u1", spotId: "s1", name: "Maya", image: null, isGuest: false, addedById: null, addedByName: null },
+      { id: "s2", spotId: "s2", name: "Dana", image: null, isGuest: true, addedById: "u1", addedByName: "Maya" },
+    ]);
+    const html = await renderHeader();
+    expect(html).toContain("2 going");
+    expect(html).not.toContain("Just you so far");
+    // The guest's face is the plain gray circle; Maya keeps her color.
+    expect(html).toMatch(/aria-label="Dana"[^>]*class="[^"]*bg-chip text-ink[^"]*">D</);
+    expect(html).toMatch(/aria-label="Maya"[^>]*class="[^"]*text-on-face[^"]*">M</);
+  });
+
   it("has no Owner line, no Edit trip pill, one Invite people pill and a pencil", async () => {
     const html = await renderHeader();
     expect(html).not.toContain("Owner");

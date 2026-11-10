@@ -5,7 +5,7 @@ import { FaceStack } from "@/components/face-stack";
 import { RouteLine } from "@/components/route-line";
 import { cardClass, primaryButton } from "@/components/ui";
 import { signInToJoin } from "../actions";
-import { JoinForm } from "./join-form";
+import { JoinForm, type UnclaimedGuest } from "./join-form";
 
 // What a visitor sees for a valid invite. Signed out, only the owner's name appears as
 // words: the other people are shown as decorative circles with no names or alt text.
@@ -13,10 +13,13 @@ export function JoinView({
   invited,
   code,
   signedIn,
+  guests = [],
 }: {
   invited: InvitedTrip;
   code: string;
   signedIn: boolean;
+  // Unclaimed guests, passed only to a signed-in visitor. Signed out, guests are just circles.
+  guests?: UnclaimedGuest[];
 }) {
   const dates = formatTripDates(invited.startDate, invited.endDate);
   const count = invited.members.length;
@@ -53,7 +56,7 @@ export function JoinView({
       </p>
 
       {signedIn ? (
-        <JoinForm code={code} />
+        <JoinForm code={code} guests={guests} />
       ) : (
         <form action={signInToJoin}>
           <input type="hidden" name="code" value={code} />

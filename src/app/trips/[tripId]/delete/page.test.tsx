@@ -85,6 +85,17 @@ describe("DeleteTripPage", () => {
     expect(html).toContain("Delete trip");
   });
 
+  it("counts guests among the people it affects", async () => {
+    mocks.getTripForMember.mockResolvedValue(trip("u1"));
+    mocks.listTripMembers.mockResolvedValue([
+      { id: "u1", spotId: "s1", name: "Maya", image: null, isGuest: false, addedById: null, addedByName: null },
+      { id: "s2", spotId: "s2", name: "Dana", image: null, isGuest: true, addedById: "u1", addedByName: "Maya" },
+    ]);
+    const html = renderToStaticMarkup(await renderContent());
+    expect(html).toContain("This deletes it for all 2 people in the trip.");
+    expect(html).not.toContain("This deletes it for good.");
+  });
+
   it("uses the one-person wording when the owner is alone", async () => {
     mocks.getTripForMember.mockResolvedValue(trip("u1"));
     mocks.listTripMembers.mockResolvedValue(people(1));

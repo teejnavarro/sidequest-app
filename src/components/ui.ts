@@ -37,6 +37,9 @@ export const dangerButton = `${button} min-h-12 bg-chip px-[22px] text-owe`;
 // trip cards and the Owner mark.
 export const amberTag =
   "inline-flex items-center rounded-full bg-amber px-3 py-1 text-xs font-bold whitespace-nowrap text-on-amber";
+// The quiet mark for a guest on the people list.
+export const guestTag =
+  "inline-flex items-center rounded-full bg-chip px-2.5 py-0.5 text-xs font-bold whitespace-nowrap text-muted";
 export const softTag =
   "inline-flex items-center rounded-full bg-blue-soft px-2.5 py-0.5 text-xs font-bold whitespace-nowrap text-blue-text";
 

@@ -1,6 +1,7 @@
 import { Face } from "./face";
 
-export type StackPerson = { id: string; name: string; image: string | null };
+// Guests (no account yet) get the plain gray circle, like on Invite people.
+export type StackPerson = { id: string; name: string; image: string | null; isGuest: boolean };
 
 const MAX_FACES = 5;
 
@@ -32,6 +33,7 @@ export function FaceStack({ people, size = 32, borderClass, decorative = false }
             image={person.image}
             size={size}
             decorative={decorative}
+            neutral={person.isGuest}
           />
         </span>
       ))}
