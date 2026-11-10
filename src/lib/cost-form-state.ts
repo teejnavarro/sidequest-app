@@ -1,6 +1,7 @@
 import type { CostDetails } from "@/lib/costs";
 import type { CostErrors, CostInput, CostRaw } from "@/lib/cost-input";
 import { costCategoryOf } from "@/lib/cost-options";
+import { firstNameOf } from "@/lib/display-name";
 import { formatMoney } from "@/lib/money";
 import { dayLabel } from "@/lib/schedule-options";
 
@@ -19,7 +20,49 @@ export const emptyCostValues: CostFormValues = {
   category: "",
 };
 
-export type ReviewPerson = { spotId: string; name: string; isYou: boolean };
+// A person (or guest) the cost can be paid by or shared with. `userId` only colors the face.
+export type CostPerson = {
+  spotId: string;
+  userId: string;
+  name: string; // first name
+  image: string | null;
+  isGuest: boolean;
+  isYou: boolean;
+};
+
+// The trip's people as the cost form lists them, in the trip's list order. A person's `id` is
+// their user id, which is how "you" is found; a guest's is their spot id.
+export function costPeople(
+  members: { id: string; spotId: string; name: string; image: string | null; isGuest: boolean }[],
+  userId: string,
+): CostPerson[] {
+  return members.map((member) => ({
+    spotId: member.spotId,
+    userId: member.id,
+    name: firstNameOf(member.name),
+    image: member.image,
+    isGuest: member.isGuest,
+    isYou: member.id === userId,
+  }));
+}
+
+// What a new cost starts as: paid by you, split between everyone, dated today in the trip's
+// time zone, or the trip's first day while the trip hasn't started.
+export function defaultCostValues(options: {
+  people: CostPerson[];
+  today: string;
+  tripStart: string;
+}): CostFormValues {
+  const { people, today, tripStart } = options;
+  return {
+    ...emptyCostValues,
+    paidBy: people.find((person) => person.isYou)?.spotId ?? "",
+    sharedBy: people.map((person) => person.spotId),
+    spentOn: today < tripStart ? tripStart : today,
+  };
+}
+
+export type ReviewPerson ={ spotId: string; name: string; isYou: boolean };
 
 // One changed field on an edit. Amounts, people and the category are ready to show; the date
 // is shown as "Sat, May 8". Old value first.

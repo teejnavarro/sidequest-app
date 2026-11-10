@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CostDetails } from "./costs";
-import { buildCostReview, valuesFromCost } from "./cost-form-state";
+import { buildCostReview, defaultCostValues, valuesFromCost } from "./cost-form-state";
 import { validateCostInput } from "./cost-input";
 
 const people = [
@@ -116,5 +116,29 @@ describe("valuesFromCost", () => {
       category: "food",
     });
     expect(valuesFromCost({ ...saved, category: null }, "1").category).toBe("");
+  });
+});
+
+describe("defaultCostValues", () => {
+  const crew = [
+    { spotId: "a", userId: "u1", name: "Maya", image: null, isGuest: false, isYou: false },
+    { spotId: "b", userId: "u2", name: "Ben", image: null, isGuest: false, isYou: true },
+    { spotId: "g", userId: "g", name: "Dana", image: null, isGuest: true, isYou: false },
+  ];
+
+  it("is paid by you, shared by everyone, with nothing else filled in", () => {
+    expect(defaultCostValues({ people: crew, today: "2027-05-09", tripStart: "2027-05-08" })).toEqual({
+      description: "",
+      amount: "",
+      paidBy: "b",
+      sharedBy: ["a", "b", "g"],
+      spentOn: "2027-05-09",
+      category: "",
+    });
+  });
+
+  it("uses the first day while the trip has not started, and today from then on", () => {
+    expect(defaultCostValues({ people: crew, today: "2027-01-01", tripStart: "2027-05-08" }).spentOn).toBe("2027-05-08");
+    expect(defaultCostValues({ people: crew, today: "2027-05-08", tripStart: "2027-05-08" }).spentOn).toBe("2027-05-08");
   });
 });
