@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import { JoinView } from "./join-view";
 
 vi.mock("../actions", () => ({ signInToJoin: async () => {} }));
-vi.mock("./join-form", () => ({ JoinForm: () => <button>Join trip</button> }));
+vi.mock("./join-form", () => ({
+  JoinForm: ({ guests }: { guests?: unknown[] }) => (
+    <button data-guests={guests?.length ?? 0}>Join trip</button>
+  ),
+}));
 
 const CODE = "3f2b8c1e-9a4d-4e7b-8c11-5d6a7b9e0f12";
 
@@ -47,7 +51,7 @@ describe("the invite page for a signed-out visitor", () => {
   it("still shows the circles, as initials, and offers no join button yet", () => {
     expect(html).toContain("MO");
     expect(html).toContain("BS");
-    expect(html).not.toContain("<button>Join trip</button>");
+    expect(html).not.toContain("Join trip</button>");
   });
 
   it("says one person, not one people", () => {
@@ -74,6 +78,37 @@ describe("the invite page for a signed-in person", () => {
     expect(html).toContain('aria-label="Benedict Secretname"');
     expect(html).toContain("Join trip");
     expect(html).not.toContain("Continue with Google");
+  });
+});
+
+describe("the invite page when the trip has guests", () => {
+  const withGuests = {
+    ...invited,
+    members: [
+      ...invited.members,
+      { id: "g1", spotId: "g1", name: "Lito Guestname", image: null, isGuest: true, addedById: "u1", addedByName: "Maya Owner" },
+    ],
+  };
+
+  it("signed out: the guest is one more circle in the count and no name appears anywhere", () => {
+    const html = renderToStaticMarkup(<JoinView invited={withGuests} code={CODE} signedIn={false} />);
+    expect(html).toContain("4 people are going");
+    expect(html).not.toContain("Lito");
+    expect(html).not.toContain("Guestname");
+  });
+
+  it("signed out: guest names are not shown even if some caller passed them", () => {
+    const html = renderToStaticMarkup(
+      <JoinView invited={withGuests} code={CODE} signedIn={false} guests={[{ id: "g1", name: "Lito Guestname" }]} />,
+    );
+    expect(html).not.toContain("Lito");
+  });
+
+  it("signed in: passes the guests to the join form", () => {
+    const html = renderToStaticMarkup(
+      <JoinView invited={withGuests} code={CODE} signedIn guests={[{ id: "g1", name: "Lito Guestname" }]} />,
+    );
+    expect(html).toContain('data-guests="1"');
   });
 });
 

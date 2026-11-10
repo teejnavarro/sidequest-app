@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getOptionalUser: vi.fn(),
   getTripByInviteCode: vi.fn(),
   isTripMember: vi.fn(),
+  listUnclaimedGuestsByInviteCode: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
   }),
@@ -21,6 +22,7 @@ vi.mock("@/lib/current-user", () => ({ getOptionalUser: mocks.getOptionalUser })
 vi.mock("@/lib/trips", () => ({
   getTripByInviteCode: mocks.getTripByInviteCode,
   isTripMember: mocks.isTripMember,
+  listUnclaimedGuestsByInviteCode: mocks.listUnclaimedGuestsByInviteCode,
 }));
 vi.mock("./join-view", () => ({ JoinView: () => null }));
 
@@ -52,6 +54,7 @@ beforeEach(() => {
   mocks.getTripByInviteCode.mockResolvedValue(invited);
   mocks.getOptionalUser.mockResolvedValue(null);
   mocks.isTripMember.mockResolvedValue(false);
+  mocks.listUnclaimedGuestsByInviteCode.mockResolvedValue([]);
 });
 
 describe("the invite page's fixed details", () => {
@@ -78,6 +81,8 @@ describe("opening an invite", () => {
     const view = await openInvite(CODE);
     expect(view.props).toEqual({ invited, code: CODE, signedIn: false });
     expect(mocks.isTripMember).not.toHaveBeenCalled();
+    // Guest names are never even read for a signed-out visitor.
+    expect(mocks.listUnclaimedGuestsByInviteCode).not.toHaveBeenCalled();
   });
 
   it("sends an existing member straight to the trip", async () => {
@@ -90,7 +95,22 @@ describe("opening an invite", () => {
   it("offers a signed-in non-member the signed-in view with Join trip", async () => {
     mocks.getOptionalUser.mockResolvedValue({ id: "u2", name: "Ben Reyes", image: null });
     const view = await openInvite(CODE);
-    expect(view.props).toEqual({ invited, code: CODE, signedIn: true });
+    expect(view.props).toEqual({ invited, code: CODE, signedIn: true, guests: [] });
+  });
+
+  it("gives a signed-in non-member the trip's unclaimed guests to pick from", async () => {
+    mocks.getOptionalUser.mockResolvedValue({ id: "u2", name: "Ben Reyes", image: null });
+    mocks.listUnclaimedGuestsByInviteCode.mockResolvedValue([{ id: "spot-1", name: "Lito" }]);
+    const view = await openInvite(CODE);
+    expect(view.props).toMatchObject({ signedIn: true, guests: [{ id: "spot-1", name: "Lito" }] });
+    expect(mocks.listUnclaimedGuestsByInviteCode).toHaveBeenCalledWith(CODE);
+  });
+
+  it("does not read guests for an existing member, who is sent to the trip", async () => {
+    mocks.getOptionalUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
+    mocks.isTripMember.mockResolvedValue(true);
+    await expect(openInvite(CODE)).rejects.toThrow("redirect:");
+    expect(mocks.listUnclaimedGuestsByInviteCode).not.toHaveBeenCalled();
   });
 
   it("accepts an upper-case link and carries the lower-case code", async () => {
