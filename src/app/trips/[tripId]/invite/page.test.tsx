@@ -154,6 +154,20 @@ describe("InvitePage", () => {
       expect(html).not.toContain("/edit");
     });
 
+    it("wraps a long guest name in its row, linked or not, instead of widening the page", async () => {
+      const long = [member("u1", "Maya"), guest("g9", "W".repeat(40), "u1", "Maya")];
+      const nameSpan = /<span class="grid min-w-0 flex-1"><span class="min-w-0 wrap-anywhere">W{40}<\/span>/;
+
+      const asOwner = await renderFor(long); // a link to Edit guest
+      expect(asOwner).toMatch(/<a [^>]*class="[^"]*\bmin-w-0\b[^"]*"[^>]*>(?:(?!<\/a>).)*W{40}/);
+      expect(asOwner).toMatch(nameSpan);
+
+      mocks.getCurrentUser.mockResolvedValue({ id: "u3", name: "Jo", image: null });
+      const asOther = await renderFor([...long, member("u3", "Jo")]); // a plain row
+      expect(asOther).toMatch(/<div class="[^"]*\bmin-w-0\b[^"]*">(?:(?!<\/div>).)*W{40}/);
+      expect(asOther).toMatch(nameSpan);
+    });
+
     it("never makes a signed-in person's row a link, even for the owner", async () => {
       const html = await renderFor(people);
       expect(html).not.toContain("/guests/s-u2/edit");

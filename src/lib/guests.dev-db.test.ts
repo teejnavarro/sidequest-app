@@ -296,6 +296,51 @@ describe("guests on the dev database", () => {
       expect((await spots(tripId)).filter((row) => row.userId === JOINER_TWO)).toHaveLength(1);
     });
 
+    describe("at the same moment", () => {
+      let raceTrip: string;
+      let raceCode: string;
+
+      beforeAll(async () => {
+        raceTrip = await trips.createTrip(OWNER_TWO, input);
+        raceCode = (await trips.getInviteCodeForMember(raceTrip, OWNER_TWO))!;
+        await trips.addGuest(raceTrip, OWNER_TWO, "Race One");
+        await trips.addGuest(raceTrip, OWNER_TWO, "Race Two");
+        await trips.addGuest(raceTrip, OWNER_TWO, "Race Three");
+      });
+
+      it("lets exactly one of two people take the same guest; the other hears it was taken", async () => {
+        const one = (await guestSpotId(raceTrip, "Race One"))!;
+        const results = await Promise.all([
+          trips.joinTripByInviteCode(raceCode, JOINER, one),
+          trips.joinTripByInviteCode(raceCode, JOINER_TWO, one),
+        ]);
+        expect(results.filter((r) => r === "taken")).toHaveLength(1);
+        expect(results.filter((r) => typeof r === "object" && r?.tripId === raceTrip)).toHaveLength(1);
+
+        const winner = results[0] === "taken" ? JOINER_TWO : JOINER;
+        const loser = winner === JOINER ? JOINER_TWO : JOINER;
+        expect((await spots(raceTrip)).find((row) => row.id === one)?.userId).toBe(winner);
+        await expect(trips.isTripMember(raceTrip, loser)).resolves.toBe(false);
+      });
+
+      it("takes a person into the trip once when two tabs claim different guests", async () => {
+        const loser = (await trips.isTripMember(raceTrip, JOINER)) ? JOINER_TWO : JOINER;
+        const two = (await guestSpotId(raceTrip, "Race Two"))!;
+        const three = (await guestSpotId(raceTrip, "Race Three"))!;
+        const results = await Promise.all([
+          trips.joinTripByInviteCode(raceCode, loser, two),
+          trips.joinTripByInviteCode(raceCode, loser, three),
+        ]);
+        expect(results).toEqual([{ tripId: raceTrip }, { tripId: raceTrip }]);
+
+        const rows = await spots(raceTrip);
+        expect(rows.filter((row) => row.userId === loser)).toHaveLength(1);
+        // Exactly one of the two guests was taken; the other is still a guest.
+        const stillGuests = rows.filter((row) => [two, three].includes(row.id) && row.userId === null);
+        expect(stillGuests).toHaveLength(1);
+      });
+    });
+
     it("refuses a claimed spot for rename and remove as a guest", async () => {
       const claimed = (await spots(tripId)).find((row) => row.userId === JOINER)!;
       await expect(trips.getGuestForEditor(tripId, claimed.id, ADDER)).resolves.toBeNull();

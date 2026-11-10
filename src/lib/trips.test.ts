@@ -444,6 +444,31 @@ describe("joinTripByInviteCode with a guest's spot", () => {
     await expect(joinTripByInviteCode(CODE, "u1", "spot-1")).resolves.toEqual({ tripId: "trip-1" });
   });
 
+  // Two tabs at once: the other tab's join landed first, so the unique index refuses a second
+  // spot for the same person. That is the same as joining twice, not an error.
+  it("treats a clash with the person's own spot from another tab as joined", async () => {
+    let calls = 0;
+    const failOnClaim = (error: unknown) =>
+      vi.spyOn(fake.queries, "push").mockImplementation((...items) => {
+        calls += 1;
+        if (calls === 2) throw error;
+        return Array.prototype.push.apply(fake.queries, items);
+      });
+
+    let push = failOnClaim(Object.assign(new Error("dup"), { code: "23505" }));
+    fake.queue = [[["trip-1"]], [["u1"]]];
+    await expect(joinTripByInviteCode(CODE, "u1", "spot-1")).resolves.toEqual({ tripId: "trip-1" });
+    push.mockRestore();
+
+    calls = 0;
+    push = failOnClaim(new Error("database down"));
+    fake.queue = [[["trip-1"]]];
+    await expect(joinTripByInviteCode(CODE, "u1", "spot-1")).rejects.toMatchObject({
+      cause: { message: "database down" },
+    });
+    push.mockRestore();
+  });
+
   it("adds nobody when the code opens no trip", async () => {
     await expect(joinTripByInviteCode(CODE, "u1", "spot-1")).resolves.toBeNull();
     expect(fake.queries).toHaveLength(1);

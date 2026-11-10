@@ -41,6 +41,11 @@ describe("JoinForm with guests", () => {
     expect(html).toContain('name="claim" value="new"');
   });
 
+  it("wraps a long guest name inside its option instead of widening the page", () => {
+    const long = renderToStaticMarkup(<JoinForm code={CODE} guests={[{ id: "spot-9", name: "W".repeat(40) }]} />);
+    expect(long).toMatch(/<label class="[^"]*\bmin-w-0\b[^"]*">(?:(?!<\/label>).)*<span class="min-w-0 wrap-anywhere">Yes, I&#x27;m W{40}<\/span><\/label>/);
+  });
+
   it("checks none of them, so the person has to choose", () => {
     expect(html).not.toMatch(/\schecked[\s=/>]/);
   });

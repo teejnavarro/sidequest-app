@@ -119,4 +119,9 @@ describe("Remove guest", () => {
     expect(keep).toContain("bg-amber");
     expect(out).toContain('data-remove="trip-1/spot-1"');
   });
+
+  it("wraps a long guest name in the question instead of widening the page", async () => {
+    mocks.getGuestForEditor.mockResolvedValue({ ...GUEST, name: "W".repeat(40) });
+    expect(await html()).toMatch(/<h2 [^>]*class="[^"]*\bwrap-anywhere\b[^"]*">Remove W{40}\?<\/h2>/);
+  });
 });
