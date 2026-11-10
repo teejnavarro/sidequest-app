@@ -22,6 +22,9 @@ vi.mock("@/lib/trips", () => ({
 }));
 vi.mock("@/components/invite-actions", () => ({ InviteActions: () => null }));
 vi.mock("@/components/face", () => ({ Face: () => null }));
+vi.mock("@/components/add-guest-form", () => ({
+  AddGuestForm: ({ tripId }: { tripId: string }) => <form data-add-guest={tripId} />,
+}));
 
 const CODE = "3f2b8c1e-9a4d-4e7b-8c11-5d6a7b9e0f12";
 const props = {
@@ -58,7 +61,23 @@ describe("InvitePage", () => {
     expect(mocks.getInviteCodeForMember).not.toHaveBeenCalled();
   });
 
-  const member = (id: string, name: string) => ({ id, name, image: null });
+  const member = (id: string, name: string) => ({
+    id,
+    spotId: `s-${id}`,
+    name,
+    image: null,
+    isGuest: false,
+    addedById: null as string | null,
+    addedByName: null as string | null,
+  });
+  const guest = (spotId: string, name: string, addedById: string, addedByName: string) => ({
+    ...member(spotId, name),
+    id: spotId,
+    spotId,
+    isGuest: true,
+    addedById,
+    addedByName,
+  });
 
   async function renderFor(members: ReturnType<typeof member>[]) {
     mocks.getInviteCodeForMember.mockResolvedValue(CODE);
@@ -87,5 +106,58 @@ describe("InvitePage", () => {
 
   it("says 1 person is in when it is just the owner", async () => {
     expect(await renderFor([member("u1", "Maya")])).toContain("1 person is in");
+  });
+
+  describe("guests", () => {
+    const people = [
+      member("u1", "Maya"),
+      member("u2", "Ben Santos"),
+      guest("g1", "Lito", "u2", "Ben Santos"),
+      guest("g2", "Tita Carmen", "u1", "Maya Reyes"),
+    ];
+
+    it("lists guests in order with a Guest tag and who added them, and counts them", async () => {
+      const html = await renderFor(people);
+      expect(html).toContain("4 people are in");
+      expect(html.match(/>Guest</g)).toHaveLength(2);
+      expect(html.indexOf("Maya")).toBeLessThan(html.indexOf("Lito"));
+      expect(html.indexOf("Lito")).toBeLessThan(html.indexOf("Tita Carmen"));
+      expect(html).toContain("Added by Ben");
+      expect(html).toContain("Added by Maya");
+      expect(html.match(/>Owner</g)).toHaveLength(1);
+    });
+
+    it("gives the people card the people anchor and the add form for this trip", async () => {
+      const html = await renderFor(people);
+      expect(html).toContain('id="people"');
+      expect(html).toContain('data-add-guest="trip-1"');
+    });
+
+    it("shows edit links to the owner for every guest", async () => {
+      // The viewer (u1) owns the trip.
+      const html = await renderFor(people);
+      expect(html).toContain('href="/trips/trip-1/guests/g1/edit"');
+      expect(html).toContain('href="/trips/trip-1/guests/g2/edit"');
+    });
+
+    it("shows an edit link to the adder only for their own guest", async () => {
+      mocks.getCurrentUser.mockResolvedValue({ id: "u2", name: "Ben", image: null });
+      const html = await renderFor(people);
+      expect(html).toContain('href="/trips/trip-1/guests/g1/edit"');
+      expect(html).not.toContain("/guests/g2/edit");
+      expect(html).toContain("Tita Carmen"); // still listed, just not a link
+    });
+
+    it("shows no edit links to a member who neither added a guest nor owns the trip", async () => {
+      mocks.getCurrentUser.mockResolvedValue({ id: "u3", name: "Jo", image: null });
+      const html = await renderFor([...people, member("u3", "Jo")]);
+      expect(html).not.toContain("/edit");
+    });
+
+    it("never makes a signed-in person's row a link, even for the owner", async () => {
+      const html = await renderFor(people);
+      expect(html).not.toContain("/guests/s-u2/edit");
+      expect(html).not.toContain("/guests/s-u1/edit");
+    });
   });
 });
