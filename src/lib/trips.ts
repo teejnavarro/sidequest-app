@@ -434,6 +434,8 @@ export async function joinTripByInviteCode(
   }
 
   const viewer = alias(tripMember, "viewer");
+  // A unique-index clash means the person's own join from another tab landed first: treat
+  // it like joining twice (the check below finds them in the trip).
   const claimed = await db
     .update(tripMember)
     .set({ userId, guestName: null, addedBy: null })
@@ -450,7 +452,11 @@ export async function joinTripByInviteCode(
         ),
       ),
     )
-    .returning({ id: tripMember.id });
+    .returning({ id: tripMember.id })
+    .catch((error: unknown) => {
+      if (isUniqueViolation(error)) return [];
+      throw error;
+    });
   if (claimed.length > 0) return { tripId };
   // Nothing changed: either the person is already in the trip (fine, same as joining twice)
   // or the spot is gone.

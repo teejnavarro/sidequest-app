@@ -27,7 +27,7 @@ async function RemoveGuestContent({ params }: { params: Params }) {
       <TaskBand backHref={`/trips/${trip.id}/invite#people`} backLabel="Invite people" title="Remove guest" />
       <main className={screenClass}>
         <section className={`${cardClass} gap-4 px-5 py-6`} aria-labelledby="remove-title">
-          <h2 id="remove-title" className="text-[19px] [overflow-wrap:anywhere]">
+          <h2 id="remove-title" className="text-[19px] wrap-anywhere">
             Remove {guest.name}?
           </h2>
           <p>They&apos;ll be taken off this trip.</p>
