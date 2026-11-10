@@ -57,6 +57,13 @@
       "when": 1794274248497,
       "tag": "0007_lying_deathbird",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794291844654,
+      "tag": "0008_broad_blue_shield",
+      "breakpoints": true
     }
   ]
 }

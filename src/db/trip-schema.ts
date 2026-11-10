@@ -1,4 +1,5 @@
 import {
+  bigint,
   check,
   date,
   index,
@@ -184,5 +185,65 @@ export const scheduleItem = pgTable(
       "schedule_item_time_check",
       sql`(${table.slot} = 'time') = (${table.time} is not null)`,
     ),
+  ],
+);
+
+// One shared cost. The amount is whole minor units of `currency` (centavos; whole dong).
+// Costs go with their trip. The id is made by the form, so a double tap saves once.
+export const cost = pgTable(
+  "cost",
+  {
+    id: text("id").primaryKey(),
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trip.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    // The trip's currency when the cost was saved.
+    currency: text("currency").notNull(),
+    // A spot (trip_member.id), not a user, so a claimed guest keeps its costs. No cascade.
+    paidBy: text("paid_by")
+      .notNull()
+      .references(() => tripMember.id),
+    // Null or one of COST_CATEGORIES.
+    category: text("category"),
+    // A calendar day, "YYYY-MM-DD".
+    spentOn: date("spent_on", { mode: "string" }).notNull(),
+    // No cascade from user: the account deletion story decides what happens here.
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    updatedBy: text("updated_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("cost_tripId_idx").on(table.tripId),
+    check("cost_amount_positive", sql`${table.amount} > 0`),
+  ],
+);
+
+// One person's part of a cost. Shares of a cost add up to cost.amount (see splitEqually).
+export const costShare = pgTable(
+  "cost_share",
+  {
+    costId: text("cost_id")
+      .notNull()
+      .references(() => cost.id, { onDelete: "cascade" }),
+    // A spot (trip_member.id). No cascade: a spot that is in a cost can't be deleted.
+    spotId: text("spot_id")
+      .notNull()
+      .references(() => tripMember.id),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.costId, table.spotId] }),
+    index("cost_share_spotId_idx").on(table.spotId),
+    check("cost_share_amount_nonnegative", sql`${table.amount} >= 0`),
   ],
 );
