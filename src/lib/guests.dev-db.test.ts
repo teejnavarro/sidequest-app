@@ -171,6 +171,7 @@ describe("guests on the dev database", () => {
       name: "Dana",
       addedById: ADDER,
       addedByName: "Ada Test",
+      costCount: 0,
     });
     await expect(trips.getGuestForEditor(tripId, dana, OWNER)).resolves.toMatchObject({ spotId: dana });
     await expect(trips.getGuestForEditor(tripId, dana, OTHER)).resolves.toBeNull();
@@ -205,21 +206,21 @@ describe("guests on the dev database", () => {
     await trips.addGuest(tripId, ADDER, "Temp Two");
     const one = (await guestSpotId(tripId, "Temp One"))!;
     const two = (await guestSpotId(tripId, "Temp Two"))!;
-    await expect(trips.removeGuest(tripId, one, OTHER)).resolves.toBe(false);
-    await expect(trips.removeGuest(tripId, one, STRANGER)).resolves.toBe(false);
-    await expect(trips.removeGuest(tripId, `${ID_PREFIX}no-such-spot`, OWNER)).resolves.toBe(false);
+    await expect(trips.removeGuest(tripId, one, OTHER)).resolves.toBe("not-found");
+    await expect(trips.removeGuest(tripId, one, STRANGER)).resolves.toBe("not-found");
+    await expect(trips.removeGuest(tripId, `${ID_PREFIX}no-such-spot`, OWNER)).resolves.toBe("not-found");
     expect(await guestSpotId(tripId, "Temp One")).toBe(one);
 
-    await expect(trips.removeGuest(tripId, one, ADDER)).resolves.toBe(true);
-    await expect(trips.removeGuest(tripId, two, OWNER)).resolves.toBe(true);
-    await expect(trips.removeGuest(tripId, one, ADDER)).resolves.toBe(false); // harmless twice
+    await expect(trips.removeGuest(tripId, one, ADDER)).resolves.toBe("ok");
+    await expect(trips.removeGuest(tripId, two, OWNER)).resolves.toBe("ok");
+    await expect(trips.removeGuest(tripId, one, ADDER)).resolves.toBe("not-found"); // harmless twice
     expect(await guestSpotId(tripId, "Temp One")).toBeUndefined();
     expect(await guestSpotId(tripId, "Temp Two")).toBeUndefined();
   });
 
   it("never removes a signed-in member as if they were a guest", async () => {
     const owner = (await spots(tripId)).find((row) => row.userId === OWNER)!;
-    await expect(trips.removeGuest(tripId, owner.id, OWNER)).resolves.toBe(false);
+    await expect(trips.removeGuest(tripId, owner.id, OWNER)).resolves.toBe("not-found");
     await expect(trips.renameGuest(tripId, owner.id, OWNER, "Nope")).resolves.toBe("not-found");
     await expect(trips.getTripForMember(tripId, OWNER)).resolves.toMatchObject({ id: tripId });
   });
@@ -345,8 +346,8 @@ describe("guests on the dev database", () => {
       const claimed = (await spots(tripId)).find((row) => row.userId === JOINER)!;
       await expect(trips.getGuestForEditor(tripId, claimed.id, ADDER)).resolves.toBeNull();
       await expect(trips.renameGuest(tripId, claimed.id, ADDER, "Dana")).resolves.toBe("not-found");
-      await expect(trips.removeGuest(tripId, claimed.id, ADDER)).resolves.toBe(false);
-      await expect(trips.removeGuest(tripId, claimed.id, OWNER)).resolves.toBe(false);
+      await expect(trips.removeGuest(tripId, claimed.id, ADDER)).resolves.toBe("not-found");
+      await expect(trips.removeGuest(tripId, claimed.id, OWNER)).resolves.toBe("not-found");
       expect((await spots(tripId)).find((row) => row.id === claimed.id)?.userId).toBe(JOINER);
     });
   });
