@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { FaceStack } from "./face-stack";
 
 const people = (n: number) =>
-  Array.from({ length: n }, (_, i) => ({ id: `u${i}`, name: `Person${i} Test`, image: null }));
+  Array.from({ length: n }, (_, i) => ({ id: `u${i}`, name: `Person${i} Test`, image: null, isGuest: false }));
 
 describe("FaceStack", () => {
   it("shows up to five faces and no extra circle", () => {
@@ -44,6 +44,27 @@ describe("FaceStack", () => {
     };
     expect(keys(true)).toEqual(["0", "1", "2"]);
     expect(keys(false)).toEqual(["u0", "u1", "u2"]);
+  });
+
+  it("draws guests on the plain gray circle and keeps people's colors, signed in or not", () => {
+    const mixed = [
+      { id: "u1", name: "Maya Test", image: null, isGuest: false },
+      { id: "spot-2", name: "Dana Guest", image: null, isGuest: true },
+    ];
+    for (const decorative of [false, true]) {
+      const html = renderToStaticMarkup(
+        <FaceStack people={mixed} borderClass="border-card" decorative={decorative} />,
+      );
+      const faces = html.match(/<span[^>]*class="inline-grid[^"]*"[^>]*>[A-Z]{2}<\/span>/g) ?? [];
+      expect(faces).toHaveLength(2);
+      const [person, guest] = faces;
+      expect(person).toContain(">MT<");
+      expect(person).toContain("text-on-face");
+      expect(person).not.toContain("bg-chip");
+      expect(guest).toContain(">DG<");
+      expect(guest).toContain("bg-chip text-ink");
+      expect(guest).not.toContain("text-on-face");
+    }
   });
 
   it("renders nothing for nobody", () => {

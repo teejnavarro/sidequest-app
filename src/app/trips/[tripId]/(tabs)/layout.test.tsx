@@ -131,6 +131,9 @@ describe("the trip header", () => {
     const html = await renderHeader();
     expect(html).toContain("2 going");
     expect(html).not.toContain("Just you so far");
+    // The guest's face is the plain gray circle; Maya keeps her color.
+    expect(html).toMatch(/aria-label="Dana"[^>]*class="[^"]*bg-chip text-ink[^"]*">D</);
+    expect(html).toMatch(/aria-label="Maya"[^>]*class="[^"]*text-on-face[^"]*">M</);
   });
 
   it("has no Owner line, no Edit trip pill, one Invite people pill and a pencil", async () => {

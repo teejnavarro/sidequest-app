@@ -45,6 +45,14 @@ describe("TripCard", () => {
     expect(html()).not.toContain("sr-only");
   });
 
+  it("counts a guest and draws them in plain gray, keeping people's colors", () => {
+    const guest = { ...person(2), id: "spot-2", isGuest: true, addedById: "u1", addedByName: "Person 1" };
+    const card = html({ members: [person(1), guest] });
+    expect(card).toContain("You + 1");
+    expect(card.match(/bg-chip text-ink/g)).toHaveLength(1);
+    expect(card.match(/text-on-face/g)).toHaveLength(1);
+  });
+
   it("says Just you so far when alone", () => {
     const card = html({ members: [person(1)] });
     expect(card).toContain("Just you so far");

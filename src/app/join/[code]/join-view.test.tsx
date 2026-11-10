@@ -97,6 +97,14 @@ describe("the invite page when the trip has guests", () => {
     expect(html).not.toContain("Guestname");
   });
 
+  it("draws the guest's circle in plain gray and keeps people's colors, signed out or in", () => {
+    for (const signedIn of [false, true]) {
+      const html = renderToStaticMarkup(<JoinView invited={withGuests} code={CODE} signedIn={signedIn} />);
+      expect(html.match(/bg-chip text-ink/g)).toHaveLength(1);
+      expect(html.match(/text-on-face/g)).toHaveLength(3);
+    }
+  });
+
   it("signed out: guest names are not shown even if some caller passed them", () => {
     const html = renderToStaticMarkup(
       <JoinView invited={withGuests} code={CODE} signedIn={false} guests={[{ id: "g1", name: "Lito Guestname" }]} />,
