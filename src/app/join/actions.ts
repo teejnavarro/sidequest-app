@@ -41,14 +41,14 @@ export async function joinTripAction(
   const user = await getOptionalUser();
   if (!user) redirect(`/join/${code}`);
 
-  let tripId: string | null;
+  let joined: Awaited<ReturnType<typeof joinTripByInviteCode>>;
   try {
-    tripId = await joinTripByInviteCode(code, user.id);
+    joined = await joinTripByInviteCode(code, user.id);
   } catch {
     return { message: "Couldn't join the trip. Please try again." };
   }
-  if (!tripId) return { message: "This invite link isn't working." };
+  if (!joined || joined === "taken") return { message: "This invite link isn't working." };
 
   revalidatePath("/trips");
-  redirect(`/trips/${tripId}/schedule`); // redirect works by throwing: keep it outside try/catch
+  redirect(`/trips/${joined.tripId}/schedule`); // redirect works by throwing: keep it outside try/catch
 }

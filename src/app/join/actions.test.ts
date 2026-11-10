@@ -33,7 +33,7 @@ beforeEach(() => {
     throw new Error(`redirect:${url}`);
   });
   mocks.getOptionalUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
-  mocks.joinTripByInviteCode.mockResolvedValue("trip-1");
+  mocks.joinTripByInviteCode.mockResolvedValue({ tripId: "trip-1" });
   mocks.signInSocial.mockResolvedValue({ url: "https://accounts.example.test/sign-in" });
 });
 

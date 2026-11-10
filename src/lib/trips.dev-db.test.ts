@@ -204,7 +204,15 @@ describe("privacy layer on the dev database", () => {
       await expect(trips.getInviteCodeForMember(tripA, OWNER)).resolves.toBe(codeA);
       const members = await trips.listTripMembers(tripA, OWNER);
       expect(members.map((row) => row.id)).toEqual([OWNER]);
-      expect(members[0]).toEqual({ id: OWNER, name: "Maya Test", image: null });
+      expect(members[0]).toEqual({
+        id: OWNER,
+        spotId: expect.any(String),
+        name: "Maya Test",
+        image: null,
+        isGuest: false,
+        addedById: null,
+        addedByName: null,
+      });
       expect(JSON.stringify(members)).not.toContain("@example.test");
     });
 
@@ -224,16 +232,28 @@ describe("privacy layer on the dev database", () => {
         endDate: input.endDate,
         destination: null,
         ownerName: "Maya Test",
-        members: [{ id: OWNER, name: "Maya Test", image: null }],
+        members: [
+          {
+            id: OWNER,
+            spotId: expect.any(String),
+            name: "Maya Test",
+            image: null,
+            isGuest: false,
+            addedById: null,
+            addedByName: null,
+          },
+        ],
       });
       expect(JSON.stringify(seen)).not.toContain("@example.test");
       await expect(trips.getTripByInviteCode(crypto.randomUUID())).resolves.toBeNull();
     });
 
     it("adds exactly one row when someone joins, and joining twice is harmless", async () => {
-      await expect(trips.joinTripByInviteCode(codeA, JOINER)).resolves.toBe(tripA);
+      await expect(trips.joinTripByInviteCode(codeA, JOINER)).resolves.toEqual({ tripId: tripA });
       expect(await rowsFor(JOINER, tripA)).toHaveLength(1);
-      await expect(trips.joinTripByInviteCode(codeA.toUpperCase(), JOINER)).resolves.toBe(tripA);
+      await expect(trips.joinTripByInviteCode(codeA.toUpperCase(), JOINER)).resolves.toEqual({
+        tripId: tripA,
+      });
       expect(await rowsFor(JOINER, tripA)).toHaveLength(1);
       await expect(trips.isTripMember(tripA, JOINER)).resolves.toBe(true);
       expect((await trips.listTripMembers(tripA, JOINER)).map((row) => row.id)).toEqual([OWNER, JOINER]);

@@ -15,9 +15,9 @@ const invited = {
   destination: "Hội An, Việt Nam",
   ownerName: "Maya Owner",
   members: [
-    { id: "u1", name: "Maya Owner", image: null },
-    { id: "u2", name: "Benedict Secretname", image: null },
-    { id: "u3", name: "Corazon Hiddenperson", image: null },
+    { id: "u1", spotId: "s1", name: "Maya Owner", image: null, isGuest: false, addedById: null, addedByName: null },
+    { id: "u2", spotId: "s2", name: "Benedict Secretname", image: null, isGuest: false, addedById: null, addedByName: null },
+    { id: "u3", spotId: "s3", name: "Corazon Hiddenperson", image: null, isGuest: false, addedById: null, addedByName: null },
   ],
 };
 

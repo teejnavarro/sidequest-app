@@ -2,7 +2,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TripCard } from "./trip-card";
 
-const person = (n: number) => ({ id: `u${n}`, name: `Person ${n}`, image: null });
+const person = (n: number) => ({
+  id: `u${n}`,
+  spotId: `s${n}`,
+  name: `Person ${n}`,
+  image: null,
+  isGuest: false,
+  addedById: null,
+  addedByName: null,
+});
 
 const trip = {
   id: "trip-1",
