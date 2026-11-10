@@ -4,6 +4,7 @@ import { joinTripAction, signInToJoin } from "./actions";
 const mocks = vi.hoisted(() => ({
   getOptionalUser: vi.fn(),
   joinTripByInviteCode: vi.fn(),
+  listUnclaimedGuestsByInviteCode: vi.fn(),
   signInSocial: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn((url: string) => {
@@ -16,7 +17,10 @@ vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/auth", () => ({ auth: { api: { signInSocial: mocks.signInSocial } } }));
 vi.mock("@/lib/current-user", () => ({ getOptionalUser: mocks.getOptionalUser }));
-vi.mock("@/lib/trips", () => ({ joinTripByInviteCode: mocks.joinTripByInviteCode }));
+vi.mock("@/lib/trips", () => ({
+  joinTripByInviteCode: mocks.joinTripByInviteCode,
+  listUnclaimedGuestsByInviteCode: mocks.listUnclaimedGuestsByInviteCode,
+}));
 
 const CODE = "3f2b8c1e-9a4d-4e7b-8c11-5d6a7b9e0f12";
 const initial = { message: "" };
@@ -34,6 +38,7 @@ beforeEach(() => {
   });
   mocks.getOptionalUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.joinTripByInviteCode.mockResolvedValue({ tripId: "trip-1" });
+  mocks.listUnclaimedGuestsByInviteCode.mockResolvedValue([]);
   mocks.signInSocial.mockResolvedValue({ url: "https://accounts.example.test/sign-in" });
 });
 
@@ -60,14 +65,14 @@ describe("joinTripAction", () => {
     await expect(joinTripAction(initial, formWith({ code: CODE }))).rejects.toThrow(
       "redirect:/trips/trip-1/schedule",
     );
-    expect(mocks.joinTripByInviteCode).toHaveBeenCalledWith(CODE, "u1");
+    expect(mocks.joinTripByInviteCode).toHaveBeenCalledWith(CODE, "u1", null);
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips");
   });
 
   it("ignores extra fields such as userId and callbackURL", async () => {
     const form = formWith({ code: CODE, userId: "someone-else", callbackURL: "https://evil.test" });
     await expect(joinTripAction(initial, form)).rejects.toThrow("redirect:/trips/trip-1/schedule");
-    expect(mocks.joinTripByInviteCode).toHaveBeenCalledWith(CODE, "u1");
+    expect(mocks.joinTripByInviteCode).toHaveBeenCalledWith(CODE, "u1", null);
   });
 
   it("says the link isn't working when the code opens no trip", async () => {
@@ -85,6 +90,60 @@ describe("joinTripAction", () => {
       message: "Couldn't join the trip. Please try again.",
     });
     expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+});
+
+describe("joinTripAction with guests", () => {
+  const GUESTS = [{ id: "spot-1", name: "Dana" }];
+  const ASK = { message: "Pick your name, or No, I'm new." };
+
+  beforeEach(() => {
+    mocks.listUnclaimedGuestsByInviteCode.mockResolvedValue(GUESTS);
+  });
+
+  it("asks for a choice, and joins nobody, when guests exist and nothing was picked", async () => {
+    await expect(joinTripAction(initial, formWith({ code: CODE }))).resolves.toEqual(ASK);
+    await expect(joinTripAction(initial, formWith({ code: CODE, claim: "" }))).resolves.toEqual(ASK);
+    expect(mocks.joinTripByInviteCode).not.toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it("joins as a new person when No, I'm new is picked", async () => {
+    await expect(joinTripAction(initial, formWith({ code: CODE, claim: "new" }))).rejects.toThrow(
+      "redirect:/trips/trip-1/schedule",
+    );
+    expect(mocks.joinTripByInviteCode).toHaveBeenCalledWith(CODE, "u1", null);
+  });
+
+  it("takes over the picked guest's spot as the signed-in person", async () => {
+    await expect(
+      joinTripAction(initial, formWith({ code: CODE, claim: "spot-1", userId: "someone-else" })),
+    ).rejects.toThrow("redirect:/trips/trip-1/schedule");
+    expect(mocks.joinTripByInviteCode).toHaveBeenCalledWith(CODE, "u1", "spot-1");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips");
+  });
+
+  it("says the spot was just taken, keeps the person on the page and refreshes it", async () => {
+    mocks.joinTripByInviteCode.mockResolvedValue("taken");
+    await expect(
+      joinTripAction(initial, formWith({ code: CODE, claim: "spot-1" })),
+    ).resolves.toEqual({ message: "That spot was just taken. Pick again." });
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/join/${CODE}`);
+    expect(mocks.revalidatePath).not.toHaveBeenCalledWith("/trips");
+  });
+
+  it("shows a plain message when checking for guests fails", async () => {
+    mocks.listUnclaimedGuestsByInviteCode.mockRejectedValue(new Error("database down"));
+    await expect(joinTripAction(initial, formWith({ code: CODE }))).resolves.toEqual({
+      message: "Couldn't join the trip. Please try again.",
+    });
+    expect(mocks.joinTripByInviteCode).not.toHaveBeenCalled();
+  });
+
+  it("does not look for guests when a choice was made", async () => {
+    await expect(joinTripAction(initial, formWith({ code: CODE, claim: "new" }))).rejects.toThrow();
+    expect(mocks.listUnclaimedGuestsByInviteCode).not.toHaveBeenCalled();
   });
 });
 
