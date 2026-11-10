@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMoney, minorDigits, parseAmount, splitEqually } from "./money";
+import { amountText, formatMoney, minorDigits, parseAmount, splitEqually } from "./money";
 
 describe("minorDigits", () => {
   it("knows each currency's decimals", () => {
@@ -63,6 +63,21 @@ describe("parseAmount", () => {
     expect(minor("250.", "VND")).toBe(250);
     expect(minor("0", "VND")).toBe("Enter an amount above zero.");
     expect(minor("1000000001", "VND")).toBe("That's too large.");
+  });
+});
+
+describe("amountText", () => {
+  it("writes minor units back as plain form text", () => {
+    expect(amountText(125050, "PHP")).toBe("1250.50");
+    expect(amountText(5, "PHP")).toBe("0.05");
+    expect(amountText(250000, "VND")).toBe("250000");
+    expect(amountText(5, "VND")).toBe("5");
+  });
+
+  it("round-trips through parseAmount", () => {
+    for (const minor of [1, 99, 100, 125050, 100_000_000_000]) {
+      expect(parseAmount(amountText(minor, "PHP"), "PHP")).toEqual({ ok: true, minor });
+    }
   });
 });
 

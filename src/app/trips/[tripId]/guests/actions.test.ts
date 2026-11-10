@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   addGuest: vi.fn(),
   renameGuest: vi.fn(),
   removeGuest: vi.fn(),
+  getGuestForEditor: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw new Error(`redirect:${url}`);
@@ -20,6 +21,7 @@ vi.mock("@/lib/trips", () => ({
   addGuest: mocks.addGuest,
   renameGuest: mocks.renameGuest,
   removeGuest: mocks.removeGuest,
+  getGuestForEditor: mocks.getGuestForEditor,
 }));
 
 const PEOPLE = "redirect:/trips/trip-1/invite#people";
@@ -44,7 +46,8 @@ beforeEach(() => {
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.addGuest.mockResolvedValue("ok");
   mocks.renameGuest.mockResolvedValue("ok");
-  mocks.removeGuest.mockResolvedValue(true);
+  mocks.removeGuest.mockResolvedValue("ok");
+  mocks.getGuestForEditor.mockResolvedValue({ spotId: "spot-1", name: "Dana", costCount: 1 });
 });
 
 describe("addGuestAction", () => {
@@ -200,8 +203,26 @@ describe("removeGuestAction", () => {
   });
 
   it("ends in the same place when the removal was refused", async () => {
-    mocks.removeGuest.mockResolvedValue(false);
+    mocks.removeGuest.mockResolvedValue("not-found");
     await expect(removeGuestAction({}, form())).rejects.toThrow(PEOPLE);
+  });
+
+  it("says the guest is part of a cost, with their name, and stays on the page", async () => {
+    mocks.removeGuest.mockResolvedValue("in-costs");
+    await expect(removeGuestAction({}, form())).resolves.toEqual({
+      error: "Dana is part of a cost, so they can't be removed.",
+    });
+    expect(mocks.getGuestForEditor).toHaveBeenCalledWith("trip-1", "spot-1", "u1");
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("still explains it when the name can't be read", async () => {
+    mocks.removeGuest.mockResolvedValue("in-costs");
+    mocks.getGuestForEditor.mockResolvedValue(null);
+    await expect(removeGuestAction({}, form())).resolves.toEqual({
+      error: "This guest is part of a cost, so they can't be removed.",
+    });
   });
 
   it("shows a plain message when the removal throws", async () => {

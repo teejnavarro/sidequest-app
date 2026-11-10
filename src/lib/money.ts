@@ -43,11 +43,18 @@ export function parseAmount(raw: string, currency: string): ParsedAmount {
   return { ok: true, minor };
 }
 
+// The amount as plain text for a form box, with the currency's decimals and no commas:
+// "1250.50" or "250000".
+export function amountText(minor: number, currency: string): string {
+  const digits = minorDigits(currency);
+  const text = String(minor).padStart(digits + 1, "0");
+  return digits === 0 ? text : `${text.slice(0, -digits)}.${text.slice(-digits)}`;
+}
+
 // "₱1,000.00" or "₫250,000", with the currency's own decimals.
 export function formatMoney(minor: number, currency: string): string {
   const digits = minorDigits(currency);
-  const text = String(minor).padStart(digits + 1, "0");
-  const decimal = digits === 0 ? text : `${text.slice(0, -digits)}.${text.slice(-digits)}`;
+  const decimal = amountText(minor, currency);
   try {
     // Intl accepts a decimal string and keeps every digit exact; the types only list numbers.
     return new Intl.NumberFormat("en", {
