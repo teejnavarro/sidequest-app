@@ -69,6 +69,18 @@ export function formatMoney(minor: number, currency: string): string {
   }
 }
 
+// What one minor unit is called, for "takes the extra centavo".
+const UNIT_NAMES: Record<string, string> = {
+  PHP: "centavo",
+  VND: "dong",
+  JPY: "yen",
+  KRW: "won",
+  IDR: "rupiah",
+};
+export function minorUnitName(currency: string): string {
+  return UNIT_NAMES[currency] ?? (minorDigits(currency) === 2 ? "cent" : "unit");
+}
+
 export type Share = { spotId: string; amount: number };
 
 // Splits `total` equally. Any leftover minor units go one each to the payer first (if the
