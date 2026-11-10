@@ -42,20 +42,40 @@ export const trip = pgTable("trip", {
     .notNull(),
 });
 
+// A spot in the trip: either a signed-in person (userId) or a guest who has no account
+// yet (guestName, addedBy). Claiming a guest fills in userId on the same row, so anything
+// tied to the spot (costs later) keeps working.
 export const tripMember = pgTable(
   "trip_member",
   {
+    // The database fills it, also for rows that already exist.
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()::text`),
     tripId: text("trip_id")
       .notNull()
       .references(() => trip.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id),
+    // Null while the spot is a guest.
+    userId: text("user_id").references(() => user.id),
+    // Only while the spot is a guest.
+    guestName: text("guest_name"),
+    // Who added the guest. Null for people who joined. No cascade, like the other user links.
+    addedBy: text("added_by").references(() => user.id),
+    // When the spot was made; the order of the list.
     joinedAt: timestamp("joined_at").defaultNow().notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.tripId, table.userId] }),
     index("trip_member_userId_idx").on(table.userId),
+    // A person is in a trip once (nulls don't clash).
+    uniqueIndex("trip_member_trip_user_unique").on(table.tripId, table.userId),
+    // A guest name is used once per trip, ignoring capitals.
+    uniqueIndex("trip_member_trip_guest_name_unique")
+      .on(table.tripId, sql`lower(${table.guestName})`)
+      .where(sql`${table.guestName} is not null`),
+    check(
+      "trip_member_kind_check",
+      sql`(${table.userId} is null) <> (${table.guestName} is null)`,
+    ),
   ],
 );
 
