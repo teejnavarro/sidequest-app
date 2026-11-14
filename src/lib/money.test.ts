@@ -21,7 +21,7 @@ describe("parseAmount", () => {
   it("reads pesos into centavos", () => {
     expect(minor("1,250.50")).toBe(125050);
     expect(minor("1250")).toBe(125000);
-    expect(minor(" 1 250 ")).toBe(125000);
+    expect(minor(" 1250 ")).toBe(125000);
     expect(minor("0.05")).toBe(5);
     expect(minor(".5")).toBe(50);
     expect(minor("12.")).toBe(1200);
@@ -79,6 +79,20 @@ describe("parseAmount", () => {
     }
   });
 
+  it("refuses a comma group that starts with zero", () => {
+    for (const raw of ["0,500", "001,250", "00,500"]) {
+      expect(minor(raw)).toBe("Enter an amount, like 1,250.50.");
+      expect(minor(raw, "VND")).toBe("Enter an amount, like 1,250.");
+    }
+  });
+
+  it("refuses a space inside the amount", () => {
+    for (const raw of ["12 50", "1 250", "1, 250", "1,250 .50"]) {
+      expect(minor(raw)).toBe("Enter an amount, like 1,250.50.");
+      expect(minor(raw, "VND")).toBe("Enter an amount, like 1,250.");
+    }
+  });
+
   it("takes and refuses the same commas for zero-decimal currencies", () => {
     expect(minor("1,250", "VND")).toBe(1250);
     expect(minor(" 1,250 ", "VND")).toBe(1250);
@@ -116,8 +130,9 @@ describe("parseAmount", () => {
     expect(minor("1,000,000,001", "VND")).toBe("That's too large.");
   });
 
-  it("treats a grouped zero as zero", () => {
-    expect(minor("0,000")).toBe("Enter an amount above zero.");
+  it("treats a plain zero as zero", () => {
+    expect(minor("0")).toBe("Enter an amount above zero.");
+    expect(minor("0.00")).toBe("Enter an amount above zero.");
   });
 });
 

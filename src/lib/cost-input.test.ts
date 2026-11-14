@@ -93,6 +93,11 @@ describe("validateCostInput", () => {
     expect(valueFor({ amount: "1,250.5" }).amount).toBe(125050);
   });
 
+  it("refuses a space inside the amount and a leading-zero comma group", () => {
+    expect(errorsFor({ amount: "12 50" }).amount).toBe("Enter an amount, like 1,250.50.");
+    expect(errorsFor({ amount: "0,500" }).amount).toBe("Enter an amount, like 1,250.50.");
+  });
+
   it("needs a payer who is in the trip", () => {
     expect(errorsFor({ paidBy: "" }).paidBy).toBe("Pick who paid.");
     expect(errorsFor({ paidBy: "stranger" }).paidBy).toBe("Pick who paid.");
