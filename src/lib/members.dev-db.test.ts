@@ -13,6 +13,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+// Each case makes a fresh trip and does many round trips to the real database.
+vi.setConfig({ testTimeout: 60_000 });
+
 const ID_PREFIX = "qa-dev-members-";
 const RUN = crypto.randomUUID();
 const OWNER = `${ID_PREFIX}owner-${RUN}`;
@@ -230,6 +233,170 @@ describe("members who left, on the dev database", () => {
       await expect(trips.getTripForMember(tripId, LEAVER)).resolves.not.toBeNull();
       await expect(ideas.getIdeaForMember(tripId, ideaId, LEAVER)).resolves.not.toBeNull();
       await setLeft(leaverSpot, true);
+    });
+  });
+
+  // A fresh trip for each case below: OWNER, BEA and LEAVER are people, plus one guest.
+  async function freshTrip() {
+    const id = await trips.createTrip(OWNER, tripInput);
+    const inviteCode = (await trips.getInviteCodeForMember(id, OWNER))!;
+    await trips.joinTripByInviteCode(inviteCode, BEA);
+    await trips.joinTripByInviteCode(inviteCode, LEAVER);
+    await trips.addGuest(id, OWNER, "Gus Guest");
+    const [owner, bea, leaver] = await Promise.all([OWNER, BEA, LEAVER].map((u) => spotIdOf(id, u)));
+    const [guestRow] = await dbModule.db
+      .select()
+      .from(schema.tripMember)
+      .where(orm.and(orm.eq(schema.tripMember.tripId, id), orm.isNull(schema.tripMember.userId)));
+    return { id, inviteCode, owner: owner!, bea: bea!, leaver: leaver!, guest: guestRow!.id };
+  }
+
+  async function ownerOf(id: string) {
+    const [row] = await dbModule.db.select().from(schema.trip).where(orm.eq(schema.trip.id, id));
+    return row!.ownerId;
+  }
+
+  async function spotRow(spotId: string) {
+    const [row] = await dbModule.db.select().from(schema.tripMember).where(orm.eq(schema.tripMember.id, spotId));
+    return row!;
+  }
+
+  describe("removing a member", () => {
+    it("lets only the owner see and remove another person who is in the trip", async () => {
+      const t = await freshTrip();
+      await expect(trips.getMemberForOwner(t.id, t.leaver, BEA)).resolves.toBeNull();
+      await expect(trips.getMemberForOwner(t.id, t.leaver, STRANGER)).resolves.toBeNull();
+      await expect(trips.removeMember(t.id, t.leaver, BEA)).resolves.toBe(false);
+      await expect(trips.removeMember(t.id, t.leaver, STRANGER)).resolves.toBe(false);
+      expect((await spotRow(t.leaver)).leftAt).toBeNull();
+
+      await costs.createCost(t.id, OWNER, costId("part-of"), {
+        description: "Taxi",
+        amount: 50000,
+        paidBy: t.owner,
+        category: null,
+        spentOn: "2027-03-12",
+        shares: money.splitEqually(50000, [t.owner, t.leaver], t.owner),
+      });
+      await expect(trips.getMemberForOwner(t.id, t.leaver, OWNER)).resolves.toEqual({
+        spotId: t.leaver,
+        userId: LEAVER,
+        name: "Lou Test",
+        image: null,
+        costCount: 1,
+      });
+      await expect(trips.removeMember(t.id, t.leaver, OWNER)).resolves.toBe(true);
+      expect((await spotRow(t.leaver)).leftAt).not.toBeNull();
+      await expect(trips.removeMember(t.id, t.leaver, OWNER)).resolves.toBe(false);
+      await expect(trips.getMemberForOwner(t.id, t.leaver, OWNER)).resolves.toBeNull();
+      await expect(trips.getTripForMember(t.id, LEAVER)).resolves.toBeNull();
+      // The cost stays.
+      const list = await costs.listCostsForMember(t.id, OWNER);
+      expect(list.costs).toHaveLength(1);
+    });
+
+    it("can't remove the owner, a guest or a spot of another trip", async () => {
+      const t = await freshTrip();
+      const other = await freshTrip();
+      await expect(trips.removeMember(t.id, t.owner, OWNER)).resolves.toBe(false);
+      await expect(trips.getMemberForOwner(t.id, t.owner, OWNER)).resolves.toBeNull();
+      await expect(trips.removeMember(t.id, t.guest, OWNER)).resolves.toBe(false);
+      await expect(trips.getMemberForOwner(t.id, t.guest, OWNER)).resolves.toBeNull();
+      await expect(trips.removeMember(t.id, other.bea, OWNER)).resolves.toBe(false);
+      expect((await spotRow(t.owner)).leftAt).toBeNull();
+      expect((await spotRow(other.bea)).leftAt).toBeNull();
+    });
+  });
+
+  describe("transferring ownership", () => {
+    it("lets only the owner hand the trip to a person still in it", async () => {
+      const t = await freshTrip();
+      await expect(trips.transferOwnership(t.id, t.bea, BEA)).resolves.toBe(false);
+      await expect(trips.transferOwnership(t.id, t.bea, STRANGER)).resolves.toBe(false);
+      await expect(trips.transferOwnership(t.id, t.guest, OWNER)).resolves.toBe(false);
+      await expect(trips.transferOwnership(t.id, t.owner, OWNER)).resolves.toBe(false);
+      await trips.removeMember(t.id, t.leaver, OWNER);
+      await expect(trips.transferOwnership(t.id, t.leaver, OWNER)).resolves.toBe(false);
+      expect(await ownerOf(t.id)).toBe(OWNER);
+
+      await expect(trips.transferOwnership(t.id, t.bea, OWNER)).resolves.toBe(true);
+      expect(await ownerOf(t.id)).toBe(BEA);
+      // The old owner stays in, but has no owner powers any more.
+      await expect(trips.isTripMember(t.id, OWNER)).resolves.toBe(true);
+      await expect(trips.transferOwnership(t.id, t.owner, OWNER)).resolves.toBe(false);
+      await expect(trips.removeMember(t.id, t.owner, OWNER)).resolves.toBe(false);
+      await expect(trips.resetInviteCode(t.id, OWNER)).resolves.toBe(false);
+      // The new owner has them, and can hand the trip back.
+      await expect(trips.getMemberForOwner(t.id, t.owner, BEA)).resolves.not.toBeNull();
+      await expect(trips.resetInviteCode(t.id, BEA)).resolves.toBe(true);
+      await expect(trips.transferOwnership(t.id, t.owner, BEA)).resolves.toBe(true);
+      expect(await ownerOf(t.id)).toBe(OWNER);
+    });
+  });
+
+  describe("leaving a trip", () => {
+    it("lets a member leave, refuses the owner and strangers, and is not repeatable", async () => {
+      const t = await freshTrip();
+      await expect(trips.leaveTrip(t.id, OWNER)).resolves.toBe("owner");
+      await expect(trips.leaveTrip(t.id, STRANGER)).resolves.toBe("not-found");
+      await expect(trips.leaveTrip(`${ID_PREFIX}no-such-trip`, BEA)).resolves.toBe("not-found");
+      await expect(trips.leaveTrip(t.id, BEA)).resolves.toBe("ok");
+      expect((await spotRow(t.bea)).leftAt).not.toBeNull();
+      await expect(trips.leaveTrip(t.id, BEA)).resolves.toBe("not-found");
+      expect((await trips.listMyTrips(BEA)).map((row) => row.id)).not.toContain(t.id);
+      expect(await ownerOf(t.id)).toBe(OWNER);
+    });
+
+    it("lets a former owner leave after handing the trip over", async () => {
+      const t = await freshTrip();
+      await trips.transferOwnership(t.id, t.bea, OWNER);
+      await expect(trips.leaveTrip(t.id, OWNER)).resolves.toBe("ok");
+      await expect(trips.leaveTrip(t.id, BEA)).resolves.toBe("owner");
+    });
+  });
+
+  describe("the invite link", () => {
+    it("is replaced only by the owner, and the old one opens nothing", async () => {
+      const t = await freshTrip();
+      await expect(trips.resetInviteCode(t.id, BEA)).resolves.toBe(false);
+      await expect(trips.resetInviteCode(t.id, STRANGER)).resolves.toBe(false);
+      expect(await trips.getInviteCodeForMember(t.id, OWNER)).toBe(t.inviteCode);
+
+      await expect(trips.resetInviteCode(t.id, OWNER)).resolves.toBe(true);
+      const fresh = (await trips.getInviteCodeForMember(t.id, OWNER))!;
+      expect(fresh).not.toBe(t.inviteCode);
+      await expect(trips.getTripByInviteCode(t.inviteCode)).resolves.toBeNull();
+      await expect(trips.getTripByInviteCode(fresh)).resolves.not.toBeNull();
+      await expect(trips.joinTripByInviteCode(t.inviteCode, STRANGER)).resolves.toBeNull();
+      await expect(trips.isTripMember(t.id, STRANGER)).resolves.toBe(false);
+    });
+  });
+
+  describe("coming back", () => {
+    it("switches the same spot on again and ignores a guest pick", async () => {
+      const t = await freshTrip();
+      await trips.removeMember(t.id, t.leaver, OWNER);
+      await expect(trips.hasLeftSpot(t.id, LEAVER)).resolves.toBe(true);
+      await expect(trips.hasLeftSpot(t.id, BEA)).resolves.toBe(false);
+      await expect(trips.hasLeftSpot(t.id, STRANGER)).resolves.toBe(false);
+
+      await expect(trips.joinTripByInviteCode(t.inviteCode, LEAVER, t.guest)).resolves.toEqual({ tripId: t.id });
+      expect(await spotIdOf(t.id, LEAVER)).toBe(t.leaver);
+      expect((await spotRow(t.leaver)).leftAt).toBeNull();
+      // The guest was not taken over.
+      expect((await spotRow(t.guest)).userId).toBeNull();
+      await expect(trips.hasLeftSpot(t.id, LEAVER)).resolves.toBe(false);
+      await expect(trips.getTripForMember(t.id, LEAVER)).resolves.not.toBeNull();
+      // Joining again changes nothing.
+      await expect(trips.joinTripByInviteCode(t.inviteCode, LEAVER)).resolves.toEqual({ tripId: t.id });
+    });
+  });
+
+  describe("guests are unchanged", () => {
+    it("still count as no member, and removeGuest still works", async () => {
+      const t = await freshTrip();
+      await expect(trips.removeGuest(t.id, t.guest, OWNER)).resolves.toBe("ok");
+      await expect(trips.removeGuest(t.id, t.guest, OWNER)).resolves.toBe("not-found");
     });
   });
 });

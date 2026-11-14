@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, exists, inArray, isNull, notExists, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, isNotNull, isNull, ne, notExists, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import { user } from "@/db/auth-schema";
@@ -454,6 +454,15 @@ export async function joinTripByInviteCode(
   const tripId = found[0]?.id;
   if (!tripId) return null;
 
+  // Coming back after leaving or being removed: the same spot is switched on again, so costs
+  // keep pointing at it. This ignores any guest the person picked.
+  const back = await db
+    .update(tripMember)
+    .set({ leftAt: null })
+    .where(and(eq(tripMember.tripId, tripId), eq(tripMember.userId, userId), isNotNull(tripMember.leftAt)))
+    .returning({ id: tripMember.id });
+  if (back.length > 0) return { tripId };
+
   if (!claimSpotId) {
     await db.insert(tripMember).values({ tripId, userId }).onConflictDoNothing();
     return { tripId };
@@ -487,6 +496,137 @@ export async function joinTripByInviteCode(
   // Nothing changed: either the person is already in the trip (fine, same as joining twice)
   // or the spot is gone.
   return (await isTripMember(tripId, userId)) ? { tripId } : "taken";
+}
+
+export type ManagedMember = {
+  spotId: string;
+  userId: string;
+  name: string;
+  image: string | null;
+  costCount: number; // how many costs the person paid or shares
+};
+
+// The spot is a person (not a guest) who is still in this trip and is not its owner, and the
+// caller owns the trip and is in it. Used inside the statements below, so the owner check is
+// never separate from the change.
+function manageableBy(tripId: string, spotId: string, ownerId: string) {
+  return and(
+    eq(tripMember.id, spotId),
+    eq(tripMember.tripId, tripId),
+    isNotNull(tripMember.userId),
+    activeSpot,
+    isMemberOf(tripId, ownerId),
+    exists(
+      db
+        .select({ one: trip.id })
+        .from(trip)
+        .where(and(eq(trip.id, tripId), eq(trip.ownerId, ownerId), ne(trip.ownerId, tripMember.userId))),
+    ),
+  );
+}
+
+// The person and how many costs they are in, only for the trip's owner and only for another
+// person still in the trip. Anyone else, a guest, the owner themself and a person who left get null.
+export async function getMemberForOwner(
+  tripId: string,
+  spotId: string,
+  ownerId: string,
+): Promise<ManagedMember | null> {
+  const rows = await db
+    .select({
+      spotId: tripMember.id,
+      userId: sql<string>`${tripMember.userId}`,
+      name: user.name,
+      image: user.image,
+      costCount: costCountOf,
+    })
+    .from(tripMember)
+    .innerJoin(user, eq(user.id, tripMember.userId))
+    .where(manageableBy(tripId, spotId, ownerId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+// Takes the person out of the trip: marks the spot as left (never deletes it, costs point at
+// it). Same conditions as getMemberForOwner, inside the update. False when nothing changed.
+export async function removeMember(tripId: string, spotId: string, ownerId: string): Promise<boolean> {
+  const updated = await db
+    .update(tripMember)
+    .set({ leftAt: sql`now()` })
+    .where(manageableBy(tripId, spotId, ownerId))
+    .returning({ id: tripMember.id });
+  return updated.length > 0;
+}
+
+// Hands the trip to another person who is still in it. One UPDATE of trip.owner_id, so there is
+// never a moment without an owner. The old owner stays a member. False when nothing changed.
+export async function transferOwnership(tripId: string, spotId: string, ownerId: string): Promise<boolean> {
+  const target = and(
+    eq(tripMember.id, spotId),
+    eq(tripMember.tripId, tripId),
+    isNotNull(tripMember.userId),
+    activeSpot,
+    ne(tripMember.userId, ownerId),
+  );
+  const updated = await db
+    .update(trip)
+    .set({
+      ownerId: sql`(select ${tripMember.userId} from ${tripMember} where ${target})`,
+    })
+    .where(
+      and(
+        eq(trip.id, tripId),
+        eq(trip.ownerId, ownerId),
+        exists(db.select({ one: tripMember.id }).from(tripMember).where(target)),
+      ),
+    )
+    .returning({ id: trip.id });
+  return updated.length > 0;
+}
+
+// A member leaves: their spot is marked as left. The owner can't leave ("owner"); a stranger
+// or someone already gone gets "not-found".
+export async function leaveTrip(tripId: string, userId: string): Promise<"ok" | "owner" | "not-found"> {
+  const updated = await db
+    .update(tripMember)
+    .set({ leftAt: sql`now()` })
+    .where(
+      and(
+        eq(tripMember.tripId, tripId),
+        eq(tripMember.userId, userId),
+        activeSpot,
+        notExists(
+          db
+            .select({ one: trip.id })
+            .from(trip)
+            .where(and(eq(trip.id, tripId), eq(trip.ownerId, userId))),
+        ),
+      ),
+    )
+    .returning({ id: tripMember.id });
+  if (updated.length > 0) return "ok";
+  return (await getTripForMember(tripId, userId)) ? "owner" : "not-found";
+}
+
+// Gives the trip a new invite code, only for its owner. The old link opens nothing right away.
+export async function resetInviteCode(tripId: string, ownerId: string): Promise<boolean> {
+  const updated = await db
+    .update(trip)
+    .set({ inviteCode: sql`gen_random_uuid()::text` })
+    .where(and(eq(trip.id, tripId), eq(trip.ownerId, ownerId), isMemberOf(tripId, ownerId)))
+    .returning({ id: trip.id });
+  return updated.length > 0;
+}
+
+// True when the person has a spot in the trip that they left or were removed from. The join
+// page uses it to skip the guest question.
+export async function hasLeftSpot(tripId: string, userId: string): Promise<boolean> {
+  const rows = await db
+    .select({ one: tripMember.id })
+    .from(tripMember)
+    .where(and(eq(tripMember.tripId, tripId), eq(tripMember.userId, userId), isNotNull(tripMember.leftAt)))
+    .limit(1);
+  return rows.length > 0;
 }
 
 // Deletes the trip for good, but only for its owner. Ownership is part of each delete's own
