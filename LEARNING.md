@@ -545,3 +545,39 @@ its costs first, in the same step.
 
 This adds two new tables, `cost` and `cost_share`. The live code doesn't use them yet, so the
 migration can run before the new code goes out, with the owner's OK.
+
+## Chapter 12: Leaving a trip without losing the costs
+
+### The problem
+
+People should be able to leave a trip, and the owner should be able to remove someone. But a
+person who paid for the boat is part of that cost forever. If we delete their row from the trip,
+the cost has nobody to point at. The database even refuses the delete, on purpose.
+
+### The idea: mark it, don't delete it
+
+This is called a soft delete. Think of a restaurant table with a "reserved" card on it: the table
+is still there, nobody can sit at it, and the bill that mentions it still makes sense. We add one
+column to the trip's list of people, `left_at`. Empty means "still in". A time means "left or was
+removed at that moment". The row stays, so every cost keeps pointing at a real spot.
+
+### One check makes it safe
+
+Soft deletes go wrong when you forget to hide the marked row somewhere. Here every "is this person
+in the trip" question already goes through a few places in the privacy layer (`isMemberOf` and the
+checks in `trips.ts`). Each one now also asks "and `left_at` is empty". So the moment someone is
+marked, they lose the trip, the ideas, the schedule and the costs at once, with no screen to
+update. The test file for this checks a person who left against every read and write.
+
+### Coming back, and handing over
+
+If the person opens the invite link again, we clear `left_at` on the same row, so they are back
+with their old costs. If you don't want that, the owner can get a new invite link: the old one
+stops working right away. Handing over the trip is one change to `trip.owner_id`, a single
+statement, so there is never a moment with no owner, and the owner can't leave until someone else
+holds it.
+
+### This one needs a live database update too
+
+One new empty column, `trip_member.left_at`. The live code ignores it, so the migration can run
+before the new code goes out, with the owner's OK.
