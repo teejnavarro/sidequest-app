@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { validateGuestName } from "@/lib/guest-input";
 import type { GuestFormState, RemoveGuestState } from "@/lib/guest-form-state";
-import { addGuest, removeGuest, renameGuest } from "@/lib/trips";
+import { addGuest, getGuestForEditor, removeGuest, renameGuest } from "@/lib/trips";
 
 // Only the named name field and the trip and spot ids are read from the form. The ids only
 // say WHICH trip or guest: who may add, rename or remove is decided inside the database
@@ -91,7 +91,11 @@ export async function removeGuestAction(
   if (spotId === "") redirect(peopleAddress(tripId));
 
   try {
-    await removeGuest(tripId, spotId, user.id);
+    const removed = await removeGuest(tripId, spotId, user.id);
+    if (removed === "in-costs") {
+      const guest = await getGuestForEditor(tripId, spotId, user.id);
+      return { error: `${guest?.name ?? "This guest"} is part of a cost, so they can't be removed.` };
+    }
   } catch {
     return { error: REMOVE_FAILED };
   }

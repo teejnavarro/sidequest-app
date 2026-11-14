@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getTripForMember: vi.fn(),
   listTripMembers: vi.fn(),
+  countCostsForTrip: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
   }),
@@ -18,6 +19,7 @@ vi.mock("@/lib/trips", () => ({
   getTripForMember: mocks.getTripForMember,
   listTripMembers: mocks.listTripMembers,
 }));
+vi.mock("@/lib/costs", () => ({ countCostsForTrip: mocks.countCostsForTrip }));
 vi.mock("./delete-form", () => ({ DeleteForm: () => <button>Delete trip</button> }));
 
 const props = {
@@ -51,6 +53,7 @@ async function renderContent() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
+  mocks.countCostsForTrip.mockResolvedValue(0);
 });
 
 // The layout's check does not protect this page, so the page must check for itself.
@@ -83,6 +86,16 @@ describe("DeleteTripPage", () => {
     expect(html).toContain('href="/trips/trip-1/edit"');
     expect(html).toContain('href="/trips/trip-1/schedule"'); // back link
     expect(html).toContain("Delete trip");
+  });
+
+  it("shows the cost count only when the trip has costs", async () => {
+    mocks.getTripForMember.mockResolvedValue(trip("u1"));
+    mocks.listTripMembers.mockResolvedValue(people(2));
+    expect(renderToStaticMarkup(await renderContent())).not.toContain("This also deletes");
+    mocks.countCostsForTrip.mockResolvedValue(1);
+    expect(renderToStaticMarkup(await renderContent())).toContain("This also deletes 1 cost.");
+    mocks.countCostsForTrip.mockResolvedValue(3);
+    expect(renderToStaticMarkup(await renderContent())).toContain("This also deletes 3 costs.");
   });
 
   it("counts guests among the people it affects", async () => {

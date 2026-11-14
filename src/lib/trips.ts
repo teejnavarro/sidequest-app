@@ -3,7 +3,7 @@ import { and, asc, desc, eq, exists, inArray, isNull, notExists, or, sql } from 
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import { user } from "@/db/auth-schema";
-import { trip, tripMember } from "@/db/trip-schema";
+import { cost, costShare, trip, tripMember } from "@/db/trip-schema";
 import { isMemberOf } from "@/lib/ideas";
 import { isInviteCode } from "@/lib/invite-code";
 import type { TripInput } from "@/lib/trip-input";
@@ -278,6 +278,13 @@ function isUniqueViolation(error: unknown): boolean {
   return codeOf(error) === "23505" || codeOf((error as { cause?: unknown } | null)?.cause) === "23505";
 }
 
+// Postgres code for "a foreign key said no".
+function isForeignKeyViolation(error: unknown): boolean {
+  const codeOf = (e: unknown) =>
+    typeof e === "object" && e !== null ? (e as { code?: unknown }).code : undefined;
+  return codeOf(error) === "23503" || codeOf((error as { cause?: unknown } | null)?.cause) === "23503";
+}
+
 // May this person change a guest: they added the guest, or they own the trip.
 function mayChangeGuest(userId: string) {
   return or(
@@ -302,7 +309,18 @@ function guestEditableBy(tripId: string, spotId: string, userId: string) {
   );
 }
 
-export type GuestSpot = { spotId: string; name: string; addedById: string; addedByName: string };
+export type GuestSpot = {
+  spotId: string;
+  name: string;
+  addedById: string;
+  addedByName: string;
+  costCount: number; // how many costs the guest paid or shares
+};
+
+// How many costs a spot paid or shares. Used inside queries on trip_member.
+const costCountOf = sql<number>`(select count(*) from ${cost} where ${cost.paidBy} = ${tripMember.id} or exists (select 1 from ${costShare} where ${costShare.costId} = ${cost.id} and ${costShare.spotId} = ${tripMember.id}))`.mapWith(
+  Number,
+);
 
 // Adds a guest (a name, no account) to the trip, but only if the person is a member: the
 // insert reads the trip and checks that in the same statement. "duplicate" means another
@@ -336,8 +354,9 @@ export async function addGuest(
   }
 }
 
-// The guest, only while the spot is still a guest in this trip and the person added it or
-// owns the trip (and is a member). Anyone else, and any other spot, gets null.
+// The guest and how many costs they are in, only while the spot is still a guest in this trip
+// and the person added it or owns the trip (and is a member). Anyone else, and any other
+// spot, gets null.
 export async function getGuestForEditor(
   tripId: string,
   spotId: string,
@@ -349,6 +368,7 @@ export async function getGuestForEditor(
       name: sql<string>`${tripMember.guestName}`,
       addedById: user.id,
       addedByName: user.name,
+      costCount: costCountOf,
     })
     .from(tripMember)
     .innerJoin(user, eq(user.id, tripMember.addedBy))
@@ -377,19 +397,28 @@ export async function renameGuest(
   }
 }
 
-// Removes a guest, with the same conditions as getGuestForEditor inside the delete itself.
-// Returns true only when a spot was removed.
-// SQ-013 MUST add "the guest has no costs or balances" to this condition before costs exist.
+// Removes a guest, with the same conditions as getGuestForEditor inside the delete itself,
+// plus "the guest is not in any cost" (the database refuses it too). "in-costs" means the
+// person may remove the guest but the guest is part of a cost; "not-found" covers everything
+// else, so the cases look the same to a stranger.
 export async function removeGuest(
   tripId: string,
   spotId: string,
   userId: string,
-): Promise<boolean> {
-  const deleted = await db
-    .delete(tripMember)
-    .where(guestEditableBy(tripId, spotId, userId))
-    .returning({ id: tripMember.id });
-  return deleted.length > 0;
+): Promise<"ok" | "in-costs" | "not-found"> {
+  try {
+    const deleted = await db
+      .delete(tripMember)
+      .where(and(guestEditableBy(tripId, spotId, userId), sql`${costCountOf} = 0`))
+      .returning({ id: tripMember.id });
+    if (deleted.length > 0) return "ok";
+  } catch (error) {
+    // A cost was added between the check and the delete: the foreign key said no.
+    if (!isForeignKeyViolation(error)) throw error;
+    return "in-costs";
+  }
+  const guest = await getGuestForEditor(tripId, spotId, userId);
+  return guest && guest.costCount > 0 ? "in-costs" : "not-found";
 }
 
 // The guests nobody has claimed yet in the trip this code opens: spot id and name. Only
@@ -463,14 +492,19 @@ export async function joinTripByInviteCode(
   return (await isTripMember(tripId, userId)) ? { tripId } : "taken";
 }
 
-// Deletes the trip for good, but only for its owner. Ownership is part of the delete's own
-// condition, so a member or a stranger deletes nothing. The member rows go with it (the
-// database cascades), and so does the invite code, which lives on the trip. Returns true
-// only when a trip was removed, so repeating the delete is harmless.
+// Deletes the trip for good, but only for its owner. Ownership is part of each delete's own
+// condition, so a member or a stranger deletes nothing. The trip's costs are deleted first,
+// in the same all-or-nothing batch: a cost points at spots with no cascade, and the database
+// checks that before the trip's own cascade has cleared the shares. The member rows, the
+// shares and the invite code (which lives on the trip) go with the trip. Returns true only
+// when a trip was removed, so repeating the delete is harmless.
 export async function deleteTripForOwner(tripId: string, userId: string): Promise<boolean> {
-  const deleted = await db
-    .delete(trip)
-    .where(and(eq(trip.id, tripId), eq(trip.ownerId, userId)))
-    .returning({ id: trip.id });
+  const owned = and(eq(trip.id, tripId), eq(trip.ownerId, userId));
+  const [, deleted] = await db.batch([
+    db
+      .delete(cost)
+      .where(and(eq(cost.tripId, tripId), exists(db.select({ one: trip.id }).from(trip).where(owned)))),
+    db.delete(trip).where(owned).returning({ id: trip.id }),
+  ]);
   return deleted.length > 0;
 }

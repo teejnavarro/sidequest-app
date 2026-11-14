@@ -285,14 +285,18 @@ describe("people in the list and on the invite", () => {
 });
 
 describe("deleteTripForOwner", () => {
-  it("puts ownership inside the delete itself, on the trip table only", async () => {
+  it("puts ownership inside both deletes, costs first, in one all-or-nothing batch", async () => {
     await deleteTripForOwner("trip-1", "u1");
-    const [{ sql, params }] = fake.queries;
-    expect(sql).toMatch(/^delete from "trip" where/);
-    expect(sql).toContain('"trip"."id" = $1');
-    expect(sql).toContain('"trip"."owner_id" = $2');
-    expect(params).toEqual(["trip-1", "u1"]);
-    expect(fake.queries).toHaveLength(1);
+    expect(fake.batches).toEqual([2]);
+    const [costs, tripDelete] = fake.queries;
+    expect(costs.sql).toMatch(/^delete from "cost" where/);
+    expect(costs.sql).toContain('"cost"."trip_id" = $1');
+    expect(costs.sql).toContain('"trip"."owner_id" = $');
+    expect(costs.params).toEqual(["trip-1", "trip-1", "u1"]);
+    expect(tripDelete.sql).toMatch(/^delete from "trip" where/);
+    expect(tripDelete.sql).toContain('"trip"."id" = $1');
+    expect(tripDelete.sql).toContain('"trip"."owner_id" = $2');
+    expect(tripDelete.params).toEqual(["trip-1", "u1"]);
   });
 
   it("says false when nothing was removed and true when a trip went", async () => {
@@ -358,18 +362,21 @@ describe("addGuest", () => {
 
 describe("changing a guest", () => {
   it("getGuestForEditor checks guest, trip, member and adder-or-owner in the query", async () => {
-    fake.rows = [["spot-1", "Lia", "u2", "Ben"]];
+    fake.rows = [["spot-1", "Lia", "u2", "Ben", "2"]];
     await expect(getGuestForEditor("trip-1", "spot-1", "u2")).resolves.toEqual({
       spotId: "spot-1",
       name: "Lia",
       addedById: "u2",
       addedByName: "Ben",
+      costCount: 2,
     });
     const { sql, params } = fake.queries[0];
     expect(sql).toContain('"trip_member"."user_id" is null');
     expect(sql).toContain('"trip_member"."added_by" =');
     expect(sql).toContain('"trip"."owner_id" =');
     expect(sql).toContain('"viewer"."user_id" =');
+    expect(sql).toContain('"cost"."paid_by" = "trip_member"."id"');
+    expect(sql).toContain('"cost_share"."spot_id" = "trip_member"."id"');
     expect(sql).not.toContain("email");
     expect(params).toEqual(expect.arrayContaining(["spot-1", "trip-1", "u2"]));
   });
@@ -392,12 +399,43 @@ describe("changing a guest", () => {
     }
   });
 
-  it("say not-found / false when nothing changed and ok / true when a spot changed", async () => {
+  it("removeGuest also refuses a guest who paid or shares any cost, inside the delete", async () => {
+    await removeGuest("trip-1", "spot-1", "u2");
+    const { sql } = fake.queries[0];
+    expect(sql).toContain('"cost"."paid_by" = "trip_member"."id"');
+    expect(sql).toContain('"cost_share"."spot_id" = "trip_member"."id"');
+    expect(sql).toContain(") = 0)");
+  });
+
+  it("say not-found when nothing changed and ok when a spot changed", async () => {
     await expect(renameGuest("trip-1", "spot-1", "u3", "Lia")).resolves.toBe("not-found");
-    await expect(removeGuest("trip-1", "spot-1", "u3")).resolves.toBe(false);
+    await expect(removeGuest("trip-1", "spot-1", "u3")).resolves.toBe("not-found");
     fake.rows = [["spot-1"]];
     await expect(renameGuest("trip-1", "spot-1", "u2", "Lia")).resolves.toBe("ok");
-    await expect(removeGuest("trip-1", "spot-1", "u2")).resolves.toBe(true);
+    await expect(removeGuest("trip-1", "spot-1", "u2")).resolves.toBe("ok");
+  });
+
+  it("removeGuest says in-costs when the person may remove the guest but the guest is in a cost", async () => {
+    fake.queue = [[], [["spot-1", "Lia", "u2", "Ben", "1"]]];
+    await expect(removeGuest("trip-1", "spot-1", "u2")).resolves.toBe("in-costs");
+    // A stranger, or a guest in no cost that was already gone, looks like not-found.
+    fake.queue = [[], []];
+    await expect(removeGuest("trip-1", "spot-1", "u3")).resolves.toBe("not-found");
+    fake.queue = [[], [["spot-1", "Lia", "u2", "Ben", "0"]]];
+    await expect(removeGuest("trip-1", "spot-1", "u2")).resolves.toBe("not-found");
+  });
+
+  it("removeGuest treats a foreign key refusal (a cost added just now) as in-costs, and passes other errors on", async () => {
+    const push = vi.spyOn(fake.queries, "push");
+    push.mockImplementationOnce(() => {
+      throw Object.assign(new Error("fk"), { code: "23503" });
+    });
+    await expect(removeGuest("trip-1", "spot-1", "u2")).resolves.toBe("in-costs");
+    push.mockImplementationOnce(() => {
+      throw new Error("database down");
+    });
+    await expect(removeGuest("trip-1", "spot-1", "u2")).rejects.toThrow();
+    push.mockRestore();
   });
 });
 

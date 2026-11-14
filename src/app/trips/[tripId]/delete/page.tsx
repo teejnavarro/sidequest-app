@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember, listTripMembers } from "@/lib/trips";
+import { countCostsForTrip } from "@/lib/costs";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
 import { cardClass, primaryButton, screenClass, skeleton } from "@/components/ui";
 import { DeleteForm } from "./delete-form";
@@ -17,7 +18,10 @@ async function DeleteTripContent({ params }: { params: Promise<{ tripId: string 
   const trip = await getTripForMember(tripId, user.id);
   if (!trip || trip.ownerId !== user.id) notFound();
 
-  const members = await listTripMembers(tripId, user.id);
+  const [members, costCount] = await Promise.all([
+    listTripMembers(tripId, user.id),
+    countCostsForTrip(tripId, user.id),
+  ]);
   const count = members.length;
 
   return (
@@ -33,6 +37,9 @@ async function DeleteTripContent({ params }: { params: Promise<{ tripId: string 
               ? `This deletes it for all ${count} people in the trip. You can't undo this.`
               : "This deletes it for good. You can't undo this."}
           </p>
+          {costCount > 0 && (
+            <p>This also deletes {costCount} {costCount === 1 ? "cost" : "costs"}.</p>
+          )}
           <div className="grid gap-3">
             <Link href={`/trips/${trip.id}/edit`} className={`${primaryButton} w-full`}>
               Keep trip

@@ -43,7 +43,7 @@ async function renderContent(page: (p: typeof props) => ReactElement) {
 }
 
 const TRIP = { id: "trip-1", name: "Saigon barkada", ownerId: "owner" };
-const GUEST = { spotId: "spot-1", name: "Lito", addedById: "u2", addedByName: "Ben Santos" };
+const GUEST = { spotId: "spot-1", name: "Lito", addedById: "u2", addedByName: "Ben Santos", costCount: 0 };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -96,6 +96,15 @@ describe("Edit guest", () => {
     const link = out.match(/<a[^>]*href="\/trips\/trip-1\/guests\/spot-1\/remove"[^>]*>Remove guest<\/a>/)?.[0];
     expect(link).toContain("text-owe");
     expect(out).toContain("A guest who&#x27;s part of any costs can&#x27;t be removed.");
+  });
+
+  it("replaces Remove guest with a muted line when the guest is part of costs", async () => {
+    mocks.getGuestForEditor.mockResolvedValue({ ...GUEST, costCount: 2 });
+    const out = await html();
+    expect(out).toContain("Lito is part of 2 costs, so they can&#x27;t be removed.");
+    expect(out).not.toContain("Remove guest");
+    mocks.getGuestForEditor.mockResolvedValue({ ...GUEST, costCount: 1 });
+    expect(await html()).toContain("Lito is part of 1 cost, so they");
   });
 
   it("names the adder's first name and the trip owner for another editor", async () => {
