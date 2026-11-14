@@ -6,7 +6,12 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getOptionalUser } from "@/lib/current-user";
 import { isInviteCode } from "@/lib/invite-code";
-import { joinTripByInviteCode, listUnclaimedGuestsByInviteCode } from "@/lib/trips";
+import {
+  getTripByInviteCode,
+  hasLeftSpot,
+  joinTripByInviteCode,
+  listUnclaimedGuestsByInviteCode,
+} from "@/lib/trips";
 
 export type JoinFormState = { message: string };
 
@@ -33,7 +38,8 @@ export async function signInToJoin(formData: FormData) {
 // while a page loads, so link previews and prefetching can't add anyone.
 //
 // The form's "claim" field is "new" (the person is new to the trip) or a guest's spot id.
-// When the trip has unclaimed guests, the person must answer one way or the other. The spot
+// When the trip has unclaimed guests, the person must answer one way or the other, unless they
+// left the trip before: the page asks them nothing, and joining switches their old spot back on. The spot
 // id only says WHICH spot: whether it can be taken is decided inside the database update.
 export async function joinTripAction(
   _prev: JoinFormState,
@@ -51,7 +57,10 @@ export async function joinTripAction(
   let joined: Awaited<ReturnType<typeof joinTripByInviteCode>>;
   try {
     if (claim === "" && (await listUnclaimedGuestsByInviteCode(code)).length > 0) {
-      return { message: "Pick your name, or No, I'm new." };
+      const invited = await getTripByInviteCode(code);
+      if (!invited || !(await hasLeftSpot(invited.id, user.id))) {
+        return { message: "Pick your name, or No, I'm new." };
+      }
     }
     joined = await joinTripByInviteCode(code, user.id, claim === "" || claim === "new" ? null : claim);
   } catch {
