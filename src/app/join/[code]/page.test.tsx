@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getOptionalUser: vi.fn(),
   getTripByInviteCode: vi.fn(),
   isTripMember: vi.fn(),
+  hasLeftSpot: vi.fn(),
   listUnclaimedGuestsByInviteCode: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
@@ -22,6 +23,7 @@ vi.mock("@/lib/current-user", () => ({ getOptionalUser: mocks.getOptionalUser })
 vi.mock("@/lib/trips", () => ({
   getTripByInviteCode: mocks.getTripByInviteCode,
   isTripMember: mocks.isTripMember,
+  hasLeftSpot: mocks.hasLeftSpot,
   listUnclaimedGuestsByInviteCode: mocks.listUnclaimedGuestsByInviteCode,
 }));
 vi.mock("./join-view", () => ({ JoinView: () => null }));
@@ -54,6 +56,7 @@ beforeEach(() => {
   mocks.getTripByInviteCode.mockResolvedValue(invited);
   mocks.getOptionalUser.mockResolvedValue(null);
   mocks.isTripMember.mockResolvedValue(false);
+  mocks.hasLeftSpot.mockResolvedValue(false);
   mocks.listUnclaimedGuestsByInviteCode.mockResolvedValue([]);
 });
 
@@ -104,6 +107,16 @@ describe("opening an invite", () => {
     const view = await openInvite(CODE);
     expect(view.props).toMatchObject({ signedIn: true, guests: [{ id: "spot-1", name: "Lito" }] });
     expect(mocks.listUnclaimedGuestsByInviteCode).toHaveBeenCalledWith(CODE);
+  });
+
+  it("skips the guest question for a person who left, so Join trip just switches them back on", async () => {
+    mocks.getOptionalUser.mockResolvedValue({ id: "u2", name: "Ben Reyes", image: null });
+    mocks.hasLeftSpot.mockResolvedValue(true);
+    mocks.listUnclaimedGuestsByInviteCode.mockResolvedValue([{ id: "spot-1", name: "Lito" }]);
+    const view = await openInvite(CODE);
+    expect(view.props).toEqual({ invited, code: CODE, signedIn: true, guests: [] });
+    expect(mocks.hasLeftSpot).toHaveBeenCalledWith("trip-1", "u2");
+    expect(mocks.listUnclaimedGuestsByInviteCode).not.toHaveBeenCalled();
   });
 
   it("does not read guests for an existing member, who is sent to the trip", async () => {

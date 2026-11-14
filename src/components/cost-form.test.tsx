@@ -8,9 +8,9 @@ vi.mock("@/app/trips/[tripId]/costs/actions", () => ({
 }));
 
 const people: CostPerson[] = [
-  { spotId: "a", userId: "u1", name: "Maya", image: null, isGuest: false, isYou: true },
-  { spotId: "b", userId: "u2", name: "Ben", image: null, isGuest: false, isYou: false },
-  { spotId: "g", userId: "g", name: "Dana", image: null, isGuest: true, isYou: false },
+  { spotId: "a", userId: "u1", name: "Maya", image: null, isGuest: false, isYou: true, hasLeft: false },
+  { spotId: "b", userId: "u2", name: "Ben", image: null, isGuest: false, isYou: false, hasLeft: false },
+  { spotId: "g", userId: "g", name: "Dana", image: null, isGuest: true, isYou: false, hasLeft: false },
 ];
 
 const filled = {
@@ -99,5 +99,18 @@ describe("CostForm", () => {
     const html = form({ mode: "edit", updatedAt: "2027-05-09T10:00:00.123Z", values: filled });
     expect(html).toContain('name="mode" value="edit"');
     expect(html).toContain('name="updatedAt" value="2027-05-09T10:00:00.123Z"');
+  });
+});
+
+describe("CostForm, people who left", () => {
+  const withLeft: CostPerson[] = [
+    ...people,
+    { spotId: "l", userId: "u3", name: "Lou", image: null, isGuest: false, isYou: false, hasLeft: true },
+  ];
+
+  it("tags a person who left in both pickers, and nobody else", () => {
+    const html = form({ people: withLeft });
+    expect(html.match(/>Left</g)).toHaveLength(2); // the payer radio and the share checkbox
+    expect(form()).not.toContain(">Left<");
   });
 });

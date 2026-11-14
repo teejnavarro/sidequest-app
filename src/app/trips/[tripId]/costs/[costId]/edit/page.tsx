@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
-import { getTripForMember, listTripMembers } from "@/lib/trips";
+import { getTripForMember, listCostPeople } from "@/lib/trips";
 import { getCostForMember } from "@/lib/costs";
 import { costPeople, valuesFromCost } from "@/lib/cost-form-state";
 import { amountText } from "@/lib/money";
@@ -25,7 +25,7 @@ async function EditCostContent({ params }: { params: Params }) {
   ]);
   if (!trip || !cost) notFound();
 
-  const people = costPeople(await listTripMembers(tripId, user.id), user.id);
+  const people = costPeople(await listCostPeople(tripId, user.id, cost.id), user.id);
 
   return (
     <>

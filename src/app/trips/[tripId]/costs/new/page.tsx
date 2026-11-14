@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
-import { getTripForMember, listTripMembers } from "@/lib/trips";
+import { getTripForMember, listCostPeople } from "@/lib/trips";
 import { costPeople, defaultCostValues } from "@/lib/cost-form-state";
 import { todayInZone } from "@/lib/trip-dates";
 import { CostForm } from "@/components/cost-form";
@@ -18,7 +18,7 @@ async function LogCostContent({ params }: { params: Promise<{ tripId: string }> 
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
 
-  const people = costPeople(await listTripMembers(tripId, user.id), user.id);
+  const people = costPeople(await listCostPeople(tripId, user.id, null), user.id);
   const values = defaultCostValues({
     people,
     today: todayInZone(trip.timeZone, new Date()),

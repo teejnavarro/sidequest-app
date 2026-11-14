@@ -5,7 +5,7 @@ import { emptyCostValues, type CostFormState } from "@/lib/cost-form-state";
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getTripForMember: vi.fn(),
-  listTripMembers: vi.fn(),
+  listCostPeople: vi.fn(),
   createCost: vi.fn(),
   updateCost: vi.fn(),
   deleteCost: vi.fn(),
@@ -21,7 +21,7 @@ vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("@/lib/trips", () => ({
   getTripForMember: mocks.getTripForMember,
-  listTripMembers: mocks.listTripMembers,
+  listCostPeople: mocks.listCostPeople,
 }));
 vi.mock("@/lib/costs", () => ({
   createCost: mocks.createCost,
@@ -37,9 +37,9 @@ const OPENED = "2027-03-12T10:00:00.123Z";
 
 // Spot a belongs to the signed-in person u1; b is another member; g is a guest.
 const members = [
-  { id: "u1", spotId: "a", name: "Maya Cruz", image: null, isGuest: false },
-  { id: "u2", spotId: "b", name: "Ben Lim", image: null, isGuest: false },
-  { id: "g", spotId: "g", name: "Dana", image: null, isGuest: true },
+  { id: "u1", spotId: "a", name: "Maya Cruz", image: null, isGuest: false, hasLeft: false },
+  { id: "u2", spotId: "b", name: "Ben Lim", image: null, isGuest: false, hasLeft: false },
+  { id: "g", spotId: "g", name: "Dana", image: null, isGuest: true, hasLeft: false },
 ];
 
 const good = {
@@ -80,7 +80,7 @@ beforeEach(() => {
   });
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.getTripForMember.mockResolvedValue({ id: "trip-1", currency: "PHP" });
-  mocks.listTripMembers.mockResolvedValue(members);
+  mocks.listCostPeople.mockResolvedValue(members);
   mocks.createCost.mockResolvedValue("ok");
   mocks.updateCost.mockResolvedValue("ok");
   mocks.deleteCost.mockResolvedValue(true);
@@ -95,7 +95,7 @@ describe("reviewOrSaveCostAction, new cost", () => {
     mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
     await expect(reviewOrSaveCostAction(initial, form())).rejects.toThrow("redirect:/");
     expect(mocks.createCost).not.toHaveBeenCalled();
-    expect(mocks.listTripMembers).not.toHaveBeenCalled();
+    expect(mocks.listCostPeople).not.toHaveBeenCalled();
   });
 
   it("goes to My trips when the trip id is missing, and back to the list for a bad cost id", async () => {
@@ -198,6 +198,38 @@ describe("reviewOrSaveCostAction, new cost", () => {
     mocks.getTripForMember.mockRejectedValue(new Error("database down"));
     const state = await reviewOrSaveCostAction(initial, form());
     expect(state.errors.form).toBe("Couldn't save the cost. Please try again.");
+  });
+});
+
+describe("people who left (SQ-006)", () => {
+  const left = { id: "u3", spotId: "l", name: "Lou Tan", image: null, isGuest: false, hasLeft: true };
+  const costForm = (mode: "new" | "edit", step: string, sharedBy: string[]) =>
+    formWith(
+      { ...good, tripId: "trip-1", costId: COST_ID, mode, step, updatedAt: OPENED },
+      sharedBy,
+    );
+
+  it("asks for the people without a cost id on a new cost, so nobody who left is offered", async () => {
+    await reviewOrSaveCostAction(initial, costForm("new", "review", ["a", "b"]));
+    expect(mocks.listCostPeople).toHaveBeenCalledWith("trip-1", "u1", null);
+  });
+
+  it("refuses a person who left on a new cost, because they are not in the list", async () => {
+    const state = await reviewOrSaveCostAction(initial, costForm("new", "review", ["a", "l"]));
+    expect(state.errors.sharedBy).toBeTruthy();
+    expect(mocks.createCost).not.toHaveBeenCalled();
+  });
+
+  it("asks for the people with the cost id on an edit, and keeps a person who left in that cost", async () => {
+    mocks.listCostPeople.mockResolvedValue([...members, left]);
+    mocks.getCostForMember.mockResolvedValue({
+      ...saved,
+      shares: [...saved.shares, { spotId: "l", amount: 0 }],
+    });
+    const state = await reviewOrSaveCostAction(initial, costForm("edit", "review", ["a", "b", "l"]));
+    expect(mocks.listCostPeople).toHaveBeenCalledWith("trip-1", "u1", COST_ID);
+    expect(state.errors).toEqual({});
+    expect(state.review?.shares.map((share) => share.spotId)).toContain("l");
   });
 });
 

@@ -121,9 +121,9 @@ describe("valuesFromCost", () => {
 
 describe("defaultCostValues", () => {
   const crew = [
-    { spotId: "a", userId: "u1", name: "Maya", image: null, isGuest: false, isYou: false },
-    { spotId: "b", userId: "u2", name: "Ben", image: null, isGuest: false, isYou: true },
-    { spotId: "g", userId: "g", name: "Dana", image: null, isGuest: true, isYou: false },
+    { spotId: "a", userId: "u1", name: "Maya", image: null, isGuest: false, isYou: false, hasLeft: false },
+    { spotId: "b", userId: "u2", name: "Ben", image: null, isGuest: false, isYou: true, hasLeft: false },
+    { spotId: "g", userId: "g", name: "Dana", image: null, isGuest: true, isYou: false, hasLeft: false },
   ];
 
   it("is paid by you, shared by everyone, with nothing else filled in", () => {

@@ -121,6 +121,19 @@ describe("the Costs tab", () => {
     expect(html).toContain("Dana paid · split 3 ways");
   });
 
+  it("says the payer left the trip, in muted text, only when they did", async () => {
+    mocks.listCostsForMember.mockResolvedValue({
+      costs: [
+        cost("Boat", "2027-05-09", { payer: { spotId: "l", name: "Lou", isGuest: false, isYou: false, hasLeft: true } }),
+        cost("Dinner", "2027-05-09"),
+      ],
+      total: 200000,
+    });
+    const html = await render();
+    expect(html).toContain('Lou<span class="text-muted"> (left the trip)</span> paid');
+    expect(html.match(/left the trip/g)).toHaveLength(1);
+  });
+
   it("shows the viewer's share, or that they are not in it", async () => {
     mocks.listCostsForMember.mockResolvedValue({
       costs: [cost("Dinner", "2027-05-09"), cost("Taxi", "2027-05-09", { myShare: null, shareCount: 1 })],
