@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   getOptionalUser: vi.fn(),
   joinTripByInviteCode: vi.fn(),
   listUnclaimedGuestsByInviteCode: vi.fn(),
+  getTripByInviteCode: vi.fn(),
+  hasLeftSpot: vi.fn(),
   signInSocial: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn((url: string) => {
@@ -20,6 +22,8 @@ vi.mock("@/lib/current-user", () => ({ getOptionalUser: mocks.getOptionalUser })
 vi.mock("@/lib/trips", () => ({
   joinTripByInviteCode: mocks.joinTripByInviteCode,
   listUnclaimedGuestsByInviteCode: mocks.listUnclaimedGuestsByInviteCode,
+  getTripByInviteCode: mocks.getTripByInviteCode,
+  hasLeftSpot: mocks.hasLeftSpot,
 }));
 
 const CODE = "3f2b8c1e-9a4d-4e7b-8c11-5d6a7b9e0f12";
@@ -39,6 +43,8 @@ beforeEach(() => {
   mocks.getOptionalUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.joinTripByInviteCode.mockResolvedValue({ tripId: "trip-1" });
   mocks.listUnclaimedGuestsByInviteCode.mockResolvedValue([]);
+  mocks.getTripByInviteCode.mockResolvedValue({ id: "trip-1" });
+  mocks.hasLeftSpot.mockResolvedValue(false);
   mocks.signInSocial.mockResolvedValue({ url: "https://accounts.example.test/sign-in" });
 });
 
@@ -106,6 +112,15 @@ describe("joinTripAction with guests", () => {
     await expect(joinTripAction(initial, formWith({ code: CODE, claim: "" }))).resolves.toEqual(ASK);
     expect(mocks.joinTripByInviteCode).not.toHaveBeenCalled();
     expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it("lets someone who left rejoin without a choice, since the page asks them nothing", async () => {
+    mocks.hasLeftSpot.mockResolvedValue(true);
+    await expect(joinTripAction(initial, formWith({ code: CODE }))).rejects.toThrow(
+      "redirect:/trips/trip-1/schedule",
+    );
+    expect(mocks.hasLeftSpot).toHaveBeenCalledWith("trip-1", "u1");
+    expect(mocks.joinTripByInviteCode).toHaveBeenCalledWith(CODE, "u1", null);
   });
 
   it("joins as a new person when No, I'm new is picked", async () => {

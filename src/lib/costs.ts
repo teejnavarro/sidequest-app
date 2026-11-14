@@ -26,7 +26,7 @@ export type CostListItem = {
   currency: string;
   category: string | null;
   spentOn: string; // "YYYY-MM-DD"
-  payer: { spotId: string; name: string; isGuest: boolean; isYou: boolean };
+  payer: { spotId: string; name: string; isGuest: boolean; isYou: boolean; hasLeft: boolean };
   shareCount: number;
   myShare: number | null; // the viewer's own share, or null when they are not in it
   addedBy: string; // first name
@@ -53,8 +53,14 @@ const creator = alias(user, "creator");
 const editor = alias(user, "editor");
 
 // All of these spots are in this trip: the count of matching rows equals the count asked for.
-function spotsInTrip(tripId: string, spotIds: string[]) {
-  return sql`(select count(*) from ${tripMember} where ${tripMember.tripId} = ${tripId} and ${inArray(tripMember.id, spotIds)}) = ${spotIds.length}`;
+// A person who left only counts when they already paid or share the cost being edited
+// (`costId`); a new cost (null) can't use them.
+function spotsInTrip(tripId: string, spotIds: string[], costId: string | null) {
+  const allowed =
+    costId === null
+      ? sql`${tripMember.leftAt} is null`
+      : sql`(${tripMember.leftAt} is null or ${tripMember.id} in (select ${cost.paidBy} from ${cost} where ${cost.id} = ${costId} union select ${costShare.spotId} from ${costShare} where ${costShare.costId} = ${costId}))`;
+  return sql`(select count(*) from ${tripMember} where ${tripMember.tripId} = ${tripId} and ${inArray(tripMember.id, spotIds)} and ${allowed}) = ${spotIds.length}`;
 }
 
 function spotsOf(input: CostInput): string[] {
@@ -77,6 +83,7 @@ export async function listCostsForMember(tripId: string, userId: string): Promis
       payerName: sql<string>`coalesce(${payerUser.name}, ${payerSpot.guestName})`,
       payerIsGuest: sql<boolean>`${payerSpot.userId} is null`,
       payerIsYou: sql<boolean>`coalesce(${payerSpot.userId} = ${userId}, false)`,
+      payerHasLeft: sql<boolean>`${payerSpot.leftAt} is not null`,
       shareCount: sql<number>`(select count(*) from ${costShare} where ${costShare.costId} = ${cost.id})`.mapWith(
         Number,
       ),
@@ -108,6 +115,7 @@ export async function listCostsForMember(tripId: string, userId: string): Promis
       name: row.payerName,
       isGuest: row.payerIsGuest,
       isYou: row.payerIsYou,
+      hasLeft: row.payerHasLeft,
     },
     shareCount: row.shareCount,
     myShare: row.myShare,
@@ -181,7 +189,7 @@ export async function createCost(
         })
         .from(trip)
         .where(
-          and(eq(trip.id, tripId), isMemberOf(tripId, userId), spotsInTrip(tripId, spotsOf(input))),
+          and(eq(trip.id, tripId), isMemberOf(tripId, userId), spotsInTrip(tripId, spotsOf(input), null)),
         ),
     )
     .onConflictDoNothing()
@@ -251,7 +259,7 @@ export async function updateCost(
     .where(
       and(
         mine,
-        spotsInTrip(tripId, spotsOf(input)),
+        spotsInTrip(tripId, spotsOf(input), costId),
         sql`date_trunc('milliseconds', ${cost.updatedAt}) = ${expectedUpdatedAt.toISOString()}::timestamp`,
       ),
     )

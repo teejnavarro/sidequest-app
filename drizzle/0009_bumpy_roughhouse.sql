@@ -1,0 +1,2 @@
+ALTER TABLE "trip_member" ADD COLUMN "left_at" timestamp;--> statement-breakpoint
+ALTER TABLE "trip_member" ADD CONSTRAINT "trip_member_left_person_check" CHECK ("trip_member"."left_at" is null or "trip_member"."user_id" is not null);

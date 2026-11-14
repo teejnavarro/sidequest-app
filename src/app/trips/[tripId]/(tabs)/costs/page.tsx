@@ -30,7 +30,8 @@ function CostRow({ cost, tripId }: { cost: CostListItem; tripId: string }) {
         <span className="text-[15px] font-bold wrap-anywhere">{cost.description}</span>
         <span className="text-[15px] font-bold tabular-nums">{formatMoney(cost.amount, cost.currency)}</span>
         <span className="col-span-2 text-[13px] text-muted wrap-anywhere">
-          {cost.payer.isYou ? "You" : cost.payer.name} paid · split {count(cost.shareCount, "way")} ·{" "}
+          {cost.payer.isYou ? "You" : cost.payer.name}
+          {cost.payer.hasLeft ? <span className="text-muted"> (left the trip)</span> : null} paid · split {count(cost.shareCount, "way")} ·{" "}
           {cost.myShare === null ? (
             "you're not in this one"
           ) : (

@@ -66,6 +66,7 @@ function PersonChoice({
         />
         {person.isYou ? "You" : person.name}
         {person.isGuest ? <span className={guestTag}>Guest</span> : null}
+        {person.hasLeft ? <span className={guestTag}>Left</span> : null}
         <Check size={14} weight="bold" aria-hidden="true" className="tick hidden" />
       </span>
     </label>

@@ -99,14 +99,14 @@ function toItem(row: IdeaRow): IdeaItem {
   };
 }
 
-// True when the person is in the trip. Used inside the queries below, never on its own.
+// True when the person is in the trip and hasn't left it. Used inside the queries below, never on its own.
 export function isMemberOf(tripId: string, userId: string) {
   const viewer = alias(tripMember, "viewer");
   return exists(
     db
       .select({ one: viewer.userId })
       .from(viewer)
-      .where(and(eq(viewer.tripId, tripId), eq(viewer.userId, userId))),
+      .where(and(eq(viewer.tripId, tripId), eq(viewer.userId, userId), isNull(viewer.leftAt))),
   );
 }
 

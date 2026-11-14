@@ -28,12 +28,21 @@ export type CostPerson = {
   image: string | null;
   isGuest: boolean;
   isYou: boolean;
+  // Left the trip: only offered on a cost they are already in.
+  hasLeft: boolean;
 };
 
 // The trip's people as the cost form lists them, in the trip's list order. A person's `id` is
 // their user id, which is how "you" is found; a guest's is their spot id.
 export function costPeople(
-  members: { id: string; spotId: string; name: string; image: string | null; isGuest: boolean }[],
+  members: {
+    id: string;
+    spotId: string;
+    name: string;
+    image: string | null;
+    isGuest: boolean;
+    hasLeft: boolean;
+  }[],
   userId: string,
 ): CostPerson[] {
   return members.map((member) => ({
@@ -43,6 +52,7 @@ export function costPeople(
     image: member.image,
     isGuest: member.isGuest,
     isYou: member.id === userId,
+    hasLeft: member.hasLeft,
   }));
 }
 

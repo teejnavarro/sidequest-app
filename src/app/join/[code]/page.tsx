@@ -3,7 +3,12 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getOptionalUser } from "@/lib/current-user";
 import { isInviteCode } from "@/lib/invite-code";
-import { getTripByInviteCode, isTripMember, listUnclaimedGuestsByInviteCode } from "@/lib/trips";
+import {
+  getTripByInviteCode,
+  hasLeftSpot,
+  isTripMember,
+  listUnclaimedGuestsByInviteCode,
+} from "@/lib/trips";
 import { screenClass, skeleton } from "@/components/ui";
 import { JoinView } from "./join-view";
 
@@ -26,8 +31,11 @@ async function JoinContent({ params }: { params: Promise<{ code: string }> }) {
   if (!user) return <JoinView invited={invited} code={lowerCode} signedIn={false} />;
 
   if (await isTripMember(invited.id, user.id)) redirect(`/trips/${invited.id}/schedule`);
-  // Guest names are read only here, for a signed-in person who is not in the trip yet.
-  const guests = await listUnclaimedGuestsByInviteCode(lowerCode);
+  // Guest names are read only here, for a signed-in person who is not in the trip yet. Someone
+  // who left already has a spot, so they get no guest question: Join trip switches it back on.
+  const guests = (await hasLeftSpot(invited.id, user.id))
+    ? []
+    : await listUnclaimedGuestsByInviteCode(lowerCode);
   return <JoinView invited={invited} code={lowerCode} signedIn guests={guests} />;
 }
 

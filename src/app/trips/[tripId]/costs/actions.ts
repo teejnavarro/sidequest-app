@@ -15,7 +15,7 @@ import {
 import { createCost, deleteCost, getCostForMember, updateCost, type CostDetails } from "@/lib/costs";
 import { firstNameOf } from "@/lib/display-name";
 import { amountText } from "@/lib/money";
-import { getTripForMember, listTripMembers } from "@/lib/trips";
+import { getTripForMember, listCostPeople } from "@/lib/trips";
 
 // Only these named fields are ever read from the form, plus the trip and cost ids, the mode,
 // the step and the time the cost was opened. Anything else a visitor adds is never looked at,
@@ -73,7 +73,8 @@ async function reviewOrSave(
 
   const trip = await getTripForMember(tripId, userId);
   if (!trip) return "gone";
-  const members = await listTripMembers(tripId, userId);
+  // A person who left is listed only when editing a cost they are in.
+  const members = await listCostPeople(tripId, userId, editing ? costId : null);
   const people = members.map((m) => ({ spotId: m.spotId, name: firstNameOf(m.name), isYou: m.id === userId }));
 
   const result = validateCostInput(values, {

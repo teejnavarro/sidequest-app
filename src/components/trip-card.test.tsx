@@ -10,6 +10,7 @@ const person = (n: number) => ({
   isGuest: false,
   addedById: null,
   addedByName: null,
+  hasLeft: false,
 });
 
 const trip = {

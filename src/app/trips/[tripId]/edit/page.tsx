@@ -3,10 +3,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
-import { getTripForMember } from "@/lib/trips";
+import { getTripForMember, listTripMembers } from "@/lib/trips";
 import { TripForm } from "@/components/trip-form";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
-import { cardClass, linkClass, screenClass, skeleton } from "@/components/ui";
+import { cardClass, helpClass, linkClass, screenClass, skeleton } from "@/components/ui";
 
 // This page sits outside the trip layout, so it checks for itself that the person is a
 // member, and reads its data inside its own Suspense boundary.
@@ -15,6 +15,13 @@ async function EditTripContent({ params }: { params: Promise<{ tripId: string }>
   const user = await getCurrentUser();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
+
+  // The owner can only leave after handing the trip to another person, so the hint about that
+  // shows only when there is another person (guests can't own a trip).
+  const isOwner = trip.ownerId === user.id;
+  const hasOtherPerson = isOwner
+    ? (await listTripMembers(tripId, user.id)).filter((member) => !member.isGuest).length > 1
+    : false;
 
   return (
     <>
@@ -34,14 +41,32 @@ async function EditTripContent({ params }: { params: Promise<{ tripId: string }>
             }}
           />
         </div>
-        {trip.ownerId === user.id ? (
+        {isOwner ? (
+          <>
+            <Link
+              href={`/trips/${trip.id}/delete`}
+              className={`${linkClass} justify-self-start text-owe`}
+            >
+              Delete trip
+            </Link>
+            {hasOtherPerson ? (
+              <p className={helpClass}>
+                To leave, make someone else the owner first. You can do that on{" "}
+                <Link href={`/trips/${trip.id}/invite#people`} className="underline underline-offset-2">
+                  Invite people
+                </Link>
+                .
+              </p>
+            ) : null}
+          </>
+        ) : (
           <Link
-            href={`/trips/${trip.id}/delete`}
+            href={`/trips/${trip.id}/leave`}
             className={`${linkClass} justify-self-start text-owe`}
           >
-            Delete trip
+            Leave trip
           </Link>
-        ) : null}
+        )}
       </main>
     </>
   );

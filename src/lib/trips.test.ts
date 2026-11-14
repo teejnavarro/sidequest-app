@@ -201,12 +201,14 @@ describe("joinTripByInviteCode", () => {
   });
 
   it("adds the person once, harmlessly if already in, and returns the trip id", async () => {
-    fake.rows = [["trip-1"]];
+    fake.queue = [[["trip-1"]], []];
     await expect(joinTripByInviteCode(CODE.toUpperCase(), "u1")).resolves.toEqual({
       tripId: "trip-1",
     });
     expect(fake.queries[0].params[0]).toBe(CODE);
-    const insert = fake.queries[1];
+    // First it tries to switch a left spot back on; nobody had one, so it adds the person.
+    expect(fake.queries[1].sql).toContain('update "trip_member" set "left_at" = $1 where');
+    const insert = fake.queries[2];
     expect(insert.sql).toContain('insert into "trip_member"');
     expect(insert.sql).toContain("on conflict do nothing");
     expect(insert.params).toEqual(expect.arrayContaining(["trip-1", "u1"]));
@@ -458,12 +460,24 @@ describe("listUnclaimedGuestsByInviteCode", () => {
   });
 });
 
-describe("joinTripByInviteCode with a guest's spot", () => {
-  it("claims with one UPDATE that checks spot, trip, guest and not-yet-a-member", async () => {
-    fake.queue = [[["trip-1"]], [["spot-1"]]];
+describe("joinTripByInviteCode after leaving", () => {
+  it("switches the person's left spot back on and stops there, ignoring a guest pick", async () => {
+    fake.queue = [[["trip-1"]], [["spot-9"]]];
     await expect(joinTripByInviteCode(CODE, "u1", "spot-1")).resolves.toEqual({ tripId: "trip-1" });
     expect(fake.queries).toHaveLength(2);
     const { sql, params } = fake.queries[1];
+    expect(sql).toContain('"trip_member"."left_at" is not null');
+    expect(params).toEqual(expect.arrayContaining([null, "trip-1", "u1"]));
+    expect(sql).not.toContain("insert");
+  });
+});
+
+describe("joinTripByInviteCode with a guest's spot", () => {
+  it("claims with one UPDATE that checks spot, trip, guest and not-yet-a-member", async () => {
+    fake.queue = [[["trip-1"]], [], [["spot-1"]]];
+    await expect(joinTripByInviteCode(CODE, "u1", "spot-1")).resolves.toEqual({ tripId: "trip-1" });
+    expect(fake.queries).toHaveLength(3);
+    const { sql, params } = fake.queries[2];
     expect(sql).toMatch(/^update "trip_member" set "user_id" = \$1, "guest_name" = \$2, "added_by" = \$3 where/);
     expect(params.slice(0, 3)).toEqual(["u1", null, null]);
     expect(sql).toContain('"trip_member"."user_id" is null');
@@ -473,12 +487,12 @@ describe("joinTripByInviteCode with a guest's spot", () => {
   });
 
   it("says taken when the spot is gone and the person is not in the trip", async () => {
-    fake.queue = [[["trip-1"]], [], []];
+    fake.queue = [[["trip-1"]], [], [], []];
     await expect(joinTripByInviteCode(CODE, "u1", "spot-1")).resolves.toBe("taken");
   });
 
   it("treats a person who is already in the trip as joined, changing nothing", async () => {
-    fake.queue = [[["trip-1"]], [], [["u1"]]];
+    fake.queue = [[["trip-1"]], [], [], [["u1"]]];
     await expect(joinTripByInviteCode(CODE, "u1", "spot-1")).resolves.toEqual({ tripId: "trip-1" });
   });
 
@@ -489,18 +503,18 @@ describe("joinTripByInviteCode with a guest's spot", () => {
     const failOnClaim = (error: unknown) =>
       vi.spyOn(fake.queries, "push").mockImplementation((...items) => {
         calls += 1;
-        if (calls === 2) throw error;
+        if (calls === 3) throw error;
         return Array.prototype.push.apply(fake.queries, items);
       });
 
     let push = failOnClaim(Object.assign(new Error("dup"), { code: "23505" }));
-    fake.queue = [[["trip-1"]], [["u1"]]];
+    fake.queue = [[["trip-1"]], [], [["u1"]]];
     await expect(joinTripByInviteCode(CODE, "u1", "spot-1")).resolves.toEqual({ tripId: "trip-1" });
     push.mockRestore();
 
     calls = 0;
     push = failOnClaim(new Error("database down"));
-    fake.queue = [[["trip-1"]]];
+    fake.queue = [[["trip-1"]], []];
     await expect(joinTripByInviteCode(CODE, "u1", "spot-1")).rejects.toMatchObject({
       cause: { message: "database down" },
     });

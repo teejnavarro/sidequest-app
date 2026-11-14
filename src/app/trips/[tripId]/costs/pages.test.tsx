@@ -7,7 +7,7 @@ import EditCostPage from "./[costId]/edit/page";
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getTripForMember: vi.fn(),
-  listTripMembers: vi.fn(),
+  listCostPeople: vi.fn(),
   getCostForMember: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
@@ -18,7 +18,7 @@ vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("@/lib/trips", () => ({
   getTripForMember: mocks.getTripForMember,
-  listTripMembers: mocks.listTripMembers,
+  listCostPeople: mocks.listCostPeople,
 }));
 vi.mock("@/lib/costs", () => ({ getCostForMember: mocks.getCostForMember }));
 // Show the forms' props as text, so the pages' choices can be read.
@@ -59,9 +59,9 @@ const trip = {
 };
 
 const members = [
-  { id: "u1", spotId: "a", name: "Maya Cruz", image: null, isGuest: false },
-  { id: "u2", spotId: "b", name: "Ben Lim", image: null, isGuest: false },
-  { id: "g", spotId: "g", name: "Dana Reyes", image: null, isGuest: true },
+  { id: "u1", spotId: "a", name: "Maya Cruz", image: null, isGuest: false, hasLeft: false },
+  { id: "u2", spotId: "b", name: "Ben Lim", image: null, isGuest: false, hasLeft: false },
+  { id: "g", spotId: "g", name: "Dana Reyes", image: null, isGuest: true, hasLeft: false },
 ];
 
 const cost = {
@@ -85,7 +85,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2027-05-09T20:00:00Z")); // already May 10 in Manila
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
   mocks.getTripForMember.mockResolvedValue(trip);
-  mocks.listTripMembers.mockResolvedValue(members);
+  mocks.listCostPeople.mockResolvedValue(members);
   mocks.getCostForMember.mockResolvedValue(cost);
 });
 
@@ -98,7 +98,7 @@ describe("Log a cost page", () => {
     mocks.getTripForMember.mockResolvedValue(null);
     await expect(run(LogCostPage)).rejects.toThrow("not-found");
     expect(mocks.getTripForMember).toHaveBeenCalledWith("trip-1", "u1");
-    expect(mocks.listTripMembers).not.toHaveBeenCalled();
+    expect(mocks.listCostPeople).not.toHaveBeenCalled();
   });
 
   it("sends a signed-out visitor away before looking anything up", async () => {
@@ -135,10 +135,32 @@ describe("Log a cost page", () => {
     ]);
   });
 
+  it("asks for the people without a cost id, so nobody who left is offered", async () => {
+    await run(LogCostPage);
+    expect(mocks.listCostPeople).toHaveBeenCalledWith("trip-1", "u1", null);
+  });
+
   it("makes a new id each time the page is opened", async () => {
     const one = formProps(await run(LogCostPage)).costId;
     const two = formProps(await run(LogCostPage)).costId;
     expect(one).not.toBe(two);
+  });
+});
+
+describe("Edit cost page, people who left", () => {
+  it("asks for the people with the cost id and passes on who left", async () => {
+    mocks.listCostPeople.mockResolvedValue([
+      ...members,
+      { id: "u3", spotId: "l", name: "Lou Tan", image: null, isGuest: false, hasLeft: true },
+    ]);
+    const people = formProps(await run(EditCostPage, "cost-1")).people;
+    expect(mocks.listCostPeople).toHaveBeenCalledWith("trip-1", "u1", "cost-1");
+    expect(people.map((p: { name: string; hasLeft: boolean }) => [p.name, p.hasLeft])).toEqual([
+      ["Maya", false],
+      ["Ben", false],
+      ["Dana", false],
+      ["Lou", true],
+    ]);
   });
 });
 

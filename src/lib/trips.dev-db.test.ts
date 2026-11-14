@@ -212,6 +212,7 @@ describe("privacy layer on the dev database", () => {
         isGuest: false,
         addedById: null,
         addedByName: null,
+        hasLeft: false,
       });
       expect(JSON.stringify(members)).not.toContain("@example.test");
     });
@@ -241,6 +242,7 @@ describe("privacy layer on the dev database", () => {
             isGuest: false,
             addedById: null,
             addedByName: null,
+            hasLeft: false,
           },
         ],
       });
