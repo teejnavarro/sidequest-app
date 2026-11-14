@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTripAction, deleteTripAction, updateTripAction } from "./actions";
+import { createTripAction, deleteTripAction, leaveTripAction, updateTripAction } from "./actions";
 import { emptyTripValues } from "@/lib/trip-form-state";
 
 const mocks = vi.hoisted(() => ({
@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createTrip: vi.fn(),
   updateTripForMember: vi.fn(),
   deleteTripForOwner: vi.fn(),
+  leaveTrip: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw new Error(`redirect:${url}`);
@@ -20,6 +21,7 @@ vi.mock("@/lib/trips", () => ({
   createTrip: mocks.createTrip,
   updateTripForMember: mocks.updateTripForMember,
   deleteTripForOwner: mocks.deleteTripForOwner,
+  leaveTrip: mocks.leaveTrip,
 }));
 
 const initial = { errors: {}, values: emptyTripValues };
@@ -220,5 +222,54 @@ describe("deleteTripAction", () => {
     });
     expect(mocks.redirect).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("leaveTripAction", () => {
+  const none = {};
+
+  beforeEach(() => {
+    mocks.leaveTrip.mockResolvedValue("ok");
+  });
+
+  it("changes nothing when signed out", async () => {
+    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    await expect(leaveTripAction(none, formWith({ tripId: "trip-1" }))).rejects.toThrow("redirect:/");
+    expect(mocks.leaveTrip).not.toHaveBeenCalled();
+  });
+
+  it("goes to My trips without leaving anything when the trip id is missing", async () => {
+    await expect(leaveTripAction(none, formWith({}))).rejects.toThrow("redirect:/trips");
+    expect(mocks.leaveTrip).not.toHaveBeenCalled();
+  });
+
+  it("leaves as the signed-in person, ignores extra fields, and goes to My trips", async () => {
+    const form = formWith({ tripId: "trip-1", userId: "someone-else" });
+    await expect(leaveTripAction(none, form)).rejects.toThrow("redirect:/trips");
+    expect(mocks.leaveTrip).toHaveBeenCalledWith("trip-1", "u1");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1", "layout");
+  });
+
+  it("sends the owner back to Edit trip without refreshing anything", async () => {
+    mocks.leaveTrip.mockResolvedValue("owner");
+    await expect(leaveTripAction(none, formWith({ tripId: "trip-1" }))).rejects.toThrow(
+      "redirect:/trips/trip-1/edit",
+    );
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("sends a stranger or a repeat to My trips", async () => {
+    mocks.leaveTrip.mockResolvedValue("not-found");
+    await expect(leaveTripAction(none, formWith({ tripId: "trip-1" }))).rejects.toThrow("redirect:/trips");
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("shows an error when it throws, and does not redirect", async () => {
+    mocks.leaveTrip.mockRejectedValue(new Error("db down"));
+    await expect(leaveTripAction(none, formWith({ tripId: "trip-1" }))).resolves.toEqual({
+      error: "Couldn't leave the trip. Please try again.",
+    });
+    expect(mocks.redirect).not.toHaveBeenCalled();
   });
 });
