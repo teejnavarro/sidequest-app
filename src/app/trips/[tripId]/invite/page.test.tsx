@@ -174,4 +174,35 @@ describe("InvitePage", () => {
       expect(html).not.toContain("/guests/s-u1/edit");
     });
   });
+
+  describe("managing people (SQ-006)", () => {
+    const people = [member("u1", "Maya"), member("u2", "Ben Santos"), guest("g1", "Lito", "u2", "Ben Santos")];
+
+    it("gives the owner a Manage link with a caret on every other person, never on themself", async () => {
+      const html = await renderFor(people);
+      expect(html).toContain('href="/trips/trip-1/members/s-u2"');
+      expect(html).toContain('aria-label="Manage Ben Santos"');
+      expect(html).not.toContain("/members/s-u1");
+      expect(html).not.toContain("Manage Maya");
+      // The guest keeps its own Edit guest link.
+      expect(html).toContain('href="/trips/trip-1/guests/g1/edit"');
+      expect(html).not.toContain("/members/g1");
+    });
+
+    it("gives the owner a quiet Get a new link under the link card", async () => {
+      const html = await renderFor(people);
+      const link = html.match(/<a[^>]*href="\/trips\/trip-1\/invite\/reset"[^>]*>.*?<\/a>/)?.[0];
+      expect(link).toContain("Get a new link");
+      expect(link).toContain("underline");
+    });
+
+    it("gives a member plain rows and no Get a new link", async () => {
+      mocks.getCurrentUser.mockResolvedValue({ id: "u2", name: "Ben", image: null });
+      const html = await renderFor(people);
+      expect(html).not.toContain("/members/");
+      expect(html).not.toContain("Manage");
+      expect(html).not.toContain("/invite/reset");
+      expect(html).not.toContain("Get a new link");
+    });
+  });
 });

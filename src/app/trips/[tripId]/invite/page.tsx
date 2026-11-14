@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CaretRight } from "@phosphor-icons/react/dist/ssr";
+import { ArrowsClockwise, CaretRight } from "@phosphor-icons/react/dist/ssr";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { getInviteCodeForMember, getTripForMember, listTripMembers } from "@/lib/trips";
@@ -11,11 +11,12 @@ import { AddGuestForm } from "@/components/add-guest-form";
 import { Face } from "@/components/face";
 import { InviteActions } from "@/components/invite-actions";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
-import { cardClass, guestTag, helpClass, screenClass, skeleton, softTag } from "@/components/ui";
+import { cardClass, guestTag, helpClass, linkClass, screenClass, skeleton, softTag } from "@/components/ui";
 
 // One row of the people list: the face, the name, a quiet "Added by" line and a Guest tag
 // for guests, the Owner tag for the owner. A guest's row is a link to Edit guest only for
-// the person who added them and for the trip owner.
+// the person who added them and for the trip owner. For the owner, every other person's row
+// links to their Member page.
 function PersonRow({
   member,
   tripId,
@@ -28,6 +29,10 @@ function PersonRow({
   viewerId: string;
 }) {
   const canEdit = member.isGuest && (member.addedById === viewerId || ownerId === viewerId);
+  const canManage = !member.isGuest && ownerId === viewerId && member.id !== ownerId;
+  const href = canEdit
+    ? `/trips/${tripId}/guests/${member.spotId}/edit`
+    : `/trips/${tripId}/members/${member.spotId}`;
   const content = (
     <>
       <Face userId={member.id} name={member.name} image={member.image} size={40} neutral={member.isGuest} />
@@ -39,7 +44,7 @@ function PersonRow({
       </span>
       {member.isGuest ? <span className={guestTag}>Guest</span> : null}
       {member.id === ownerId ? <span className={softTag}>Owner</span> : null}
-      {canEdit ? (
+      {canEdit || canManage ? (
         <CaretRight size={20} weight="bold" aria-hidden="true" className="shrink-0 text-muted" />
       ) : null}
     </>
@@ -47,10 +52,10 @@ function PersonRow({
   const row = "flex min-h-11 min-w-0 items-center gap-3";
   return (
     <li>
-      {canEdit ? (
+      {canEdit || canManage ? (
         <Link
-          href={`/trips/${tripId}/guests/${member.spotId}/edit`}
-          aria-label={`Edit guest ${member.name}`}
+          href={href}
+          aria-label={canEdit ? `Edit guest ${member.name}` : `Manage ${member.name}`}
           className={`${row} -mx-2 rounded-field px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-text`}
         >
           {content}
@@ -92,6 +97,15 @@ async function InviteContent({ params }: { params: Promise<{ tripId: string }> }
           {/* One shortened line. The whole link is still in the page, and is what Copy and Share send. */}
           <p className="truncate text-sm text-muted select-all">{link}</p>
           <InviteActions url={link} tripName={trip.name} />
+          {trip.ownerId === user.id ? (
+            <Link
+              href={`/trips/${trip.id}/invite/reset`}
+              className={`${linkClass} justify-self-start text-sm underline`}
+            >
+              <ArrowsClockwise size={16} weight="bold" aria-hidden="true" />
+              Get a new link
+            </Link>
+          ) : null}
         </section>
 
         <section id="people" className={`${cardClass} gap-3 px-5 py-6`} aria-labelledby="members-title">

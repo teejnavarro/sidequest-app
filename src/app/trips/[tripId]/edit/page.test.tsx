@@ -5,6 +5,7 @@ import EditTripPage from "./page";
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getTripForMember: vi.fn(),
+  listTripMembers: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
   }),
@@ -12,7 +13,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
-vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
+vi.mock("@/lib/trips", () => ({
+  getTripForMember: mocks.getTripForMember,
+  listTripMembers: mocks.listTripMembers,
+}));
 vi.mock("@/components/trip-form", () => ({ TripForm: () => null }));
 
 // The page is a tree of React elements, which can point back at themselves (a link
@@ -43,6 +47,7 @@ async function renderContent() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
+  mocks.listTripMembers.mockResolvedValue([]);
 });
 
 // The layout's check does not protect this page, so the page must check for itself.
@@ -103,5 +108,49 @@ describe("EditTripPage delete link", () => {
     const page = show(await renderContent());
     expect(page).not.toContain("/delete");
     expect(page).not.toContain("Delete trip");
+  });
+});
+
+describe("EditTripPage leaving (SQ-006)", () => {
+  const trip = (ownerId: string) => ({
+    id: "trip-1",
+    name: "Hội An long weekend",
+    startDate: "2027-03-12",
+    endDate: "2027-03-15",
+    timeZone: "Asia/Ho_Chi_Minh",
+    currency: "VND",
+    destination: null,
+    ownerId,
+    ownerName: "Someone",
+    ownerImage: null,
+  });
+  const person = (id: string) => ({ id, spotId: `s-${id}`, name: id, image: null, isGuest: false });
+  const guest = { id: "g1", spotId: "g1", name: "Lito", image: null, isGuest: true };
+
+  it("shows a red Leave trip link to a member who is not the owner", async () => {
+    mocks.getTripForMember.mockResolvedValue(trip("someone-else"));
+    const page = show(await renderContent());
+    expect(page).toContain("/trips/trip-1/leave");
+    expect(page).toContain("Leave trip");
+    expect(page).toContain("text-owe");
+    expect(mocks.listTripMembers).not.toHaveBeenCalled();
+  });
+
+  it("shows the owner no Leave trip link, and the make-someone-else-owner line when another person is in", async () => {
+    mocks.getTripForMember.mockResolvedValue(trip("u1"));
+    mocks.listTripMembers.mockResolvedValue([person("u1"), person("u2")]);
+    const page = show(await renderContent());
+    expect(page).not.toContain("/leave");
+    expect(page).toContain("To leave, make someone else the owner first. You can do that on");
+    expect(page).toContain("/trips/trip-1/invite#people");
+    expect(page).toContain("Delete trip");
+  });
+
+  it("leaves out that line when the owner is alone or only guests are in", async () => {
+    mocks.getTripForMember.mockResolvedValue(trip("u1"));
+    mocks.listTripMembers.mockResolvedValue([person("u1"), guest]);
+    expect(show(await renderContent())).not.toContain("To leave");
+    mocks.listTripMembers.mockResolvedValue([person("u1")]);
+    expect(show(await renderContent())).not.toContain("To leave");
   });
 });
