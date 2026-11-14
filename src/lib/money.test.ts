@@ -93,6 +93,12 @@ describe("parseAmount", () => {
     }
   });
 
+  it("trims pasted spaces at the ends but refuses them inside", () => {
+    expect(minor(" 1,250\t")).toBe(125000);
+    expect(minor("1 250")).toBe("Enter an amount, like 1,250.50.");
+    expect(minor("0,000")).toBe("Enter an amount, like 1,250.50.");
+  });
+
   it("takes and refuses the same commas for zero-decimal currencies", () => {
     expect(minor("1,250", "VND")).toBe(1250);
     expect(minor(" 1,250 ", "VND")).toBe(1250);
