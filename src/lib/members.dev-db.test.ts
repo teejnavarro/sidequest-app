@@ -465,4 +465,92 @@ describe("members who left, on the dev database", () => {
       ).resolves.toBe("changed"); // refused spots look like a changed cost, as for foreign spots
     });
   });
+
+  // Added by QA (SQ-006): the owner's promise behind "Get a new link".
+  describe("a removed person and the old link", () => {
+    it("can't come back with the old link, only with the new one, to the same spot", async () => {
+      const t = await freshTrip();
+      await trips.removeMember(t.id, t.leaver, OWNER);
+      await trips.resetInviteCode(t.id, OWNER);
+      const fresh = (await trips.getInviteCodeForMember(t.id, OWNER))!;
+
+      await expect(trips.joinTripByInviteCode(t.inviteCode, LEAVER)).resolves.toBeNull();
+      expect((await spotRow(t.leaver)).leftAt).not.toBeNull();
+      await expect(trips.getTripForMember(t.id, LEAVER)).resolves.toBeNull();
+
+      await expect(trips.joinTripByInviteCode(fresh, LEAVER)).resolves.toEqual({ tripId: t.id });
+      expect(await spotIdOf(t.id, LEAVER)).toBe(t.leaver);
+      expect((await spotRow(t.leaver)).leftAt).toBeNull();
+    });
+  });
+
+  // Added by QA (SQ-006): every change, not only adding, is closed to a person who left.
+  describe("a removed person can't change what they made", () => {
+    it("refuses votes, edits and deletes on ideas, schedule, costs and guests, while the owner still can", async () => {
+      const t = await freshTrip();
+      const ideaRow = (await ideas.createIdea(t.id, LEAVER, ideaInput))!;
+      const itemInput = {
+        kind: "new" as const,
+        name: "Ferry",
+        notes: null,
+        day: "2027-03-13",
+        slot: "full" as const,
+        time: null,
+      };
+      const itemRow = (await schedule.addNewItem(t.id, LEAVER, itemInput))!;
+      const costRow = costId("leaver-made");
+      const costInput = {
+        description: "Snacks",
+        amount: 20000,
+        paidBy: t.owner,
+        category: null,
+        spentOn: "2027-03-12",
+        shares: money.splitEqually(20000, [t.owner, t.bea], t.owner),
+      };
+      await costs.createCost(t.id, LEAVER, costRow, costInput);
+      await trips.addGuest(t.id, LEAVER, "Lou's Friend");
+      const [guestRow] = await dbModule.db
+        .select()
+        .from(schema.tripMember)
+        .where(orm.and(orm.eq(schema.tripMember.tripId, t.id), orm.eq(schema.tripMember.guestName, "Lou's Friend")));
+      const updatedAt = (await costs.getCostForMember(t.id, costRow, OWNER))!.updatedAt;
+
+      await trips.removeMember(t.id, t.leaver, OWNER);
+
+      await expect(ideas.setVote(t.id, ideaRow, LEAVER, 1)).resolves.toBeNull();
+      await expect(ideas.updateIdea(t.id, ideaRow, LEAVER, { ...ideaInput, name: "Changed" })).resolves.toBe(false);
+      await expect(ideas.deleteIdea(t.id, ideaRow, LEAVER)).resolves.toBe(false);
+      await expect(schedule.moveScheduleItem(t.id, itemRow, LEAVER, { ...itemInput, name: "Changed" })).resolves.toBe(
+        false,
+      );
+      await expect(schedule.removeScheduleItem(t.id, itemRow, LEAVER)).resolves.toBe(false);
+      await expect(
+        costs.updateCost(t.id, costRow, LEAVER, { ...costInput, description: "Changed" }, updatedAt),
+      ).resolves.toBe("not-found");
+      await expect(costs.deleteCost(t.id, costRow, LEAVER)).resolves.toBe(false);
+      await expect(trips.renameGuest(t.id, guestRow!.id, LEAVER, "Changed")).resolves.toBe("not-found");
+      await expect(trips.removeGuest(t.id, guestRow!.id, LEAVER)).resolves.toBe("not-found");
+
+      // Nothing changed, and the owner can still do each of them.
+      expect((await ideas.getIdeaForMember(t.id, ideaRow, OWNER))!.name).toBe("Island hop");
+      expect((await costs.getCostForMember(t.id, costRow, OWNER))!.description).toBe("Snacks");
+      await expect(ideas.setVote(t.id, ideaRow, OWNER, 1)).resolves.not.toBeNull();
+      await expect(trips.removeGuest(t.id, guestRow!.id, OWNER)).resolves.toBe("ok");
+      await expect(costs.deleteCost(t.id, costRow, OWNER)).resolves.toBe(true);
+      await expect(schedule.removeScheduleItem(t.id, itemRow, OWNER)).resolves.toBe(true);
+      await expect(ideas.deleteIdea(t.id, ideaRow, OWNER)).resolves.toBe(true);
+    });
+  });
+
+  // Added by QA (SQ-006): "the new owner gets the owner powers" includes deleting the trip.
+  describe("deleting after a hand-over", () => {
+    it("lets only the new owner delete the trip", async () => {
+      const t = await freshTrip();
+      await trips.transferOwnership(t.id, t.bea, OWNER);
+      await expect(trips.deleteTripForOwner(t.id, OWNER)).resolves.toBe(false);
+      await expect(trips.getTripForMember(t.id, OWNER)).resolves.not.toBeNull();
+      await expect(trips.deleteTripForOwner(t.id, BEA)).resolves.toBe(true);
+      await expect(trips.getTripForMember(t.id, BEA)).resolves.toBeNull();
+    });
+  });
 });
