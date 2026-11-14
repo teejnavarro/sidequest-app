@@ -36,13 +36,22 @@ async function EditGuestContent({ params }: { params: Params }) {
           </p>
           <EditGuestForm tripId={trip.id} spotId={guest.spotId} name={guest.name} />
         </div>
-        <Link
-          href={`/trips/${trip.id}/guests/${guest.spotId}/remove`}
-          className={`${linkClass} justify-self-start text-owe`}
-        >
-          Remove guest
-        </Link>
-        <p className={helpClass}>A guest who&apos;s part of any costs can&apos;t be removed.</p>
+        {guest.costCount > 0 ? (
+          <p className={`${helpClass} wrap-anywhere`}>
+            {guest.name} is part of {guest.costCount} {guest.costCount === 1 ? "cost" : "costs"}, so they
+            can&apos;t be removed.
+          </p>
+        ) : (
+          <>
+            <Link
+              href={`/trips/${trip.id}/guests/${guest.spotId}/remove`}
+              className={`${linkClass} justify-self-start text-owe`}
+            >
+              Remove guest
+            </Link>
+            <p className={helpClass}>A guest who&apos;s part of any costs can&apos;t be removed.</p>
+          </>
+        )}
       </main>
     </>
   );
