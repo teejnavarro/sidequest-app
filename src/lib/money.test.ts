@@ -65,6 +65,28 @@ describe("parseAmount", () => {
     expect(minor("1000000001", "VND")).toBe("That's too large.");
   });
 
+  it("takes commas only as thousands separators", () => {
+    expect(minor("1,250")).toBe(125000);
+    expect(minor("1,250.50")).toBe(125050);
+    expect(minor("1,000,000")).toBe(100_000_000);
+    expect(minor("1250.50")).toBe(125050);
+    expect(minor(" 1,250 ")).toBe(125000);
+  });
+
+  it("refuses misplaced commas", () => {
+    for (const raw of ["1250,50", "12,50", "1,25", "1,2345", ",500", "1,,250", "1,250,", "1.250,50"]) {
+      expect(minor(raw)).toBe("Enter an amount, like 1,250.50.");
+    }
+  });
+
+  it("takes and refuses the same commas for zero-decimal currencies", () => {
+    expect(minor("1,250", "VND")).toBe(1250);
+    expect(minor(" 1,250 ", "VND")).toBe(1250);
+    for (const raw of ["1250,50", "12,50", "1,25", "1,2345", ",500", "1,,250", "1,250,", "1.250,50"]) {
+      expect(minor(raw, "VND")).toBe("Enter an amount, like 1,250.");
+    }
+  });
+
   it("refuses digits from other scripts instead of misreading them", () => {
     expect(minor("１２３")).toBe("Enter an amount, like 1,250.50.");
     expect(minor("١٢٣")).toBe("Enter an amount, like 1,250.50.");
