@@ -368,6 +368,81 @@ describe("shared costs on the dev database", () => {
     await expect(costs.deleteCost(tripA, id, ADDER)).resolves.toBe(false); // harmless twice
   });
 
+  it("lets only one of two saves from the same copy win, even at the same moment", async () => {
+    const id = costId("race");
+    await costs.createCost(tripA, OWNER, id, input({ description: "Race" }));
+    const opened = (await costs.getCostForMember(tripA, id, OWNER))!;
+    const fromOwner = { description: "From owner", amount: 90000, spots: [ownerSpot, adderSpot, dana] };
+    const fromAdder = { description: "From adder", amount: 1001, spots: [adderSpot, eli] };
+    const results = await Promise.all([
+      costs.updateCost(tripA, id, OWNER, input({ description: fromOwner.description, amount: fromOwner.amount, shares: shareOf(fromOwner.spots, fromOwner.amount, ownerSpot) }), opened.updatedAt),
+      costs.updateCost(tripA, id, ADDER, input({ description: fromAdder.description, amount: fromAdder.amount, paidBy: adderSpot, shares: shareOf(fromAdder.spots, fromAdder.amount, adderSpot) }), opened.updatedAt),
+    ]);
+    expect([...results].sort()).toEqual(["changed", "ok"]);
+    const winner = results[0] === "ok" ? fromOwner : fromAdder;
+    const [row] = (await costRows(tripA)).filter((r) => r.id === id);
+    expect(row).toMatchObject({ description: winner.description, amount: winner.amount });
+    // The loser's shares never mix in: the shares are exactly the winner's and add up.
+    const saved = await shareRows(id);
+    expect(saved.map((s) => s.spotId).sort()).toEqual([...winner.spots].sort());
+    expect(saved.reduce((sum, s) => sum + s.amount, 0)).toBe(winner.amount);
+  });
+
+  it("refuses to remove a guest who only shares a cost or only paid one, until they are taken out", async () => {
+    await trips.addGuest(tripA, ADDER, "Sharer Only");
+    await trips.addGuest(tripA, ADDER, "Payer Only");
+    const people = await trips.listTripMembers(tripA, OWNER);
+    const sharer = people.find((p) => p.name === "Sharer Only")!.spotId;
+    const payer = people.find((p) => p.name === "Payer Only")!.spotId;
+    const sharerCost = costId("sharer-only");
+    await costs.createCost(tripA, OWNER, sharerCost, input({ amount: 1000, shares: shareOf([ownerSpot, sharer], 1000, ownerSpot) }));
+    await costs.createCost(tripA, OWNER, costId("payer-only"), input({ amount: 1000, paidBy: payer, shares: shareOf([ownerSpot, adderSpot], 1000, payer) }));
+    for (const spot of [sharer, payer]) {
+      expect((await trips.getGuestForEditor(tripA, spot, ADDER))?.costCount).toBe(1);
+      await expect(trips.removeGuest(tripA, spot, ADDER)).resolves.toBe("in-costs");
+    }
+    // An edit that takes the sharer out of their only cost frees them.
+    const opened = (await costs.getCostForMember(tripA, sharerCost, OWNER))!;
+    await expect(
+      costs.updateCost(tripA, sharerCost, OWNER, input({ amount: 1000, shares: shareOf([ownerSpot], 1000, ownerSpot) }), opened.updatedAt),
+    ).resolves.toBe("ok");
+    await expect(trips.getGuestForEditor(tripA, sharer, ADDER)).resolves.toMatchObject({ costCount: 0 });
+    await expect(trips.removeGuest(tripA, sharer, ADDER)).resolves.toBe("ok");
+    await expect(trips.removeGuest(tripA, payer, ADDER)).resolves.toBe("in-costs");
+  });
+
+  it("has the database refuse a zero cost or a negative share, as a last line of defence", async () => {
+    await expect(
+      dbModule.db.insert(schema.cost).values({
+        id: costId("zero"),
+        tripId: tripA,
+        description: "Zero",
+        amount: 0,
+        currency: "PHP",
+        paidBy: ownerSpot,
+        spentOn: "2027-03-12",
+        createdBy: OWNER,
+        updatedBy: OWNER,
+      }),
+    ).rejects.toThrow();
+    await expect(
+      dbModule.db.insert(schema.costShare).values({ costId: costId("thirds"), spotId: eli, amount: -1 }),
+    ).rejects.toThrow();
+    expect((await shareRows(costId("thirds"))).some((s) => s.spotId === eli)).toBe(false);
+  });
+
+  it("lets only the owner delete a trip with costs: a member or stranger leaves every cost and share", async () => {
+    const before = await costRows(tripA);
+    expect(before.length).toBeGreaterThan(0);
+    const sharesBefore = (await Promise.all(before.map((r) => shareRows(r.id)))).flat().length;
+    await expect(trips.deleteTripForOwner(tripA, ADDER)).resolves.toBe(false);
+    await expect(trips.deleteTripForOwner(tripA, STRANGER)).resolves.toBe(false);
+    await expect(trips.deleteTripForOwner(tripA, OWNER_TWO)).resolves.toBe(false);
+    const after = await costRows(tripA);
+    expect(after).toHaveLength(before.length);
+    expect((await Promise.all(after.map((r) => shareRows(r.id)))).flat()).toHaveLength(sharesBefore);
+  });
+
   it("keeps every cost and share when a guest's spot is claimed", async () => {
     const before = await costs.listCostsForMember(tripA, OWNER);
     const danaCosts = before.costs.filter((c) => c.payer.spotId === dana || c.id === costId("guest-paid"));

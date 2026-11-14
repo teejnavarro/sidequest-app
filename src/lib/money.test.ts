@@ -64,6 +64,17 @@ describe("parseAmount", () => {
     expect(minor("0", "VND")).toBe("Enter an amount above zero.");
     expect(minor("1000000001", "VND")).toBe("That's too large.");
   });
+
+  it("refuses digits from other scripts instead of misreading them", () => {
+    expect(minor("１２３")).toBe("Enter an amount, like 1,250.50.");
+    expect(minor("١٢٣")).toBe("Enter an amount, like 1,250.50.");
+  });
+
+  it("takes the exact limit and refuses one centavo more", () => {
+    expect(minor("1,000,000,000.00")).toBe(100_000_000_000);
+    expect(minor("999,999,999.99")).toBe(99_999_999_999);
+    expect(minor("1000000000.01")).toBe("That's too large.");
+  });
 });
 
 describe("amountText", () => {
@@ -92,6 +103,15 @@ describe("formatMoney", () => {
   it("shows zero-decimal currencies without decimals", () => {
     expect(formatMoney(250000, "VND")).toBe("₫250,000");
     expect(formatMoney(5, "VND")).toBe("₫5");
+    expect(formatMoney(1500, "JPY")).toBe("¥1,500");
+    expect(formatMoney(1500, "KRW")).toBe("₩1,500");
+    // Intl puts a non-breaking space after "Rp".
+    expect(formatMoney(250000, "IDR")).toMatch(/^Rp\s250,000$/);
+  });
+
+  it("keeps every digit of the largest amount", () => {
+    expect(formatMoney(99_999_999_999, "PHP")).toBe("₱999,999,999.99");
+    expect(formatMoney(1, "PHP")).toBe("₱0.01");
   });
 });
 
@@ -113,6 +133,8 @@ describe("splitEqually", () => {
     expect(amounts(splitEqually(2, ["a", "b", "c"], "a"))).toEqual([1, 1, 0]);
     expect(amounts(splitEqually(2, ["a", "b", "c"], "c"))).toEqual([1, 0, 1]);
     expect(amounts(splitEqually(5, ["a", "b", "c"], "b"))).toEqual([2, 2, 1]);
+    // Payer not sharing: the leftovers go in list order.
+    expect(amounts(splitEqually(2, ["a", "b", "c"], "z"))).toEqual([1, 1, 0]);
   });
 
   it("splits evenly with no leftover", () => {
