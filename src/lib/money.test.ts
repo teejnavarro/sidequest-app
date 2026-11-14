@@ -97,6 +97,28 @@ describe("parseAmount", () => {
     expect(minor("999,999,999.99")).toBe(99_999_999_999);
     expect(minor("1000000000.01")).toBe("That's too large.");
   });
+
+  it("reads a one-digit fraction after grouped thousands", () => {
+    expect(minor("1,250.5")).toBe(125050);
+    expect(minor("1,250.5", "VND")).toBe("Enter an amount, like 1,250.");
+  });
+
+  it("refuses full-width commas and other-script digits around commas", () => {
+    expect(minor("1，250")).toBe("Enter an amount, like 1,250.50.");
+    expect(minor("１,２５０")).toBe("Enter an amount, like 1,250.50.");
+    expect(minor("1,٢٥٠")).toBe("Enter an amount, like 1,250.50.");
+  });
+
+  it("applies the limit to grouped amounts", () => {
+    expect(minor("1,000,000,001")).toBe("That's too large.");
+    expect(minor("10,000,000,000")).toBe("That's too large.");
+    expect(minor("1,000,000,000", "VND")).toBe(1_000_000_000);
+    expect(minor("1,000,000,001", "VND")).toBe("That's too large.");
+  });
+
+  it("treats a grouped zero as zero", () => {
+    expect(minor("0,000")).toBe("Enter an amount above zero.");
+  });
 });
 
 describe("amountText", () => {
