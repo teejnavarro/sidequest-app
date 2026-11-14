@@ -26,10 +26,13 @@ export function parseAmount(raw: string, currency: string): ParsedAmount {
   const example = digits === 0 ? "1,250" : "1,250.50";
   const badFormat = { ok: false, error: `Enter an amount, like ${example}.` } as const;
 
-  const cleaned = raw.replace(/[\s,]/g, "");
-  const match = /^(\d*)(?:\.(\d*))?$/.exec(cleaned);
+  // Commas are allowed only as thousands separators in the whole part: "1,250", never "12,50".
+  // Spaces are trimmed at the ends only; a space inside the amount is refused.
+  const match = /^([\d,]*)(?:\.(\d*))?$/.exec(raw.trim());
   if (!match) return badFormat;
-  const typedWhole = match[1] ?? "";
+  const groupedWhole = match[1] ?? "";
+  if (groupedWhole.includes(",") && !/^[1-9]\d{0,2}(,\d{3})+$/.test(groupedWhole)) return badFormat;
+  const typedWhole = groupedWhole.replace(/,/g, "");
   const fraction = match[2] ?? "";
   if (typedWhole === "" && fraction === "") return badFormat;
   if (fraction.length > digits) return badFormat;
