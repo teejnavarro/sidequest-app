@@ -32,7 +32,13 @@ export type TripMemberSummary = {
   isGuest: boolean;
   addedById: string | null;
   addedByName: string | null;
+  // True for a person who left or was removed. Only costs list them (listCostPeople).
+  hasLeft: boolean;
 };
+
+// A spot of someone still in the trip. A person who left keeps their row (costs point at
+// it) but loses all access, so every membership check also asks for this.
+const activeSpot = isNull(tripMember.leftAt);
 
 const adder = alias(user, "adder");
 
@@ -45,6 +51,7 @@ const memberColumns = {
   isGuest: sql<boolean>`${tripMember.userId} is null`,
   addedById: tripMember.addedBy,
   addedByName: adder.name,
+  hasLeft: sql<boolean>`${tripMember.leftAt} is not null`,
 };
 
 export type TripSummary = {
@@ -81,7 +88,7 @@ export async function listMyTrips(userId: string): Promise<TripListItem[]> {
     })
     .from(trip)
     .innerJoin(tripMember, eq(tripMember.tripId, trip.id))
-    .where(eq(tripMember.userId, userId))
+    .where(and(eq(tripMember.userId, userId), activeSpot))
     .orderBy(desc(trip.createdAt));
   if (trips.length === 0) return [];
 
@@ -90,7 +97,7 @@ export async function listMyTrips(userId: string): Promise<TripListItem[]> {
     .from(tripMember)
     .leftJoin(user, eq(user.id, tripMember.userId))
     .leftJoin(adder, eq(adder.id, tripMember.addedBy))
-    .where(inArray(tripMember.tripId, trips.map((row) => row.id)))
+    .where(and(inArray(tripMember.tripId, trips.map((row) => row.id)), activeSpot))
     .orderBy(asc(tripMember.joinedAt), asc(tripMember.id));
 
   const byTrip = new Map<string, TripMemberSummary[]>();
@@ -122,7 +129,7 @@ export async function getTripForMember(
     .from(trip)
     .innerJoin(tripMember, eq(tripMember.tripId, trip.id))
     .innerJoin(user, eq(user.id, trip.ownerId))
-    .where(and(eq(trip.id, tripId), eq(tripMember.userId, userId)))
+    .where(and(eq(trip.id, tripId), eq(tripMember.userId, userId), activeSpot))
     .limit(1);
   return rows[0] ?? null;
 }
@@ -171,7 +178,7 @@ export async function updateTripForMember(
           db
             .select({ one: tripMember.userId })
             .from(tripMember)
-            .where(and(eq(tripMember.tripId, trip.id), eq(tripMember.userId, userId))),
+            .where(and(eq(tripMember.tripId, trip.id), eq(tripMember.userId, userId), activeSpot)),
         ),
       ),
     )
@@ -189,7 +196,7 @@ export async function getInviteCodeForMember(
     .select({ inviteCode: trip.inviteCode })
     .from(trip)
     .innerJoin(tripMember, eq(tripMember.tripId, trip.id))
-    .where(and(eq(trip.id, tripId), eq(tripMember.userId, userId)))
+    .where(and(eq(trip.id, tripId), eq(tripMember.userId, userId), activeSpot))
     .limit(1);
   return rows[0]?.inviteCode ?? null;
 }
@@ -201,23 +208,12 @@ export async function listTripMembers(
   tripId: string,
   userId: string,
 ): Promise<TripMemberSummary[]> {
-  const viewer = alias(tripMember, "viewer");
   return db
     .select(memberColumns)
     .from(tripMember)
     .leftJoin(user, eq(user.id, tripMember.userId))
     .leftJoin(adder, eq(adder.id, tripMember.addedBy))
-    .where(
-      and(
-        eq(tripMember.tripId, tripId),
-        exists(
-          db
-            .select({ one: viewer.userId })
-            .from(viewer)
-            .where(and(eq(viewer.tripId, tripId), eq(viewer.userId, userId))),
-        ),
-      ),
-    )
+    .where(and(eq(tripMember.tripId, tripId), activeSpot, isMemberOf(tripId, userId)))
     .orderBy(asc(tripMember.joinedAt), asc(tripMember.id));
 }
 
@@ -257,7 +253,7 @@ export async function getTripByInviteCode(code: string): Promise<InvitedTrip | n
     .from(tripMember)
     .leftJoin(user, eq(user.id, tripMember.userId))
     .leftJoin(adder, eq(adder.id, tripMember.addedBy))
-    .where(eq(tripMember.tripId, found.id))
+    .where(and(eq(tripMember.tripId, found.id), activeSpot))
     .orderBy(asc(tripMember.joinedAt), asc(tripMember.id));
   return { ...found, members };
 }
@@ -266,7 +262,7 @@ export async function isTripMember(tripId: string, userId: string): Promise<bool
   const rows = await db
     .select({ one: tripMember.userId })
     .from(tripMember)
-    .where(and(eq(tripMember.tripId, tripId), eq(tripMember.userId, userId)))
+    .where(and(eq(tripMember.tripId, tripId), eq(tripMember.userId, userId), activeSpot))
     .limit(1);
   return rows.length > 0;
 }
@@ -342,6 +338,7 @@ export async function addGuest(
             guestName: sql<string | null>`${name}::text`.as("guest_name"),
             addedBy: sql<string | null>`${userId}::text`.as("added_by"),
             joinedAt: sql<Date>`now()`.as("joined_at"),
+            leftAt: sql<Date | null>`null::timestamp`.as("left_at"),
           })
           .from(trip)
           .where(and(eq(trip.id, tripId), isMemberOf(tripId, userId))),
