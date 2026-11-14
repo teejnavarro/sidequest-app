@@ -217,6 +217,30 @@ export async function listTripMembers(
     .orderBy(asc(tripMember.joinedAt), asc(tripMember.id));
 }
 
+// The people a cost form can offer: everyone still in the trip, plus (when editing a cost) the
+// people who left but paid or share that cost, marked hasLeft. Same shape and order as
+// listTripMembers; a person who is not a member gets an empty list.
+export async function listCostPeople(
+  tripId: string,
+  userId: string,
+  costId: string | null,
+): Promise<TripMemberSummary[]> {
+  const stays =
+    costId === null
+      ? activeSpot
+      : or(
+          activeSpot,
+          sql`${tripMember.id} in (select ${cost.paidBy} from ${cost} where ${cost.id} = ${costId} union select ${costShare.spotId} from ${costShare} where ${costShare.costId} = ${costId})`,
+        );
+  return db
+    .select(memberColumns)
+    .from(tripMember)
+    .leftJoin(user, eq(user.id, tripMember.userId))
+    .leftJoin(adder, eq(adder.id, tripMember.addedBy))
+    .where(and(eq(tripMember.tripId, tripId), stays, isMemberOf(tripId, userId)))
+    .orderBy(asc(tripMember.joinedAt), asc(tripMember.id));
+}
+
 export type InvitedTrip = {
   id: string;
   name: string;

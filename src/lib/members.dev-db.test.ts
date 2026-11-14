@@ -399,4 +399,70 @@ describe("members who left, on the dev database", () => {
       await expect(trips.removeGuest(t.id, t.guest, OWNER)).resolves.toBe("not-found");
     });
   });
+
+  describe("costs keep people who left", () => {
+    it("lists a person who left only for the costs they are in, and flags a payer who left", async () => {
+      const t = await freshTrip();
+      const input = (paidBy: string, spots: string[]) => ({
+        description: "Dinner",
+        amount: 30000,
+        paidBy,
+        category: null,
+        spentOn: "2027-03-12",
+        shares: money.splitEqually(30000, spots, paidBy),
+      });
+      await costs.createCost(t.id, OWNER, costId("with-lou"), input(t.leaver, [t.owner, t.bea, t.leaver]));
+      await costs.createCost(t.id, OWNER, costId("without-lou"), input(t.owner, [t.owner, t.bea]));
+      await trips.removeMember(t.id, t.leaver, OWNER);
+
+      const ids = async (forCost: string | null, viewer = OWNER) =>
+        (await trips.listCostPeople(t.id, viewer, forCost)).map((row) => row.spotId);
+      expect(await ids(null)).toEqual([t.owner, t.bea, t.guest]);
+      expect(await ids(costId("with-lou"))).toEqual([t.owner, t.bea, t.leaver, t.guest]);
+      expect(await ids(costId("without-lou"))).toEqual([t.owner, t.bea, t.guest]);
+      const people = await trips.listCostPeople(t.id, OWNER, costId("with-lou"));
+      expect(people.map((row) => row.hasLeft)).toEqual([false, false, true, false]);
+      await expect(trips.listCostPeople(t.id, STRANGER, costId("with-lou"))).resolves.toEqual([]);
+      await expect(trips.listCostPeople(t.id, LEAVER, costId("with-lou"))).resolves.toEqual([]);
+
+      const list = await costs.listCostsForMember(t.id, BEA);
+      const byLabel = (label: string) => list.costs.find((item) => item.id === costId(label))!;
+      expect(byLabel("with-lou").payer).toMatchObject({ spotId: t.leaver, hasLeft: true });
+      expect(byLabel("without-lou").payer).toMatchObject({ spotId: t.owner, hasLeft: false });
+    });
+
+    it("refuses a person who left on a new cost, and keeps one already in an edited cost", async () => {
+      const t = await freshTrip();
+      const base = (paidBy: string, spots: string[]) => ({
+        description: "Boat",
+        amount: 60000,
+        paidBy,
+        category: null,
+        spentOn: "2027-03-12",
+        shares: money.splitEqually(60000, spots, paidBy),
+      });
+      await costs.createCost(t.id, OWNER, costId("kept"), base(t.owner, [t.owner, t.leaver]));
+      await trips.removeMember(t.id, t.leaver, OWNER);
+
+      await expect(
+        costs.createCost(t.id, OWNER, costId("new-payer"), base(t.leaver, [t.owner, t.leaver])),
+      ).resolves.toBe("not-found");
+      await expect(
+        costs.createCost(t.id, OWNER, costId("new-share"), base(t.owner, [t.owner, t.leaver])),
+      ).resolves.toBe("not-found");
+
+      const open = async () => (await costs.getCostForMember(t.id, costId("kept"), OWNER))!;
+      // Keeping the person who left is fine, even as the payer.
+      await expect(
+        costs.updateCost(t.id, costId("kept"), OWNER, base(t.leaver, [t.owner, t.leaver]), (await open()).updatedAt),
+      ).resolves.toBe("ok");
+      // Taking them out works too, and then they can't be put back.
+      await expect(
+        costs.updateCost(t.id, costId("kept"), OWNER, base(t.owner, [t.owner, t.bea]), (await open()).updatedAt),
+      ).resolves.toBe("ok");
+      await expect(
+        costs.updateCost(t.id, costId("kept"), OWNER, base(t.owner, [t.owner, t.leaver]), (await open()).updatedAt),
+      ).resolves.toBe("changed"); // refused spots look like a changed cost, as for foreign spots
+    });
+  });
 });

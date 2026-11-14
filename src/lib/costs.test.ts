@@ -78,9 +78,9 @@ describe("listCostsForMember", () => {
 
   it("shapes each row, uses first names and adds up the total", async () => {
     fake.rows = [
-      ["c1", "Taxi", 25050, "PHP", null, "2027-03-13", "spot-b", "Ben Cruz", false, false, "2", null, "u1", "Ana Reyes", "u2", "Ben Cruz"],
-      ["c2", "Dinner", 100000, "PHP", "food", "2027-03-12", "spot-a", "Ana Reyes", false, true, "3", "33334", "u1", "Ana Reyes", "u1", "Ana Reyes"],
-      ["c3", "Tour", 5, "PHP", "activities", "2027-03-12", "spot-g", "Dana", true, false, "1", "5", "u1", "Ana Reyes", "u1", "Ana Reyes"],
+      ["c1", "Taxi", 25050, "PHP", null, "2027-03-13", "spot-b", "Ben Cruz", false, false, false, "2", null, "u1", "Ana Reyes", "u2", "Ben Cruz"],
+      ["c2", "Dinner", 100000, "PHP", "food", "2027-03-12", "spot-a", "Ana Reyes", false, true, false, "3", "33334", "u1", "Ana Reyes", "u1", "Ana Reyes"],
+      ["c3", "Tour", 5, "PHP", "activities", "2027-03-12", "spot-g", "Dana", true, false, false, "1", "5", "u1", "Ana Reyes", "u1", "Ana Reyes"],
     ];
     const list = await listCostsForMember("trip-1", "u1");
     expect(list.total).toBe(125055);
@@ -91,7 +91,7 @@ describe("listCostsForMember", () => {
       currency: "PHP",
       category: null,
       spentOn: "2027-03-13",
-      payer: { spotId: "spot-b", name: "Ben Cruz", isGuest: false, isYou: false },
+      payer: { spotId: "spot-b", name: "Ben Cruz", isGuest: false, isYou: false, hasLeft: false },
       shareCount: 2,
       myShare: null,
       addedBy: "Ana",
