@@ -10,11 +10,11 @@ for the owner to learn how a full-stack app is built. First real use: the Ho Chi
 trip in May 2027.
 
 ## Scope
-- Stage 1, planning (end Feb 2027): Google sign-in, invite links, guests; separate trips
+- Stage 1, planning (built 18 Dec 2026 to mid-Jan 2027): Google sign-in, invite links, guests; separate trips
   with owners; "My trips" with per-trip balances; Schedule, Ideas, Bookings and Costs tabs;
   trip cost estimate; Splitwise-style splits with review steps, trash and CSV export;
   GCash/Maya/bank settle-up with optional payment screenshots; account deletion.
-- Stage 2, on the trip (end Apr 2027): common fund ("ambagan"), offline viewing.
+- Stage 2, on the trip (end Feb 2027): common fund ("ambagan"), offline viewing.
 - Stage 3, after the trip: Trip Wrapped recap.
 - Phase 2 (separate go-ahead): seat sale watcher, place search, AI itinerary draft, daily
   digest, connected trips (n8n-powered).
@@ -24,8 +24,10 @@ trip in May 2027.
 ## Next steps
 - [x] Run `/pm` to turn the brief into a backlog by stage, with a cut list
 - [x] `/architect Work on SQ-001` (tech stack and first live page)
-- [ ] Early friend test in January 2027
-- [ ] Stage 1 ready for the group by end of February 2027
+- [ ] Stage 1 built in six bundles, between 18 December 2026 and mid-January 2027 (next: SQ-014)
+- [ ] Research offline viewing (SQ-025) in December 2026
+- [ ] Early friend test after Stage 1 is built, late January 2027 at the latest
+- [ ] Group trial and Stage 2 by end of February 2027
 
 ## Links
 - Brief: `docs/BRIEF.md`
@@ -92,3 +94,5 @@ Production address: https://sidequest-app-rho.vercel.app/ (updates on every merg
 - 2026-11-14 - SQ-013 done: PR #11 merged with a merge commit and confirmed live by the owner. Members log shared costs with a review step before saving; the Costs tab lists them with your share; guests in a cost can't be removed. Production migration 0008 (cost and cost_share tables) applied with the owner's OK. Checked on an iPhone and a Samsung through staging.
 - 2026-11-14 - SQ-033 done: PR #12 merged with a merge commit and confirmed live by the owner. Amounts now refuse misplaced commas: "1,250" works, but "12,50", "1250,50" and "0,500" show the usual amount error instead of saving a wrong number. Spaces inside an amount are refused too. No database change.
 - 2026-11-14 - SQ-006 in progress on `feature/members-leave-transfer`: the owner can remove a member, hand the trip to another member and get a new invite link; members can leave from Edit trip. People who leave stop seeing the trip, and their costs stay, marked "left the trip". Rejoining with the invite link puts them back in the same place. New `left_at` column, so the live database needs a migration, with the owner's OK. Chapter 12 of `LEARNING.md` explains it.
+- 2026-11-14 - SQ-006 done: PR #13 merged with a merge commit and the production deploy is Ready. The owner can remove a member, hand the trip to another member and get a new invite link; members can leave from Edit trip, and their costs stay, marked "left the trip". Production migration 0009 (the `left_at` column) applied with the owner's OK. Staging phone test passed. By design, the old invite link still works for a removed person until Get a new link is used.
+- 2026-11-14 - Brief amendment approved (improvement plan step 7): Stage 1 built between 18 December 2026 and mid-January 2027 (was end of February), friend test after that, group trial by end of February, Stage 2 by end of February 2027 (was end of April). Offline viewing (SQ-025) gets a research round in December. Remaining Stage 1 stories are built in six bundles: Costs core (SQ-014), Costs extras (SQ-015, SQ-016, SQ-018), Bookings (SQ-011, SQ-012, SQ-017), Payments (SQ-019, SQ-020), Account (SQ-021, moved after Payments by the owner), Small fixes (SQ-009, SQ-029, SQ-028). Backlog regrouped into matching epics and approved; SQ-029 set to P2, size S, ready. Not shortened: QA on money and privacy, the staging flow, the owner's OK before each production migration, the two-week change freeze. Next: SQ-014.
