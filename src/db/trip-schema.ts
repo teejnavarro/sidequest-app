@@ -64,6 +64,10 @@ export const tripMember = pgTable(
     addedBy: text("added_by").references(() => user.id),
     // When the spot was made; the order of the list.
     joinedAt: timestamp("joined_at").defaultNow().notNull(),
+    // Set when the person leaves or is removed; cleared when they rejoin by the invite
+    // link. The row stays so costs keep pointing at the spot. Guests never have it
+    // (they are deleted instead).
+    leftAt: timestamp("left_at"),
   },
   (table) => [
     index("trip_member_userId_idx").on(table.userId),
@@ -76,6 +80,10 @@ export const tripMember = pgTable(
     check(
       "trip_member_kind_check",
       sql`(${table.userId} is null) <> (${table.guestName} is null)`,
+    ),
+    check(
+      "trip_member_left_person_check",
+      sql`${table.leftAt} is null or ${table.userId} is not null`,
     ),
   ],
 );
