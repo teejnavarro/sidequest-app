@@ -505,3 +505,43 @@ count.
 This changes the member table, so the live database needs a migration. It is built so the live
 code keeps working before and after it: existing members just get their own spot numbers and
 nothing is deleted or rewritten. It can run before the new code goes out, with the owner's OK.
+
+## Chapter 11: Logging shared costs
+
+### Money is whole pieces, never decimals
+
+Computers can't hold 0.1 exactly as a decimal, and the tiny errors add up. So an amount is never
+stored as 1000.50. It is stored as a whole number of the smallest piece of that money: 100,050
+centavos for ₱1,000.50. Yen, won and dong have no smaller piece, so for them the whole number is
+just the amount. Everything we add, split and compare is whole numbers, and the amount is only
+turned into a friendly "₱1,000.50" when it is shown. When you type an amount, we read the text
+itself and refuse anything the currency can't hold, like "1250.505" in pesos.
+
+### The extra centavo
+
+₱1,000.00 split three ways is 333.33 each, with one centavo left over. We never lose it and we
+never invent it. One person takes the extra piece, so the shares are 333.34, 333.33 and 333.33,
+and they always add up to the total. The rule is the same every time: the person who paid takes
+the extra if they are sharing the cost, otherwise the first person in the trip's list. The review
+step tells you who got it, so it is never a surprise.
+
+### A review step that checks again on Save
+
+After you tap Review, the server checks what you typed, works out the split and shows it back. When
+you tap Save, the server does all of that again from your typed values; it does not trust the
+numbers that were on the review screen. A cost is also saved under an id made when the page
+opened, so a double tap saves one cost. When you edit, the page remembers when you opened the cost.
+If someone else saved a change in the meantime, you see "Someone just changed this cost" with the
+fresh values, instead of quietly overwriting their work.
+
+### Costs point at spots
+
+Like claiming a guest's spot, a cost points at spots, not at accounts. A guest can pay or share a
+cost, and when that friend later joins and takes over their spot, every cost stays right. A guest
+who's in a cost can't be removed, and the database enforces that too. Deleting a whole trip deletes
+its costs first, in the same step.
+
+### This one needs a live database update too
+
+This adds two new tables, `cost` and `cost_share`. The live code doesn't use them yet, so the
+migration can run before the new code goes out, with the owner's OK.
