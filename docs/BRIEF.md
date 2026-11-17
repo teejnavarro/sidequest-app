@@ -1,7 +1,8 @@
 # Project Brief — Sidequest
 
 Approved by the owner on 2026-10-31, and the amended version (stages, payment details, gap
-fixes) approved the same day. This brief is the contract; changes need the owner's approval.
+fixes) approved the same day. Amended again on 2026-11-14 (earlier dates, build in bundles).
+This brief is the contract; changes need the owner's approval.
 
 ```
 PROJECT BRIEF — Sidequest (group trip planner)
@@ -24,7 +25,7 @@ Audience:        The owner and their travel groups (about 2–10 people per trip
 
 In scope (Phase 1) is built in three stages, timed to when each part gets used.
 
-STAGE 1 — Planning (ready by end of February 2027)
+STAGE 1 — Planning (built between 18 December 2026 and mid-January 2027)
   Trips & members
                  - Sign in with Google. Join a trip through a shared invite link.
                  - Each trip is a separate space with its own members, schedule,
@@ -122,7 +123,7 @@ STAGE 1 — Planning (ready by end of February 2027)
                    currently in a trip with you; access ends when someone leaves
                    or is removed; only you can add, edit or delete your own
 
-STAGE 2 — On the trip (ready by end of April 2027)
+STAGE 2 — On the trip (ready by end of February 2027)
                  - Common fund ("ambagan"): members record what they chip in to a
                    pot held by one member (the treasurer); spending can be paid
                    from the fund; everyone sees the fund balance; leftovers are
@@ -187,8 +188,9 @@ Constraints:     - Budget ₱0: free hosting and database tiers only (any cost
                    needs approval first)
                  - Hosting and database must not pause or sleep from inactivity
                    in a way that could make the app unavailable mid-trip
-                 - Stage 1 by end of February 2027, Stage 2 by end of April 2027,
-                   Stage 3 after the May 2027 Ho Chi Minh City trip
+                 - Stage 1 built between 18 December 2026 and mid-January 2027,
+                   Stage 2 by end of February 2027, Stage 3 after the May 2027
+                   Ho Chi Minh City trip
                  - Change freeze: no new features in the 2 weeks before the trip
                    (bug fixes only, with owner OK)
                  - Public repo: no real names, trips, costs, payment details or
@@ -234,8 +236,8 @@ Success criteria:
                    together (front end, back end, database, logins, hosting)
 
 Plan:            1. /pm: turn this brief into a prioritized backlog by stage,
-                    with a "cut list" of Stage 1 items that can slip to March
-                    without hurting the core
+                    with a "cut list" of Stage 1 items that can slip past the
+                    Stage 1 date without hurting the core
                  2. Foundation: tech choices (explained plainly), hosting,
                     Google sign-in, trips, "My trips", invite links, ownership,
                     guests, account deletion
@@ -244,15 +246,35 @@ Plan:            1. /pm: turn this brief into a prioritized backlog by stage,
                  4. Shared costs: splits, categories, review steps, trash,
                     balances, settle-up, other currencies, members who left,
                     payment details, screenshots, CSV export
-                 5. Early friend test (January 2027): one or two friends try it;
-                    fix what they find
-                 6. Group trial: the whole group plans HCMC in it (Stage 1 done,
-                    end Feb)
-                 7. Stage 2: common fund + offline (end Apr), then change freeze
+                 5. Early friend test (after Stage 1 is built, late January 2027
+                    at the latest): one or two friends try it; fix what they
+                    find. The Google sign-in app is published before this, so
+                    friends outside the test list can sign in.
+                 6. Group trial: the whole group plans HCMC in it (by end of
+                    February 2027)
+                 7. Stage 2: common fund + offline (end of February 2027), then
+                    change freeze. Offline viewing gets a short /research round
+                    in December 2026, because it is the least certain part.
                  8. Stage 3: Trip Wrapped (after the trip)
                  9. /review-brief, then wrap up Phase 1
                 10. Phase 2 (separate go-ahead): research, seat sale watcher,
                     AI itinerary draft, daily digest, connected trips
+
+Build approach:  The remaining Stage 1 stories are built in bundles. One bundle
+                 is one branch, one spec, one Lavish review, one QA pass, one
+                 pull request and one migration.
+                 1. Costs core: balances and settle-up, on its own
+                 2. Costs extras: other currencies, trash and restore, CSV export
+                 3. Bookings: flights and hotels, cost estimate, log a booking
+                    as a paid cost
+                 4. Payments: payment details, settle up with details and
+                    receipts (full QA and security review)
+                 5. Account: delete my account and privacy note
+                 6. Small fixes: accent-free search, session lookups, portfolio
+                    README
+                 Bundling never shortens: QA on money math and privacy, the
+                 staging flow and phone check, the owner's OK before each
+                 production migration, or the two-week change freeze.
 
 Open questions:  None.
 
