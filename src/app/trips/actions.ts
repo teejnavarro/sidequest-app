@@ -62,17 +62,20 @@ export async function updateTripAction(
   const result = validateTripInput(values);
   if (!result.ok) return { errors: result.errors, values };
 
-  let saved: boolean;
+  let saved: Awaited<ReturnType<typeof updateTripForMember>>;
   try {
     // Who may change this trip is decided only in here, never by the form.
-    saved = tripId !== "" && (await updateTripForMember(tripId, user.id, result.value));
+    saved = tripId === "" ? "not-found" : await updateTripForMember(tripId, user.id, result.value);
   } catch {
     return {
       errors: { form: "Couldn't save the trip. Please try again." },
       values,
     };
   }
-  if (!saved) {
+  if (saved === "currency-locked") {
+    return { errors: { currency: "Can't change once costs are logged." }, values };
+  }
+  if (saved === "not-found") {
     return { errors: { form: "We couldn't find that trip." }, values };
   }
 

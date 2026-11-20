@@ -177,7 +177,7 @@ describe("members who left, on the dev database", () => {
     });
 
     it("can't change the trip or add a guest", async () => {
-      await expect(trips.updateTripForMember(tripId, LEAVER, tripInput)).resolves.toBe(false);
+      await expect(trips.updateTripForMember(tripId, LEAVER, tripInput)).resolves.toBe("not-found");
       await expect(trips.addGuest(tripId, LEAVER, "Ghost Guest")).resolves.toBe("not-found");
     });
 

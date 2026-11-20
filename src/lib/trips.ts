@@ -163,12 +163,14 @@ export async function createTrip(userId: string, input: TripInput): Promise<stri
 }
 
 // Changes the trip's details. Membership is part of the update's own condition, so a
-// non-member changes nothing. Returns false when nothing was changed. Never touches ownerId.
+// non-member changes nothing. The currency can't change once the trip has costs: that is part
+// of the same condition, and a refused change says "currency-locked" to a member and
+// "not-found" to anyone else. Never touches ownerId.
 export async function updateTripForMember(
   tripId: string,
   userId: string,
   input: TripInput,
-): Promise<boolean> {
+): Promise<"ok" | "currency-locked" | "not-found"> {
   const updated = await db
     .update(trip)
     .set({
@@ -188,10 +190,28 @@ export async function updateTripForMember(
             .from(tripMember)
             .where(and(eq(tripMember.tripId, trip.id), eq(tripMember.userId, userId), activeSpot)),
         ),
+        or(
+          eq(trip.currency, input.currency),
+          notExists(db.select({ one: cost.id }).from(cost).where(eq(cost.tripId, trip.id))),
+        ),
       ),
     )
     .returning({ id: trip.id });
-  return updated.length > 0;
+  if (updated.length > 0) return "ok";
+
+  const locked = await db
+    .select({ id: trip.id })
+    .from(trip)
+    .where(
+      and(
+        eq(trip.id, tripId),
+        isMemberOf(tripId, userId),
+        ne(trip.currency, input.currency),
+        exists(db.select({ one: cost.id }).from(cost).where(eq(cost.tripId, trip.id))),
+      ),
+    )
+    .limit(1);
+  return locked.length > 0 ? "currency-locked" : "not-found";
 }
 
 

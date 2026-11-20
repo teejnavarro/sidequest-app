@@ -115,7 +115,7 @@ describe("privacy layer on the dev database", () => {
     await expect(trips.listMyTrips(STRANGER)).resolves.toEqual([]);
     await expect(
       trips.updateTripForMember(tripId, STRANGER, { ...input, name: "Changed by a stranger" }),
-    ).resolves.toBe(false);
+    ).resolves.toBe("not-found");
     await expect(trips.getTripForMember(tripId, OWNER)).resolves.toMatchObject({
       name: input.name,
     });
@@ -125,7 +125,7 @@ describe("privacy layer on the dev database", () => {
     await expect(trips.getTripForMember(`${ID_PREFIX}no-such-trip`, OWNER)).resolves.toBeNull();
     await expect(
       trips.updateTripForMember(`${ID_PREFIX}no-such-trip`, OWNER, input),
-    ).resolves.toBe(false);
+    ).resolves.toBe("not-found");
   });
 
   it("lets a second member see and edit the trip, and the owner stays the owner", async () => {
@@ -142,7 +142,7 @@ describe("privacy layer on the dev database", () => {
       currency: "PHP",
       destination: null,
     };
-    await expect(trips.updateTripForMember(tripId, MEMBER, edited)).resolves.toBe(true);
+    await expect(trips.updateTripForMember(tripId, MEMBER, edited)).resolves.toBe("ok");
 
     const seenByOwner = await trips.getTripForMember(tripId, OWNER);
     expect(seenByOwner).toMatchObject({ ...edited, ownerId: OWNER, ownerName: "Maya Test" });
@@ -324,7 +324,7 @@ describe("privacy layer on the dev database", () => {
       );
       await expect(
         trips.updateTripForMember(withPlace, OWNER, { ...input, name: "Place trip", destination: null }),
-      ).resolves.toBe(true);
+      ).resolves.toBe("ok");
       await expect(trips.getTripForMember(withPlace, OWNER)).resolves.toMatchObject({
         destination: null,
       });

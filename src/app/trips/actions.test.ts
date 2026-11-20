@@ -48,7 +48,7 @@ beforeEach(() => {
   });
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.createTrip.mockResolvedValue("trip-1");
-  mocks.updateTripForMember.mockResolvedValue(true);
+  mocks.updateTripForMember.mockResolvedValue("ok");
 });
 
 describe("createTripAction", () => {
@@ -117,9 +117,19 @@ describe("updateTripAction", () => {
   });
 
   it("changes nothing for a non-member and says the trip was not found", async () => {
-    mocks.updateTripForMember.mockResolvedValue(false);
+    mocks.updateTripForMember.mockResolvedValue("not-found");
     const state = await updateTripAction(initial, formWith({ ...good, tripId: "someone-elses" }));
     expect(state.errors.form).toBe("We couldn't find that trip.");
+    expect(state.values).toEqual(good);
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("refuses a currency change once the trip has costs and keeps what was typed", async () => {
+    mocks.updateTripForMember.mockResolvedValue("currency-locked");
+    const state = await updateTripAction(initial, formWith({ ...good, tripId: "trip-1" }));
+    expect(state.errors.currency).toBe("Can't change once costs are logged.");
+    expect(state.errors.form).toBeUndefined();
     expect(state.values).toEqual(good);
     expect(mocks.redirect).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
