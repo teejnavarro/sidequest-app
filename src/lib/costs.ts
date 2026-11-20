@@ -7,6 +7,7 @@ import { cost, costShare, trip, tripMember } from "@/db/trip-schema";
 import { firstNameOf } from "@/lib/display-name";
 import { isMemberOf } from "@/lib/ideas";
 import type { CostInput } from "@/lib/cost-input";
+import { type Payment, balancesOf, settleUp } from "@/lib/balances";
 
 // The privacy layer for shared costs, next to trips.ts and ideas.ts. Same rules: every
 // function checks that the person is a member of the trip inside the same database query, so
@@ -307,4 +308,85 @@ export async function countCostsForTrip(tripId: string, userId: string): Promise
     .from(cost)
     .where(and(eq(cost.tripId, tripId), isMemberOf(tripId, userId)));
   return rows[0]?.count ?? 0;
+}
+
+export type BalancePerson = {
+  spotId: string;
+  id: string; // user id for a person, spot id for a guest (colors the face)
+  name: string; // first name
+  image: string | null;
+  isGuest: boolean;
+  isYou: boolean;
+  hasLeft: boolean;
+  net: number; // paid - share in minor units; > 0 is owed, < 0 owes
+};
+
+export type TripBalances = {
+  people: BalancePerson[];
+  payments: Payment[];
+  total: number; // all costs in the trip's currency
+  costCount: number;
+};
+
+const NO_BALANCES: TripBalances = { people: [], payments: [], total: 0, costCount: 0 };
+
+// Who is owed and who owes in this trip, and the fewest payments that settle it. Worked out
+// fresh from the costs and shares, never stored. Only costs in the trip's current currency
+// count. People still in the trip are listed, plus people who left but still have money owed
+// either way. A person who is not in the trip gets nothing.
+export async function getBalancesForMember(tripId: string, userId: string): Promise<TripBalances> {
+  const costInTripCurrency = sql`${cost.currency} = ${trip.currency}`;
+  const [rows, totals] = await Promise.all([
+    db
+      .select({
+        spotId: tripMember.id,
+        id: sql<string>`coalesce(${tripMember.userId}, ${tripMember.id})`,
+        name: sql<string>`coalesce(${user.name}, ${tripMember.guestName})`,
+        image: user.image,
+        isGuest: sql<boolean>`${tripMember.userId} is null`,
+        isYou: sql<boolean>`coalesce(${tripMember.userId} = ${userId}, false)`,
+        hasLeft: sql<boolean>`${tripMember.leftAt} is not null`,
+        paid: sql<number>`(select coalesce(sum(${cost.amount}), 0) from ${cost} where ${cost.paidBy} = ${tripMember.id} and ${costInTripCurrency})`.mapWith(
+          Number,
+        ),
+        share: sql<number>`(select coalesce(sum(${costShare.amount}), 0) from ${costShare} inner join ${cost} on ${cost.id} = ${costShare.costId} where ${costShare.spotId} = ${tripMember.id} and ${costInTripCurrency})`.mapWith(
+          Number,
+        ),
+      })
+      .from(tripMember)
+      .innerJoin(trip, eq(trip.id, tripMember.tripId))
+      .leftJoin(user, eq(user.id, tripMember.userId))
+      .where(and(eq(tripMember.tripId, tripId), isMemberOf(tripId, userId)))
+      .orderBy(asc(tripMember.joinedAt), asc(tripMember.id)),
+    db
+      .select({
+        count: sql<number>`count(*)`.mapWith(Number),
+        total: sql<number>`coalesce(sum(${cost.amount}), 0)`.mapWith(Number),
+      })
+      .from(cost)
+      .innerJoin(trip, eq(trip.id, cost.tripId))
+      .where(and(eq(cost.tripId, tripId), costInTripCurrency, isMemberOf(tripId, userId))),
+  ]);
+
+  const balances = balancesOf(rows.map((row) => ({ spotId: row.spotId, paid: row.paid, share: row.share })));
+  const people = rows
+    .map((row, index) => ({
+      spotId: row.spotId,
+      id: row.id,
+      name: firstNameOf(row.name),
+      image: row.image,
+      isGuest: row.isGuest,
+      isYou: row.isYou,
+      hasLeft: row.hasLeft,
+      net: balances[index]!.net,
+    }))
+    .filter((person) => !person.hasLeft || person.net !== 0);
+  if (people.length === 0) return NO_BALANCES;
+  return {
+    people,
+    // People who left with a zero balance are dropped above and contribute nothing here.
+    payments: settleUp(people.map(({ spotId, net }) => ({ spotId, net }))),
+    total: totals[0]?.total ?? 0,
+    costCount: totals[0]?.count ?? 0,
+  };
 }
