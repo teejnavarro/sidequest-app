@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MapPin } from "@phosphor-icons/react/dist/ssr";
 import { formatTripDates, todayInZone, tripTimeLabel } from "@/lib/trip-dates";
 import type { TripListItem } from "@/lib/trips";
+import { BalanceLine } from "@/components/balance-line";
 import { FaceStack } from "@/components/face-stack";
 import { RouteLine } from "@/components/route-line";
 import { cardClass, pressCard, softTag } from "@/components/ui";
@@ -27,6 +28,9 @@ export function TripCard({ trip, now }: { trip: TripListItem; now: Date }) {
         </p>
       ) : null}
       <RouteLine start={dates.start} end={dates.end} />
+      {trip.myBalance === null ? null : (
+        <BalanceLine net={trip.myBalance} currency={trip.currency} className="text-[15px]" />
+      )}
       <span className="flex items-center gap-3">
         <FaceStack people={trip.members} size={32} borderClass="border-card" decorative />
         <span className="text-[13px] text-muted">

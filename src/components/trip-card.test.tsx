@@ -80,6 +80,16 @@ describe("TripCard", () => {
     expect(html({ name: "A".repeat(80) })).toMatch(/<h2 class="[^"]*wrap-anywhere/);
   });
 
+  it("shows the viewer's balance for this trip in words, and nothing when there are no costs", () => {
+    expect(html({ myBalance: 125000 })).toMatch(/text-owed[^>]*>You&#x27;re owed ₱1,250.00</);
+    expect(html({ myBalance: -40000 })).toMatch(/text-owe[^>]*>You owe ₱400.00</);
+    const settled = html({ myBalance: 0 });
+    expect(settled).toContain("All settled");
+    expect(settled).not.toMatch(/text-owed|text-owe[ "]/);
+    const none = html();
+    expect(none).not.toMatch(/owed|You owe|All settled/);
+  });
+
   it("shows the dates as a route line", () => {
     const card = html();
     expect(card).toContain("Mar 12");
