@@ -145,6 +145,25 @@ describe("the Balances page", () => {
     expect(html.match(/left the trip/g)).toHaveLength(3);
   });
 
+  it("marks a person who left when they are the one being paid, and shows no amount for a settled viewer", async () => {
+    mocks.getBalancesForMember.mockResolvedValue({
+      ...example,
+      people: [
+        person("maya", "Maya", 0, { isYou: true }),
+        person("lou", "Lou", 2500, { hasLeft: true }),
+        person("jun", "Jun", -2500),
+      ],
+      payments: [{ from: "jun", to: "lou", amount: 2500 }],
+    });
+    const html = await render();
+    expect(html).toContain('Jun pays Lou<span class="text-muted"> (left the trip)</span>');
+    expect(html).toContain("₱25.00");
+    const section = html.slice(html.indexOf("Everyone&#x27;s balance</h2>"));
+    const viewerRow = section.slice(section.indexOf(">You<"), section.indexOf("</li>"));
+    expect(viewerRow).toContain("are settled");
+    expect(viewerRow).not.toContain("₱");
+  });
+
   it("says everyone is even when nothing is owed", async () => {
     mocks.getBalancesForMember.mockResolvedValue({
       people: [person("maya", "Maya", 0, { isYou: true }), person("bea", "Bea", 0)],
