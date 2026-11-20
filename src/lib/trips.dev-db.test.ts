@@ -55,6 +55,8 @@ describe("privacy layer on the dev database", () => {
   async function cleanUp() {
     const { db } = dbModule;
     const { like } = orm;
+    // Costs first (their shares go with them): they point at member rows with no cascade.
+    await db.delete(schema.cost).where(like(schema.cost.createdBy, `${ID_PREFIX}%`));
     // Deleting a trip also deletes its member rows.
     await db.delete(schema.trip).where(like(schema.trip.ownerId, `${ID_PREFIX}%`));
     await db.delete(schema.tripMember).where(like(schema.tripMember.userId, `${ID_PREFIX}%`));
@@ -413,4 +415,38 @@ describe("privacy layer on the dev database", () => {
     });
   });
 
+  it("refuses a currency change once the trip has a cost, but allows the same currency", async () => {
+    const locked = await trips.createTrip(OWNER, { ...input, name: "Locked currency" });
+    const [spot] = await dbModule.db
+      .select({ id: schema.tripMember.id })
+      .from(schema.tripMember)
+      .where(orm.eq(schema.tripMember.tripId, locked));
+    await expect(trips.updateTripForMember(locked, OWNER, { ...input, currency: "PHP" })).resolves.toBe("ok");
+    await expect(trips.updateTripForMember(locked, OWNER, input)).resolves.toBe("ok");
+
+    await dbModule.db.insert(schema.cost).values({
+      id: `${ID_PREFIX}cost-${RUN}`,
+      tripId: locked,
+      description: "Dinner",
+      amount: 5000,
+      currency: "VND",
+      paidBy: spot.id,
+      spentOn: "2027-03-12",
+      createdBy: OWNER,
+      updatedBy: OWNER,
+    });
+    await expect(trips.updateTripForMember(locked, OWNER, { ...input, currency: "PHP" })).resolves.toBe(
+      "currency-locked",
+    );
+    await expect(trips.updateTripForMember(locked, STRANGER, { ...input, currency: "PHP" })).resolves.toBe(
+      "not-found",
+    );
+    await expect(
+      trips.updateTripForMember(locked, OWNER, { ...input, name: "Renamed, same currency" }),
+    ).resolves.toBe("ok");
+    await expect(trips.getTripForMember(locked, OWNER)).resolves.toMatchObject({
+      name: "Renamed, same currency",
+      currency: "VND",
+    });
+  });
 });

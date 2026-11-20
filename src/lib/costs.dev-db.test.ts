@@ -457,6 +457,76 @@ describe("shared costs on the dev database", () => {
     await expect(trips.getGuestForEditor(tripA, dana, ADDER)).resolves.toBeNull();
   });
 
+  it("works out balances and the fewest payments for a hand-worked trip, per member and per trip", async () => {
+    // Trip C: Maya (owner), Bea and Jun (members), Dana (guest). The six costs of the spec.
+    const tripC = await trips.createTrip(OWNER, { ...tripInput, name: "Balances trip" });
+    const joinCode = (await trips.getInviteCodeForMember(tripC, OWNER))!;
+    await trips.joinTripByInviteCode(joinCode, ADDER); // Bea
+    await trips.joinTripByInviteCode(joinCode, JOINER); // Jun
+    await trips.addGuest(tripC, ADDER, "Dana");
+    const people = await trips.listTripMembers(tripC, OWNER);
+    const spot = (name: string) => people.find((p) => p.name === name)!.spotId;
+    const [maya, bea, jun, dan] = [spot("Maya Test"), spot("Ada Test"), spot("Cho Test"), spot("Dana")];
+    const log = (name: string, amount: number, paidBy: string, among: string[]) =>
+      costs.createCost(tripC, OWNER, costId(name), {
+        description: name,
+        amount,
+        paidBy,
+        category: null,
+        spentOn: "2027-03-12",
+        shares: shareOf(among, amount, paidBy),
+      });
+    await log("bal-hotel", 600000, maya, [maya, bea, jun, dan]);
+    await log("bal-pho", 180000, bea, [maya, bea, jun, dan]);
+    await log("bal-grab", 42000, jun, [maya, bea, jun]);
+    await log("bal-tour", 320000, jun, [maya, bea, jun, dan]);
+    await log("bal-coffee", 100000, dan, [maya, bea, dan]);
+    await log("bal-market", 64000, bea, [bea, jun]);
+    // Another trip's cost never shows up here.
+    await costs.createCost(tripB, OWNER_TWO, costId("bal-other"), {
+      description: "Elsewhere",
+      amount: 999999,
+      paidBy: otherTripSpot,
+      category: null,
+      spentOn: "2027-03-12",
+      shares: [{ spotId: otherTripSpot, amount: 999999 }],
+    });
+
+    const seen = await costs.getBalancesForMember(tripC, OWNER);
+    expect(seen.people.map((p) => [p.name, p.net, p.isGuest, p.isYou, p.hasLeft])).toEqual([
+      ["Maya", 277667, false, true, false],
+      ["Ada", -110333, false, false, false],
+      ["Cho", 41000, false, false, false],
+      ["Dana", -208334, true, false, false],
+    ]);
+    expect(seen.payments).toEqual([
+      { from: bea, to: maya, amount: 69333 },
+      { from: bea, to: jun, amount: 41000 },
+      { from: dan, to: maya, amount: 208334 },
+    ]);
+    expect([seen.total, seen.costCount]).toEqual([1306000, 6]);
+    expect(seen.people.reduce((sum, p) => sum + p.net, 0)).toBe(0);
+    expect(JSON.stringify(seen)).not.toContain("@example.test");
+
+    const empty = { people: [], payments: [], total: 0, costCount: 0 };
+    await expect(costs.getBalancesForMember(tripC, STRANGER)).resolves.toEqual(empty);
+    await expect(costs.getBalancesForMember(tripC, OWNER_TWO)).resolves.toEqual(empty);
+
+    // My trips: each trip has its own balance for the viewer; none for a trip without costs.
+    const noCosts = await trips.createTrip(OWNER, { ...tripInput, name: "No costs yet" });
+    const mine = await trips.listMyTrips(OWNER);
+    expect(mine.find((row) => row.id === tripC)?.myBalance).toBe(277667);
+    expect(mine.find((row) => row.id === noCosts)?.myBalance).toBeNull();
+    expect((await trips.listMyTrips(OWNER_TWO)).find((row) => row.id === tripB)?.myBalance).toBe(0);
+
+    // Bea owes money and is removed: she stays in the owner's balances, marked as left.
+    await expect(trips.removeMember(tripC, bea, OWNER)).resolves.toBe(true);
+    const after = await costs.getBalancesForMember(tripC, OWNER);
+    expect(after.people.find((p) => p.spotId === bea)).toMatchObject({ net: -110333, hasLeft: true });
+    expect(after.payments).toEqual(seen.payments);
+    await expect(costs.getBalancesForMember(tripC, ADDER)).resolves.toEqual(empty);
+  }, 60_000);
+
   it("removes a trip's costs and shares when the trip is deleted", async () => {
     const id = costId("with-trip");
     await costs.createCost(tripB, OWNER_TWO, id, {
