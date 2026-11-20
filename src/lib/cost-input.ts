@@ -162,16 +162,21 @@ function splitOwn(
     const given = Object.values(own).reduce((sum, minor) => sum + minor, 0);
     return { error: `That's ${formatMoney(given - total, currency)} more than the total.` };
   }
-  if (result.rest === 0) {
-    const empty = sharedBy.find((id) => own[id] === undefined);
-    if (empty) {
-      const zero = formatMoney(0, currency);
-      return {
-        error: you(empty)
-          ? `Your share comes to ${zero}. Untick yourself or add an amount.`
-          : `${name(empty)}'s share comes to ${zero}. Untick ${name(empty)} or add an amount.`,
-      };
-    }
+  // No one ticked may end with a share of 0 (owner decision 2026-11-20), so a reopened uneven
+  // cost always saves again unchanged.
+  const empty = result.shares.find((share) => share.amount === 0)?.spotId;
+  if (empty && result.rest === 0) {
+    const zero = formatMoney(0, currency);
+    return {
+      error: you(empty)
+        ? `Your share comes to ${zero}. Untick yourself or add an amount.`
+        : `${name(empty)}'s share comes to ${zero}. Untick ${name(empty)} or add an amount.`,
+    };
+  }
+  if (empty) {
+    return {
+      error: `${formatMoney(result.rest, currency)} left over can't be shared by ${sharedBy.length} people. Add it to someone's amount.`,
+    };
   }
   return { shares: result.shares.map(({ spotId, amount }) => ({ spotId, amount })), ownParts: own };
 }

@@ -94,6 +94,30 @@ describe("uneven splits (own amounts)", () => {
     );
   });
 
+  // Owner decision B (2026-11-20): an uneven split never saves a ₱0.00 share, so a reopened
+  // uneven cost always saves again unchanged.
+  it("refuses a left-over too small to give everyone sharing it a piece", () => {
+    // ₱1,000.01, you had ₱1,000.00: ₱0.01 left for 3 people, so two would get ₱0.00
+    expect(errorsFor(items({ a: "1000" }, { amount: "1,000.01" })).own).toBe(
+      "₱0.01 left over can't be shared by 3 people. Add it to someone's amount.",
+    );
+    expect(errorsFor(items({ a: "999.99" }, { amount: "1,000.01" })).own).toBe(
+      "₱0.02 left over can't be shared by 3 people. Add it to someone's amount.",
+    );
+    // VND whole units: 2 dong for 3 people
+    const vnd = { currency: "VND", spotIds: ["a", "b", "c"], names: context.names };
+    expect(errorsFor(items({ b: "250,000" }, { amount: "250,002" }), vnd).own).toBe(
+      "₫2 left over can't be shared by 3 people. Add it to someone's amount.",
+    );
+  });
+
+  it("allows a small left-over when everyone without an amount still gets a piece", () => {
+    // ₱0.02 left for 3 people: the payer (You) and Ben take a centavo each, Dana gets none of
+    // the rest but keeps her own ₱0.50, so no one ends at ₱0.00.
+    const v = valueFor(items({ a: "1000", c: "0.50" }, { amount: "1,000.52" }));
+    expect(v.shares.map((s) => s.amount)).toEqual([100001, 1, 50]);
+  });
+
   it("does not report own problems while the amount itself is wrong", () => {
     const e = errorsFor(items({ a: "9999" }, { amount: "" }));
     expect(e.amount).toBeDefined();
