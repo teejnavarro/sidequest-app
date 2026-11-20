@@ -70,7 +70,12 @@ export type TripDetails = TripSummary & {
   ownerImage: string | null;
 };
 
-export type TripListItem = TripSummary & { members: TripMemberSummary[] };
+export type TripListItem = TripSummary & {
+  members: TripMemberSummary[];
+  // The viewer's own paid minus share in this trip's currency (> 0 owed, < 0 owes), or null
+  // when the trip has no costs yet. Never added across trips.
+  myBalance: number | null;
+};
 
 // Every trip the person belongs to, newest first, each with the people and guests in it (id,
 // name, photo, never email; oldest spot first). Two queries in total, not one per trip: the
@@ -85,6 +90,9 @@ export async function listMyTrips(userId: string): Promise<TripListItem[]> {
       timeZone: trip.timeZone,
       currency: trip.currency,
       destination: trip.destination,
+      myBalance: sql<number | null>`case when exists (select 1 from ${cost} where ${cost.tripId} = ${trip.id} and ${cost.currency} = ${trip.currency}) then (select coalesce(sum(${cost.amount}), 0) from ${cost} where ${cost.paidBy} = ${tripMember.id} and ${cost.currency} = ${trip.currency}) - (select coalesce(sum(${costShare.amount}), 0) from ${costShare} inner join ${cost} on ${cost.id} = ${costShare.costId} where ${costShare.spotId} = ${tripMember.id} and ${cost.currency} = ${trip.currency}) else null end`.mapWith(
+        (value) => (value === null || value === undefined ? null : Number(value)),
+      ),
     })
     .from(trip)
     .innerJoin(tripMember, eq(tripMember.tripId, trip.id))

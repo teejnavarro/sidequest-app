@@ -22,6 +22,7 @@ const trip = {
   currency: "PHP",
   destination: null as string | null,
   members: [person(1), person(2), person(3)],
+  myBalance: null as number | null,
 };
 
 // 2027-03-01 at noon in Manila: the trip is 11 days away.
