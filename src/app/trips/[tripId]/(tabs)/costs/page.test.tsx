@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getTripForMember: vi.fn(),
   listCostsForMember: vi.fn(),
+  getBalancesForMember: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
   }),
@@ -15,7 +16,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
-vi.mock("@/lib/costs", () => ({ listCostsForMember: mocks.listCostsForMember }));
+vi.mock("@/lib/costs", () => ({
+  listCostsForMember: mocks.listCostsForMember,
+  getBalancesForMember: mocks.getBalancesForMember,
+}));
 
 type ContentProps = { params: Promise<{ tripId: string }> };
 
@@ -53,6 +57,15 @@ beforeEach(() => {
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
   mocks.getTripForMember.mockResolvedValue(trip);
   mocks.listCostsForMember.mockResolvedValue({ costs: [], total: 0 });
+  mocks.getBalancesForMember.mockResolvedValue(balances(0));
+});
+
+const balances = (myNet: number, extra = {}) => ({
+  people: [{ spotId: "s1", id: "u1", name: "Maya", image: null, isGuest: false, isYou: true, hasLeft: false, net: myNet }],
+  payments: [],
+  total: 125050,
+  costCount: 2,
+  ...extra,
 });
 
 describe("the Costs tab", () => {
@@ -61,6 +74,7 @@ describe("the Costs tab", () => {
     await expect(render()).rejects.toThrow("not-found");
     expect(mocks.getTripForMember).toHaveBeenCalledWith("trip-1", "u1");
     expect(mocks.listCostsForMember).not.toHaveBeenCalled();
+    expect(mocks.getBalancesForMember).not.toHaveBeenCalled();
   });
 
   it("sends a signed-out visitor away before looking anything up", async () => {
@@ -75,23 +89,47 @@ describe("the Costs tab", () => {
     expect(html).toContain("Log the first one: who paid, and who shares it.");
     expect(html).toContain('href="/trips/trip-1/costs/new"');
     expect(html).toContain("Log a cost");
-    expect(html).not.toContain("Logged so far");
+    expect(html).not.toContain("Your balance for this trip");
   });
 
-  it("shows the total and the count", async () => {
+  const twoCosts = () =>
     mocks.listCostsForMember.mockResolvedValue({
       costs: [cost("Dinner", "2027-05-09"), cost("Taxi", "2027-05-09", { amount: 25050 })],
       total: 125050,
     });
+
+  it("shows what you are owed in green words, the total and the count, and the link", async () => {
+    twoCosts();
+    mocks.getBalancesForMember.mockResolvedValue(balances(277667));
     const html = await render();
-    expect(html).toContain("Logged so far");
-    expect(html).toContain("₱1,250.50");
-    expect(html).toContain("2 costs. Who owes whom comes soon.");
+    expect(html).toContain("Your balance for this trip");
+    expect(html).toMatch(/text-owed[^>]*>You&#x27;re owed ₱2,776.67</);
+    expect(html).toContain("₱1,250.50 logged in 2 costs");
+    expect(html).toContain('href="/trips/trip-1/costs/balances"');
+    expect(html).toContain("See who owes whom");
+    expect(html).not.toContain("Logged so far");
+  });
+
+  it("shows what you owe in red words", async () => {
+    twoCosts();
+    mocks.getBalancesForMember.mockResolvedValue(balances(-110333));
+    expect(await render()).toMatch(/text-owe[^>]*>You owe ₱1,103.33</);
+  });
+
+  it("says All settled with a check, and no color, when the balance is zero or you are not listed", async () => {
+    twoCosts();
+    for (const result of [balances(0), balances(0, { people: [] })]) {
+      mocks.getBalancesForMember.mockResolvedValue(result);
+      const html = await render();
+      expect(html).toContain("All settled");
+      expect(html).not.toMatch(/text-owed|text-owe[ "]/);
+    }
   });
 
   it("says '1 cost' for one", async () => {
     mocks.listCostsForMember.mockResolvedValue({ costs: [cost("Dinner", "2027-05-09")], total: 100000 });
-    expect(await render()).toContain("1 cost. Who owes");
+    mocks.getBalancesForMember.mockResolvedValue(balances(0, { total: 100000, costCount: 1 }));
+    expect(await render()).toContain("₱1,000.00 logged in 1 cost<");
   });
 
   it("groups costs under their day, keeping the order it was given", async () => {
