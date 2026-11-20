@@ -28,14 +28,25 @@ function readText(formData: FormData, key: string): string {
 }
 
 function readValues(formData: FormData): CostFormValues {
+  const sharedBy = formData.getAll("sharedBy").filter((value): value is string => typeof value === "string");
   return {
     description: readText(formData, "description"),
     amount: readText(formData, "amount"),
     paidBy: readText(formData, "paidBy"),
-    sharedBy: formData.getAll("sharedBy").filter((value): value is string => typeof value === "string"),
+    sharedBy,
     spentOn: readText(formData, "spentOn"),
     category: readText(formData, "category"),
+    split: readText(formData, "split") === "items" ? "items" : "equal",
+    own: readOwn(formData, sharedBy),
   };
+}
+
+// Only own:<spotId> boxes for people ticked in Split between are read; everything else is
+// ignored. Whether the amounts are right is decided by validateCostInput.
+function readOwn(formData: FormData, sharedBy: string[]): Record<string, string> {
+  const own: Record<string, string> = {};
+  for (const spotId of sharedBy) own[spotId] = readText(formData, `own:${spotId}`);
+  return own;
 }
 
 // The form makes the cost's id (crypto.randomUUID), so a double tap saves once. This is a
@@ -80,6 +91,7 @@ async function reviewOrSave(
   const result = validateCostInput(values, {
     currency: trip.currency,
     spotIds: members.map((member) => member.spotId),
+    names: Object.fromEntries(people.map((p) => [p.spotId, p.isYou ? "You" : p.name])),
   });
   if (!result.ok) {
     return { errors: result.errors, values, review: null, notice: null, updatedAt: token };

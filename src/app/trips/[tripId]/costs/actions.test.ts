@@ -87,6 +87,55 @@ beforeEach(() => {
   mocks.getCostForMember.mockResolvedValue(saved);
 });
 
+describe("reviewOrSaveCostAction, uneven split", () => {
+  const form = (extra: Record<string, string> = {}, sharedBy?: string[]) =>
+    formWith(
+      { ...good, amount: "1,860", tripId: "trip-1", costId: COST_ID, mode: "new", step: "review", split: "items", ...extra },
+      sharedBy,
+    );
+
+  it("reviews what each person had, and saves the same shares from the named fields", async () => {
+    const own = { "own:a": "700", "own:g": "300" };
+    const review = await reviewOrSaveCostAction(initial, form(own));
+    expect(review.errors).toEqual({});
+    expect(review.review).toMatchObject({ uneven: true, rest: 86000 });
+    expect(review.review?.shares.map((s) => s.own)).toEqual([70000, 0, 30000]);
+    expect(review.values).toMatchObject({ split: "items", own: { a: "700", b: "", g: "300" } });
+
+    await expect(reviewOrSaveCostAction(initial, form({ ...own, step: "save" }))).rejects.toThrow(LIST);
+    const input = mocks.createCost.mock.calls[0][3];
+    expect(input.shares).toEqual([
+      { spotId: "a", amount: 98667 },
+      { spotId: "b", amount: 28667 },
+      { spotId: "g", amount: 58666 },
+    ]);
+  });
+
+  it("says when the own amounts are over the total, and saves nothing", async () => {
+    const state = await reviewOrSaveCostAction(initial, form({ "own:a": "2,000", step: "save" }));
+    expect(state.errors.own).toBe("That's ₱140.00 more than the total.");
+    expect(mocks.createCost).not.toHaveBeenCalled();
+  });
+
+  it("reads own boxes only for ticked people", async () => {
+    const state = await reviewOrSaveCostAction(initial, form({ "own:a": "700", "own:g": "9,999", "own:zzz": "5" }, ["a", "b"]));
+    expect(state.review?.shares.map((s) => s.own)).toEqual([70000, 0]);
+    expect(state.values.own).toEqual({ a: "700", b: "" });
+  });
+
+  it("ignores own boxes when the split is equal", async () => {
+    const state = await reviewOrSaveCostAction(initial, form({ split: "equal", "own:a": "9,999" }));
+    expect(state.errors).toEqual({});
+    expect(state.review?.uneven).toBe(false);
+    expect(state.review?.shares.map((s) => s.amount)).toEqual([62000, 62000, 62000]);
+  });
+
+  it("names the viewer as You in an own-amount error", async () => {
+    const state = await reviewOrSaveCostAction(initial, form({ "own:a": "x" }));
+    expect(state.errors.own).toBe("Check your amount. Enter an amount, like 1,250.50.");
+  });
+});
+
 describe("reviewOrSaveCostAction, new cost", () => {
   const form = (extra: Record<string, string> = {}, sharedBy?: string[]) =>
     formWith({ ...good, tripId: "trip-1", costId: COST_ID, mode: "new", step: "review", ...extra }, sharedBy);
@@ -159,6 +208,7 @@ describe("reviewOrSaveCostAction, new cost", () => {
         { spotId: "b", amount: 33333 },
         { spotId: "g", amount: 33333 },
       ],
+      ownParts: null,
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1/costs");
   });
@@ -282,6 +332,8 @@ describe("reviewOrSaveCostAction, edit", () => {
       sharedBy: ["a", "b", "g"],
       spentOn: "2027-03-12",
       category: "food",
+      split: "items",
+      own: expect.any(Object),
     });
     expect(state.updatedAt).toBe("2027-03-12T11:00:00.000Z");
     expect(state.review).toBeNull();

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { COST_CATEGORIES, costCategoryOf, isCostCategory } from "./cost-options";
 import { validateCostInput } from "./cost-input";
 
-const context = { currency: "PHP", spotIds: ["a", "b", "c"] };
+const context = { currency: "PHP", spotIds: ["a", "b", "c"], names: { a: "You", b: "Ben", c: "Dana" } };
 
 const valid = {
   description: "Dinner at Bún Chả",
@@ -24,6 +24,82 @@ function valueFor(overrides: Record<string, unknown>, ctx = context) {
   if (!result.ok) throw new Error("expected ok: " + JSON.stringify(result.errors));
   return result.value;
 }
+
+describe("uneven splits (own amounts)", () => {
+  const items = (own: Record<string, string>, overrides: Record<string, unknown> = {}) => ({
+    split: "items",
+    own,
+    ...overrides,
+  });
+
+  it("is each person's own amount plus an equal part of the rest, and keeps ownParts for the review", () => {
+    const ok = validateCostInput(
+      { ...valid, amount: "1,860", paidBy: "b", ...items({ a: "700", b: "", c: "300" }) },
+      context,
+    );
+    if (!ok.ok) throw new Error(JSON.stringify(ok.errors));
+    // rest 860 / 3 = 286.66 and 2 centavos over: the payer (Ben) and then You take one each
+    expect(ok.value.shares).toEqual([
+      { spotId: "a", amount: 98667 },
+      { spotId: "b", amount: 28667 },
+      { spotId: "c", amount: 58666 },
+    ]);
+    expect(ok.value.shares.reduce((s, x) => s + x.amount, 0)).toBe(186000);
+    expect(ok.value.ownParts).toEqual({ a: 70000, c: 30000 });
+  });
+
+  it("ignores the own boxes for an equal split, with ownParts null", () => {
+    const v = valueFor({ split: "equal", own: { a: "abc", b: "9999999" } });
+    expect(v.shares.map((s) => s.amount)).toEqual([33334, 33333, 33333]);
+    expect(v.ownParts).toBeNull();
+    expect(valueFor({}).ownParts).toBeNull();
+  });
+
+  it("treats zero as an empty box", () => {
+    const v = valueFor(items({ a: "0", b: "0.00", c: "100" }));
+    expect(v.ownParts).toEqual({ c: 10000 });
+  });
+
+  it("allows rest 0 when everyone ticked has an amount", () => {
+    const v = valueFor(items({ a: "400", b: "300", c: "300" }));
+    expect(v.shares.map((s) => s.amount)).toEqual([40000, 30000, 30000]);
+  });
+
+  it("reports a bad amount for the first person with one", () => {
+    expect(errorsFor(items({ a: "1.2.3", b: "x" })).own).toBe(
+      "Check your amount. Enter an amount, like 1,250.50.",
+    );
+    expect(errorsFor(items({ b: "x" })).own).toBe("Check Ben's amount. Enter an amount, like 1,250.50.");
+  });
+
+  it("refuses an amount for someone who is not ticked", () => {
+    expect(errorsFor(items({ c: "100" }, { sharedBy: ["a", "b"] })).own).toBe(
+      "Tick Dana in Split between, or clear their amount.",
+    );
+    expect(errorsFor(items({ a: "100" }, { sharedBy: ["b", "c"] })).own).toBe(
+      "Tick yourself in Split between, or clear your amount.",
+    );
+  });
+
+  it("says how much the own amounts are over the total", () => {
+    expect(errorsFor(items({ a: "800", b: "300" })).own).toBe("That's ₱100.00 more than the total.");
+  });
+
+  it("refuses a person left with ₱0.00 when nothing is left over", () => {
+    expect(errorsFor(items({ a: "500", b: "500" })).own).toBe(
+      "Dana's share comes to ₱0.00. Untick Dana or add an amount.",
+    );
+    expect(errorsFor(items({ b: "500", c: "500" })).own).toBe(
+      "Your share comes to ₱0.00. Untick yourself or add an amount.",
+    );
+  });
+
+  it("does not report own problems while the amount itself is wrong", () => {
+    const e = errorsFor(items({ a: "9999" }, { amount: "" }));
+    expect(e.amount).toBeDefined();
+    expect(e.own).toBeUndefined();
+  });
+});
 
 describe("cost categories", () => {
   it("lists the six categories in order, each with an icon", () => {
@@ -60,6 +136,7 @@ describe("validateCostInput", () => {
           { spotId: "b", amount: 33333 },
           { spotId: "c", amount: 33333 },
         ],
+        ownParts: null,
       },
     });
   });
@@ -79,7 +156,7 @@ describe("validateCostInput", () => {
     expect(errorsFor({ amount: "" }).amount).toBe("Enter an amount, like 1,250.50.");
     expect(errorsFor({ amount: "0" }).amount).toBe("Enter an amount above zero.");
     expect(errorsFor({ amount: "1.005" }).amount).toBe("Enter an amount, like 1,250.50.");
-    expect(errorsFor({ amount: "250.5" }, { currency: "VND", spotIds: ["a"] }).amount).toBe(
+    expect(errorsFor({ amount: "250.5" }, { currency: "VND", spotIds: ["a"], names: { a: "You", b: "Ben", c: "Dana" } }).amount).toBe(
       "Enter an amount, like 1,250.",
     );
   });
@@ -87,7 +164,7 @@ describe("validateCostInput", () => {
   it("refuses a misplaced comma instead of saving a wrong amount", () => {
     expect(errorsFor({ amount: "12,50" }).amount).toBe("Enter an amount, like 1,250.50.");
     expect(errorsFor({ amount: "1250,50" }).amount).toBe("Enter an amount, like 1,250.50.");
-    expect(errorsFor({ amount: "12,50" }, { currency: "VND", spotIds: ["a"] }).amount).toBe(
+    expect(errorsFor({ amount: "12,50" }, { currency: "VND", spotIds: ["a"], names: { a: "You", b: "Ben", c: "Dana" } }).amount).toBe(
       "Enter an amount, like 1,250.",
     );
     expect(valueFor({ amount: "1,250.5" }).amount).toBe(125050);
