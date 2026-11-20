@@ -3,6 +3,18 @@ import { describe, expect, it, vi } from "vitest";
 import { CostForm } from "./cost-form";
 import { emptyCostValues, type CostPerson } from "@/lib/cost-form-state";
 
+// A static render can't run the server action, so a test that needs the state the server
+// sends back (errors) sets `serverState`; every other test gets React's own hook.
+const fake = vi.hoisted(() => ({ serverState: null as unknown }));
+vi.mock("react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react")>();
+  return {
+    ...actual,
+    useActionState: ((action: never, initial: never) =>
+      fake.serverState ? [fake.serverState, () => {}, false] : actual.useActionState(action, initial)) as typeof actual.useActionState,
+  };
+});
+
 vi.mock("@/app/trips/[tripId]/costs/actions", () => ({
   reviewOrSaveCostAction: async () => ({ errors: {}, values: {}, review: null, notice: null, updatedAt: "" }),
 }));
@@ -149,6 +161,24 @@ describe("CostForm, uneven split panel", () => {
     expect(form({ values: { ...items, amount: "1000.01", own: { a: "100" } } })).toContain(
       "₱900.01 left over, shared equally<",
     );
+  });
+
+  it("links the server's own-amount error to every box, so a screen reader reads it", () => {
+    const message = "That's ₱40.00 more than the total.";
+    fake.serverState = { errors: { own: message }, values: items, review: null, notice: null, updatedAt: "" };
+    try {
+      const html = form({ values: items });
+      expect(html).toContain('id="own-error"');
+      expect(html).toContain("That&#x27;s ₱40.00 more than the total.");
+      expect(html.match(/aria-describedby="own-error"/g)).toHaveLength(3);
+      expect(html.match(/name="own:[^"]*"[^>]*aria-invalid="true"|aria-invalid="true"[^>]*name="own:/g)).toHaveLength(3);
+    } finally {
+      fake.serverState = null;
+    }
+    // Without an error the boxes are not marked.
+    const clean = form({ values: items });
+    expect(clean).not.toContain('aria-describedby="own-error"');
+    expect(clean).not.toContain('id="own-error"');
   });
 });
 

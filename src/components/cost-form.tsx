@@ -123,6 +123,16 @@ export function CostForm(props: CostFormProps) {
   const [amount, setAmount] = useState(values.amount);
   const [open, setOpen] = useState(values.split === "items");
   const [own, setOwn] = useState(values.own);
+  // When the server sends back new state (a newer copy after "Someone just changed this
+  // cost"), these follow it, like the uncontrolled boxes do through the form's key.
+  const [shown, setShown] = useState(state);
+  if (shown !== state) {
+    setShown(state);
+    setSharedBy(values.sharedBy);
+    setAmount(values.amount);
+    setOpen(values.split === "items");
+    setOwn(values.own);
+  }
 
   const hidden = (
     <>
@@ -287,6 +297,8 @@ export function CostForm(props: CostFormProps) {
                       value={own[person.spotId] ?? ""}
                       onChange={(event) => setOwn((now) => ({ ...now, [person.spotId]: event.target.value }))}
                       aria-label={`${person.isYou ? "Your" : `${person.name}'s`} amount`}
+                      aria-invalid={errors.own ? true : undefined}
+                      aria-describedby={errors.own ? "own-error" : undefined}
                       autoComplete="off"
                       placeholder="0"
                       className={`${inputClass} ${placeholder} w-28 text-right tabular-nums`}
@@ -298,7 +310,11 @@ export function CostForm(props: CostFormProps) {
           ) : (
             <input type="hidden" name="split" value="equal" />
           )}
-          {errors.own ? <span className={errorClass}>{errors.own}</span> : null}
+          {errors.own ? (
+            <span id="own-error" className={errorClass}>
+              {errors.own}
+            </span>
+          ) : null}
         </fieldset>
 
         <Field id="spentOn" label="Date" error={errors.spentOn}>
