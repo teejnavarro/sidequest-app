@@ -28,7 +28,10 @@ function extraSentence(review: CostReview): string | null {
     review.extraTakers.length === 1
       ? `${names} ${review.extraTakers[0].isYou ? "take" : "takes"} the extra ${unit}`
       : `${names} each take one extra ${unit}`;
-  return `${formatMoney(review.amount, review.currency)} doesn't split evenly ${review.shares.length} ways, so ${part}. The shares always add up to the total.`;
+  // On an uneven split only what is left over after the own amounts is divided.
+  const divided = formatMoney(review.rest, review.currency);
+  const subject = review.uneven ? `${divided} left over` : formatMoney(review.amount, review.currency);
+  return `${subject} doesn't split evenly ${review.shares.length} ways, so ${part}. The shares always add up to the total.`;
 }
 
 // Old value struck through, an arrow, the new value.
@@ -48,7 +51,7 @@ function Before({ was, now }: { was: string; now: string }) {
 export function CostReviewView({ review }: { review: CostReview }) {
   const { currency, amount } = review;
   const money = (minor: number) => formatMoney(minor, currency);
-  const even = review.extraTakers.length === 0;
+  const even = review.extraTakers.length === 0 && !review.uneven;
   const extra = extraSentence(review);
   const nothingChanged = review.changes.length === 0 && review.shareChanges.length === 0;
 
@@ -80,7 +83,15 @@ export function CostReviewView({ review }: { review: CostReview }) {
           <ul className="grid gap-1 border-t border-line pt-3 text-[15px]">
             {review.shares.map((share) => (
               <li key={share.spotId} className="flex justify-between gap-3">
-                <span className="min-w-0 wrap-anywhere">{who(share)}</span>
+                <span className="grid min-w-0">
+                  <span className="wrap-anywhere">{who(share)}</span>
+                  {share.own === null ? null : (
+                    <span className="text-[13px] text-muted tabular-nums">
+                      {share.own > 0 ? `${money(share.own)} own + ` : ""}
+                      {money(share.amount - share.own)} shared
+                    </span>
+                  )}
+                </span>
                 <span className="tabular-nums">{money(share.amount)}</span>
               </li>
             ))}
