@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { amountText, formatMoney, minorDigits, parseAmount, splitEqually } from "./money";
+import {
+  amountText,
+  formatMoney,
+  minorDigits,
+  parseAmount,
+  splitByItems,
+  splitEqually,
+} from "./money";
 
 describe("minorDigits", () => {
   it("knows each currency's decimals", () => {
@@ -222,5 +229,66 @@ describe("splitEqually", () => {
 
   it("returns nothing for nobody", () => {
     expect(splitEqually(100, [], "a")).toEqual([]);
+  });
+});
+
+describe("splitByItems", () => {
+  const ids = ["you", "bea", "jun", "dana"];
+
+  it("matches the Lavish example", () => {
+    const result = splitByItems(
+      186000,
+      ids,
+      [
+        { spotId: "you", own: 70000 },
+        { spotId: "bea", own: 50000 },
+        { spotId: "dana", own: 30000 },
+      ],
+      "jun",
+    );
+    expect(result?.shares.map((s) => s.amount)).toEqual([79000, 59000, 9000, 39000]);
+    expect(result?.rest).toBe(36000);
+  });
+
+  it("refuses own amounts over the total", () => {
+    expect(splitByItems(1000, ids, [{ spotId: "you", own: 1001 }], "you")).toBeNull();
+  });
+
+  it("gives rest 0 when own amounts equal the total", () => {
+    const result = splitByItems(1000, ["a", "b"], [{ spotId: "a", own: 600 }, { spotId: "b", own: 400 }], "a");
+    expect(result?.rest).toBe(0);
+    expect(result?.shares.map((s) => s.amount)).toEqual([600, 400]);
+  });
+
+  it("gives the payer the extra unit of an odd rest first", () => {
+    const result = splitByItems(1002, ["a", "b", "c"], [{ spotId: "a", own: 1 }], "c");
+    expect(result?.rest).toBe(1001);
+    expect(result?.shares.map((s) => s.equalPart)).toEqual([334, 333, 334]);
+    expect(result?.shares.map((s) => s.amount)).toEqual([335, 333, 334]);
+  });
+
+  it("ignores own amounts for people not sharing", () => {
+    const result = splitByItems(900, ["a", "b"], [{ spotId: "z", own: 500 }], "a");
+    expect(result?.rest).toBe(900);
+  });
+
+  it("always adds up to the total, each share own + equal part", () => {
+    let seed = 7;
+    const random = (max: number) => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed % max;
+    };
+    for (let run = 0; run < 500; run++) {
+      const count = 1 + random(6);
+      const spots = Array.from({ length: count }, (_, i) => `s${i}`);
+      const total = 1 + random(100000);
+      const own = spots
+        .filter(() => random(2) === 0)
+        .map((spotId) => ({ spotId, own: 1 + random(Math.max(1, Math.floor(total / count))) }));
+      const result = splitByItems(total, spots, own, spots[random(count)]!);
+      if (!result) continue;
+      expect(result.shares.reduce((s, x) => s + x.amount, 0)).toBe(total);
+      for (const share of result.shares) expect(share.amount).toBe(share.own + share.equalPart);
+    }
   });
 });
