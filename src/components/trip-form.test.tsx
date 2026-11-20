@@ -30,6 +30,18 @@ describe("TripForm", () => {
     );
   });
 
+  it("locks the currency once the trip has costs: disabled select, hidden value, new help", () => {
+    const locked = renderToStaticMarkup(<TripForm mode="edit" tripId="t1" currencyLocked values={{ ...trip, currency: "VND" }} />);
+    expect(locked).toContain('<input type="hidden" name="currency" value="VND"/>');
+    expect(locked.match(/name="currency"/g)).toHaveLength(1);
+    expect(locked).toMatch(/<select id="currency"[^>]*disabled/);
+    expect(locked).toContain("Can&#x27;t change once costs are logged.");
+    const open = renderToStaticMarkup(<TripForm mode="edit" tripId="t1" values={trip} />);
+    expect(open).not.toContain('type="hidden" name="currency"');
+    expect(open).toMatch(/<select id="currency" name="currency"/);
+    expect(open).toContain("Costs are added up in this currency.");
+  });
+
   it("groups the fields as The trip, When and Details", () => {
     const page = html();
     expect(page.match(/<fieldset/g)).toHaveLength(3);

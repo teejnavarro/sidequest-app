@@ -18,7 +18,7 @@ import {
 
 type TripFormProps =
   | { mode: "create"; values: TripFormValues }
-  | { mode: "edit"; values: TripFormValues; tripId: string };
+  | { mode: "edit"; values: TripFormValues; tripId: string; currencyLocked?: boolean };
 
 type FieldProps = {
   id: string;
@@ -92,6 +92,9 @@ export function TripForm(props: TripFormProps) {
   // The two dates, tracked only to draw the route line. The inputs stay uncontrolled.
   const [start, setStart] = useState(props.values.startDate);
   const [end, setEnd] = useState(props.values.endDate);
+  // Once a trip has costs its currency can't change: the select is shown but not sent, and a
+  // hidden field carries the current value. The server refuses a changed one anyway.
+  const currencyLocked = props.mode === "edit" && props.currencyLocked === true;
   const showRoute = isCalendarDay(start) && isCalendarDay(end) && end >= start;
   const route = showRoute ? formatTripDates(start, end) : null;
 
@@ -199,13 +202,15 @@ export function TripForm(props: TripFormProps) {
         <Field
           id="currency"
           label="Main currency"
-          help="Costs are added up in this currency."
+          help={currencyLocked ? "Can't change once costs are logged." : "Costs are added up in this currency."}
           error={errors.currency}
         >
           <SelectBox>
+            {currencyLocked ? <input type="hidden" name="currency" value={values.currency} /> : null}
             <select
               id="currency"
-              name="currency"
+              name={currencyLocked ? undefined : "currency"}
+              disabled={currencyLocked}
               defaultValue={values.currency}
               aria-invalid={errors.currency ? true : undefined}
               aria-describedby={describedBy("currency", errors.currency, "help")}
