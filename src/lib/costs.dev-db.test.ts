@@ -692,6 +692,65 @@ describe("shared costs on the dev database", () => {
     expect([row.originalAmount, row.originalCurrency, row.rate]).toEqual([null, null, null]);
   });
 
+  it("starts a new cost from the last currency and the latest rate, ignoring the trash", async () => {
+    const t = await trips.createTrip(OWNER, { ...tripInput, name: "Defaults trip" });
+    await trips.joinTripByInviteCode((await trips.getInviteCodeForMember(t, OWNER))!, ADDER);
+    await trips.addGuest(t, OWNER, "Zed Unused");
+    const people = await trips.listTripMembers(t, OWNER);
+    const maya = people.find((p) => p.name === "Maya Test")!.spotId;
+    const ada = people.find((p) => p.name === "Ada Test")!.spotId;
+    const log = (id: string, by: string, rate: string | null) =>
+      costs.createCost(t, by, id, {
+        description: "Meal",
+        amount: 200000,
+        paidBy: by === OWNER ? maya : ada,
+        category: null,
+        spentOn: "2027-03-12",
+        shares: [
+          { spotId: maya, amount: 100000, originalAmount: rate ? 435000 : null },
+          { spotId: ada, amount: 100000, originalAmount: rate ? 435000 : null },
+        ],
+        money: rate
+          ? { kind: "rate", currency: "VND", original: 870000, rate }
+          : { kind: "trip" },
+      });
+    const plain = (currency: string, rate: string) => ({ currency, rate });
+
+    await expect(costs.getNewCostDefaults(t, OWNER)).resolves.toEqual(plain("PHP", ""));
+    await expect(costs.getNewCostDefaults(t, STRANGER)).resolves.toEqual(plain("", ""));
+
+    await log(costId("def-1"), OWNER, "435");
+    await log(costId("def-2"), ADDER, "440");
+    await expect(costs.getNewCostDefaults(t, OWNER)).resolves.toEqual(plain("VND", "440"));
+    await expect(costs.getNewCostDefaults(t, STRANGER)).resolves.toEqual(plain("", ""));
+    await expect(costs.getNewCostDefaults(tripB, OWNER)).resolves.toEqual(plain("", ""));
+
+    await costs.deleteCost(t, costId("def-2"), OWNER);
+    await expect(costs.getNewCostDefaults(t, OWNER)).resolves.toEqual(plain("VND", "435"));
+    await log(costId("def-3"), OWNER, null);
+    await expect(costs.getNewCostDefaults(t, OWNER)).resolves.toEqual(plain("PHP", ""));
+    await costs.deleteCost(t, costId("def-3"), OWNER);
+    await expect(costs.getNewCostDefaults(t, OWNER)).resolves.toEqual(plain("VND", "435"));
+
+    // Export: live costs only, people in them only, no email, members only.
+    await expect(costs.listCostsForExport(t, STRANGER)).resolves.toBeNull();
+    const data = (await costs.listCostsForExport(t, OWNER))!;
+    expect([data.tripName, data.currency]).toEqual(["Defaults trip", "PHP"]);
+    expect(data.costs.map((c) => c.id)).toEqual([costId("def-1")]);
+    expect(data.costs[0]).toMatchObject({
+      amount: 200000,
+      original: { amount: 870000, currency: "VND", rate: "435" },
+      paidBy: maya,
+      shares: { [maya]: 100000, [ada]: 100000 },
+    });
+    expect(data.people.map((p) => [p.name, p.isGuest, p.hasLeft])).toEqual([
+      ["Maya Test", false, false],
+      ["Ada Test", false, false],
+    ]);
+    expect(JSON.stringify(data)).not.toContain("@example.test");
+    expect(JSON.stringify(data)).not.toContain("Zed");
+  }, 60_000);
+
   it("removes a trip's costs and shares when the trip is deleted", async () => {
     const id = costId("with-trip");
     await costs.createCost(tripB, OWNER_TWO, id, {

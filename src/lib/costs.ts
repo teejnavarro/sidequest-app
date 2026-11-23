@@ -499,3 +499,139 @@ export async function getBalancesForMember(tripId: string, userId: string): Prom
     costCount: totals[0]?.count ?? 0,
   };
 }
+
+// What the New cost form starts with: the currency the viewer used last in this trip, and the
+// newest rate anyone in the trip typed for it. With no live cost of theirs it is the trip's
+// currency. Trashed costs are ignored. A stranger gets "" and "" (the trip's currency is not
+// theirs to see).
+export async function getNewCostDefaults(
+  tripId: string,
+  userId: string,
+): Promise<{ currency: string; rate: string }> {
+  const [[tripRow], [last]] = await Promise.all([
+    db
+      .select({ currency: trip.currency })
+      .from(trip)
+      .where(and(eq(trip.id, tripId), isMemberOf(tripId, userId)))
+      .limit(1),
+    db
+      .select({ currency: sql<string>`coalesce(${cost.originalCurrency}, ${cost.currency})` })
+      .from(cost)
+      .where(and(eq(cost.tripId, tripId), live, eq(cost.createdBy, userId), isMemberOf(tripId, userId)))
+      .orderBy(desc(cost.createdAt), desc(cost.id))
+      .limit(1),
+  ]);
+  if (!tripRow) return { currency: "", rate: "" };
+  if (!last) return { currency: tripRow.currency, rate: "" };
+  const [latest] = await db
+    .select({ rate: cost.rate })
+    .from(cost)
+    .where(
+      and(
+        eq(cost.tripId, tripId),
+        live,
+        eq(cost.originalCurrency, last.currency),
+        isNotNull(cost.rate),
+        isMemberOf(tripId, userId),
+      ),
+    )
+    .orderBy(desc(cost.createdAt), desc(cost.id))
+    .limit(1);
+  return { currency: last.currency, rate: latest?.rate ?? "" };
+}
+
+export type ExportCost = {
+  id: string;
+  spentOn: string;
+  description: string;
+  category: string | null;
+  amount: number; // trip currency, minor units
+  original: { amount: number; currency: string; rate: string | null } | null;
+  paidBy: string; // a spot id
+  shares: Record<string, number>; // spot id -> trip-currency minor units
+};
+
+export type ExportPerson = { spotId: string; name: string; isGuest: boolean; hasLeft: boolean };
+
+export type CostsExport = {
+  tripName: string;
+  currency: string;
+  people: ExportPerson[]; // everyone in a live cost, in the trip's list order
+  costs: ExportCost[]; // oldest first
+};
+
+// Everything the spreadsheet download needs, for a member only (null for anyone else): the
+// trip's live costs, oldest first, and the people in them. Full names, never emails.
+export async function listCostsForExport(tripId: string, userId: string): Promise<CostsExport | null> {
+  const [tripRow] = await db
+    .select({ name: trip.name, currency: trip.currency })
+    .from(trip)
+    .where(and(eq(trip.id, tripId), isMemberOf(tripId, userId)))
+    .limit(1);
+  if (!tripRow) return null;
+
+  const [costRows, shareRows, spots] = await Promise.all([
+    db
+      .select({
+        id: cost.id,
+        spentOn: cost.spentOn,
+        description: cost.description,
+        category: cost.category,
+        amount: cost.amount,
+        originalAmount: cost.originalAmount,
+        originalCurrency: cost.originalCurrency,
+        rate: cost.rate,
+        paidBy: cost.paidBy,
+      })
+      .from(cost)
+      .where(and(eq(cost.tripId, tripId), live, isMemberOf(tripId, userId)))
+      .orderBy(asc(cost.spentOn), asc(cost.createdAt), asc(cost.id)),
+    db
+      .select({ costId: costShare.costId, spotId: costShare.spotId, amount: costShare.amount })
+      .from(costShare)
+      .innerJoin(cost, eq(cost.id, costShare.costId))
+      .where(and(eq(cost.tripId, tripId), live, isMemberOf(tripId, userId))),
+    db
+      .select({
+        spotId: tripMember.id,
+        name: sql<string>`coalesce(${user.name}, ${tripMember.guestName})`,
+        isGuest: sql<boolean>`${tripMember.userId} is null`,
+        hasLeft: sql<boolean>`${tripMember.leftAt} is not null`,
+      })
+      .from(tripMember)
+      .leftJoin(user, eq(user.id, tripMember.userId))
+      .where(
+        and(
+          eq(tripMember.tripId, tripId),
+          isMemberOf(tripId, userId),
+          sql`(exists (select 1 from ${cost} where ${cost.paidBy} = ${tripMember.id} and ${cost.deletedAt} is null) or exists (select 1 from ${costShare} inner join ${cost} on ${cost.id} = ${costShare.costId} where ${costShare.spotId} = ${tripMember.id} and ${cost.deletedAt} is null))`,
+        ),
+      )
+      .orderBy(asc(tripMember.joinedAt), asc(tripMember.id)),
+  ]);
+
+  const sharesOf = new Map<string, Record<string, number>>();
+  for (const share of shareRows) {
+    const map = sharesOf.get(share.costId) ?? {};
+    map[share.spotId] = share.amount;
+    sharesOf.set(share.costId, map);
+  }
+  return {
+    tripName: tripRow.name,
+    currency: tripRow.currency,
+    people: spots,
+    costs: costRows.map((row) => {
+      const original = originalOf({ amount: row.originalAmount, currency: row.originalCurrency });
+      return {
+        id: row.id,
+        spentOn: row.spentOn,
+        description: row.description,
+        category: row.category,
+        amount: row.amount,
+        original: original && { ...original, rate: row.rate },
+        paidBy: row.paidBy,
+        shares: sharesOf.get(row.id) ?? {},
+      };
+    }),
+  };
+}
