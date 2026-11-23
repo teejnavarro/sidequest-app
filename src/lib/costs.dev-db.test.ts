@@ -751,6 +751,82 @@ describe("shared costs on the dev database", () => {
     expect(JSON.stringify(data)).not.toContain("Zed");
   }, 60_000);
 
+  it("exports a CSV whose TOTAL row matches the app, live costs only, foreign costs in pesos", async () => {
+    const { validateCostInput } = await import("./cost-input");
+    const { buildCostsCsv } = await import("./costs-csv");
+    const t = await trips.createTrip(OWNER, { ...tripInput, name: "CSV trip" });
+    await trips.joinTripByInviteCode((await trips.getInviteCodeForMember(t, OWNER))!, ADDER);
+    await trips.addGuest(t, OWNER, "Dana");
+    const people = await trips.listTripMembers(t, OWNER);
+    const spot = (name: string) => people.find((p) => p.name === name)!.spotId;
+    const [maya, ada, guest] = [spot("Maya Test"), spot("Ada Test"), spot("Dana")];
+    const context = { currency: "PHP", spotIds: [maya, ada, guest], names: {} };
+    const log = async (id: string, raw: Record<string, unknown>) => {
+      const checked = validateCostInput(
+        { description: "Meal", paidBy: maya, spentOn: "2027-03-12", category: "", split: "equal", ...raw },
+        context,
+      );
+      if (!checked.ok) throw new Error(JSON.stringify(checked.errors));
+      await costs.createCost(t, OWNER, costId(id), checked.value);
+    };
+    // ₱1,000.00 over three (Maya takes the extra centavo), ₫870,000 at 435 = ₱2,000.00 over two,
+    // and ₱500.00 that goes to the trash.
+    await log("csv-pesos", { amount: "1,000", sharedBy: [maya, ada, guest] });
+    await log("csv-dong", { amount: "870,000", currency: "VND", fx: "rate", rate: "435", sharedBy: [maya, ada] });
+    await log("csv-trashed", { amount: "500", sharedBy: [maya, ada, guest] });
+    await costs.deleteCost(t, costId("csv-trashed"), OWNER);
+
+    const csv = buildCostsCsv((await costs.listCostsForExport(t, OWNER))!);
+    const rows = csv.replace(/^\uFEFF/, "").split("\r\n").filter((line) => line !== "").map((line) => line.split(","));
+    expect(rows[0]!.slice(7)).toEqual(["Paid by", "Maya", "Ada", "Dana (guest)"]);
+    expect(rows.slice(1, -1).map((row) => row.slice(3, 7))).toEqual([
+      ["1000.00", "PHP", "", "1000.00"],
+      ["870000", "VND", "435", "2000.00"],
+    ]);
+    const total = rows.at(-1)!;
+    expect([total[0], total[6], ...total.slice(8)]).toEqual(["TOTAL", "3000.00", "1333.34", "1333.33", "333.33"]);
+    expect((await costs.listCostsForMember(t, OWNER)).total).toBe(300000);
+  }, 60_000);
+
+  it("restores a cost after someone in it left the trip, and balances come back the same", async () => {
+    const t = await trips.createTrip(OWNER, { ...tripInput, name: "Left trip" });
+    await trips.joinTripByInviteCode((await trips.getInviteCodeForMember(t, OWNER))!, ADDER);
+    const people = await trips.listTripMembers(t, OWNER);
+    const maya = people.find((p) => p.name === "Maya Test")!.spotId;
+    const ada = people.find((p) => p.name === "Ada Test")!.spotId;
+    const id = costId("left-restore");
+    await costs.createCost(t, OWNER, id, {
+      description: "Taxi",
+      amount: 60000,
+      paidBy: maya,
+      category: null,
+      spentOn: "2027-03-12",
+      shares: shareOf([maya, ada], 60000, maya),
+      money: { kind: "trip" as const },
+    });
+    const balancesBefore = await costs.getBalancesForMember(t, OWNER);
+    expect(balancesBefore.payments).toEqual([expect.objectContaining({ amount: 30000 })]);
+
+    await expect(costs.deleteCost(t, id, OWNER)).resolves.toBe(true);
+    await expect(trips.leaveTrip(t, ADDER)).resolves.toBe("ok");
+    await expect(costs.restoreCost(t, id, OWNER)).resolves.toBe(true);
+
+    // The same money comes back; Ada now shows as left the trip, still owing her share.
+    await expect(costs.getBalancesForMember(t, OWNER)).resolves.toEqual({
+      ...balancesBefore,
+      people: balancesBefore.people.map((p) => ({ ...p, hasLeft: p.spotId === ada })),
+    });
+    const back = await costs.getCostForMember(t, id, OWNER);
+    expect(back!.shares.map((s) => [s.spotId, s.amount])).toEqual([
+      [maya, 30000],
+      [ada, 30000],
+    ]);
+    // Someone who left can't put it back or see it.
+    await costs.deleteCost(t, id, OWNER);
+    await expect(costs.restoreCost(t, id, ADDER)).resolves.toBe(false);
+    await expect(costs.listTrashForMember(t, ADDER)).resolves.toEqual([]);
+  }, 60_000);
+
   it("removes a trip's costs and shares when the trip is deleted", async () => {
     const id = costId("with-trip");
     await costs.createCost(tripB, OWNER_TWO, id, {

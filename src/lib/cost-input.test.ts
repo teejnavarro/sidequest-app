@@ -346,3 +346,54 @@ describe("validateCostInput in another currency", () => {
     );
   });
 });
+
+// The rate message is picked with a rough estimate, but the line is exact: a converted amount
+// rounds half up, so exactly half a centavo saves as ₱0.01 and anything under it is refused.
+describe("rate limits and other money paths", () => {
+  const solo = { sharedBy: ["a"], fx: "rate" };
+
+  it("saves exactly half a centavo as ₱0.01, and refuses anything under it as too small", () => {
+    // ₫1 at ₱1 = ₫200 is exactly ₱0.005.
+    expect(valueFor({ ...solo, currency: "VND", amount: "1", rate: "200" }).amount).toBe(1);
+    expect(errorsFor({ ...solo, currency: "VND", amount: "1", rate: "200.000001" }).rate).toBe(
+      "That rate makes it less than ₱0.01.",
+    );
+  });
+
+  it("names the smallest amount in a zero-decimal trip currency", () => {
+    const yen = { ...context, currency: "JPY", spotIds: ["a"] };
+    // ₱1.00 at ¥1 = ₱2 is exactly ¥0.5.
+    expect(valueFor({ ...solo, currency: "PHP", amount: "1", rate: "2" }, yen).amount).toBe(1);
+    expect(errorsFor({ ...solo, currency: "PHP", amount: "1", rate: "2.000001" }, yen).rate).toBe(
+      "That rate makes it less than ¥1.",
+    );
+  });
+
+  it("takes the largest amount exactly, and calls anything over it too large", () => {
+    const top = { ...solo, currency: "USD", amount: "1,000,000,000" };
+    expect(valueFor({ ...top, rate: "1" }).amount).toBe(100_000_000_000);
+    expect(errorsFor({ ...top, rate: "0.999999" }).rate).toBe("That's too large.");
+  });
+
+  it("reads a rate typed with thousands commas and stores it without them", () => {
+    const v = valueFor({ ...solo, currency: "VND", amount: "1,234,500", rate: "1,234.5" });
+    expect(v.amount).toBe(100000);
+    expect(v.money).toEqual({ kind: "rate", currency: "VND", original: 1234500, rate: "1234.5" });
+    expect(errorsFor({ ...solo, currency: "VND", amount: "1,234,500", rate: "1,23" }).rate).toBe(
+      "Enter a rate, like 435.",
+    );
+  });
+
+  it("takes a card amount in whole units when the trip currency has no decimals", () => {
+    const dongTrip = { ...context, currency: "VND", spotIds: ["a", "b"] };
+    const yen = { currency: "JPY", amount: "10,000", fx: "charged", sharedBy: ["a", "b"] };
+    const v = valueFor({ ...yen, charged: "1,700,001" }, dongTrip);
+    expect(v.amount).toBe(1700001);
+    expect(v.money).toEqual({ kind: "charged", currency: "JPY", original: 10000 });
+    expect(v.shares).toEqual([
+      { spotId: "a", amount: 850001, originalAmount: 5000 },
+      { spotId: "b", amount: 850000, originalAmount: 5000 },
+    ]);
+    expect(errorsFor({ ...yen, charged: "1,700,000.50" }, dongTrip).charged).toBe("Enter an amount, like 1,250.");
+  });
+});
