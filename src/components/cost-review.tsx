@@ -1,12 +1,12 @@
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { costCategoryOf } from "@/lib/cost-options";
 import type { CostReview } from "@/lib/cost-form-state";
-import { formatMoney, minorUnitName } from "@/lib/money";
+import { formatMoney, minorUnitName, rateText } from "@/lib/money";
 import { dayLabel } from "@/lib/schedule-options";
 
 const FIELD_LABELS = {
-  amount: "Amount",
   main: "Amount in trip currency",
+  amount: "Amount",
   rate: "Rate",
   description: "What was it?",
   paidBy: "Who paid?",
@@ -24,15 +24,17 @@ function joinNames(names: string[]): string {
 // The sentence for a split that has a leftover, or nothing when it divides evenly.
 function extraSentence(review: CostReview): string | null {
   if (review.extraTakers.length === 0) return null;
-  const unit = minorUnitName(review.currency);
+  // On a cost in another currency the equal part is worked out in that currency.
+  const currency = review.original?.currency ?? review.currency;
+  const unit = minorUnitName(currency);
   const names = joinNames(review.extraTakers.map(who));
   const part =
     review.extraTakers.length === 1
       ? `${names} ${review.extraTakers[0].isYou ? "take" : "takes"} the extra ${unit}`
       : `${names} each take one extra ${unit}`;
   // On an uneven split only what is left over after the own amounts is divided.
-  const divided = formatMoney(review.rest, review.currency);
-  const subject = review.uneven ? `${divided} left over` : formatMoney(review.amount, review.currency);
+  const divided = formatMoney(review.rest, currency);
+  const subject = review.uneven ? `${divided} left over` : formatMoney(review.original?.amount ?? review.amount, currency);
   return `${subject} doesn't split evenly ${review.shares.length} ways, so ${part}. The shares always add up to the total.`;
 }
 
@@ -48,6 +50,16 @@ function Before({ was, now }: { was: string; now: string }) {
   );
 }
 
+// The muted line under the summary for a cost in another currency: what was typed and the rate.
+function originalLine(review: CostReview): string | null {
+  const { original } = review;
+  if (!original) return null;
+  const typed = formatMoney(original.amount, original.currency);
+  if (original.rate !== null) return `${typed} at ${rateText(original.rate, original.currency, review.currency)}`;
+  const effective = rateText(original.effectiveRate, original.currency, review.currency);
+  return `${typed}, card charged ${formatMoney(review.amount, review.currency)} (${effective})`;
+}
+
 // What the server worked out, shown before saving. A new cost shows the split; an edit shows
 // only what changed. The buttons live in the form around this.
 export function CostReviewView({ review }: { review: CostReview }) {
@@ -55,6 +67,9 @@ export function CostReviewView({ review }: { review: CostReview }) {
   const money = (minor: number) => formatMoney(minor, currency);
   const even = review.extraTakers.length === 0 && !review.uneven;
   const extra = extraSentence(review);
+  const { original } = review;
+  const originalMoney = (minor: number) => formatMoney(minor, original?.currency ?? currency);
+  const fromOriginal = originalLine(review);
   const nothingChanged = review.changes.length === 0 && review.shareChanges.length === 0;
 
   return (
@@ -68,6 +83,7 @@ export function CostReviewView({ review }: { review: CostReview }) {
             {review.shares.length === 1 ? "way" : "ways"}
             {even ? ` = ${money(review.shares[0].amount)} each` : ""}
           </p>
+          {fromOriginal ? <p className="text-[13px] text-muted tabular-nums wrap-anywhere">{fromOriginal}</p> : null}
           <dl className="grid gap-1 text-[15px]">
             <div className="flex gap-2">
               <dt className="text-muted">What</dt>
@@ -87,18 +103,25 @@ export function CostReviewView({ review }: { review: CostReview }) {
               <li key={share.spotId} className="flex justify-between gap-3">
                 <span className="grid min-w-0">
                   <span className="wrap-anywhere">{who(share)}</span>
-                  {share.own === null ? null : (
+                  {share.own !== null ? (
                     <span className="text-[13px] text-muted tabular-nums">
-                      {share.own > 0 ? `${money(share.own)} own + ` : ""}
-                      {money(share.amount - share.own)} shared
+                      {share.own > 0 ? `${originalMoney(share.own)} own + ` : ""}
+                      {originalMoney((share.originalAmount ?? share.amount) - share.own)} shared
                     </span>
-                  )}
+                  ) : share.originalAmount !== null ? (
+                    <span className="text-[13px] text-muted tabular-nums">{originalMoney(share.originalAmount)}</span>
+                  ) : null}
                 </span>
                 <span className="tabular-nums">{money(share.amount)}</span>
               </li>
             ))}
             <li className="flex justify-between gap-3 border-t border-line pt-2 font-bold">
-              <span>Total</span>
+              <span className="grid">
+                Total
+                {original ? (
+                  <span className="text-[13px] font-normal text-muted tabular-nums">{originalMoney(original.amount)}</span>
+                ) : null}
+              </span>
               <span className="tabular-nums">{money(amount)}</span>
             </li>
           </ul>
@@ -108,7 +131,7 @@ export function CostReviewView({ review }: { review: CostReview }) {
           <ul className="grid gap-3 text-[15px]">
             {review.changes.map((change) => (
               <li key={change.field} className="grid gap-0.5">
-                <span className="text-[13px] font-bold text-muted">{FIELD_LABELS[change.field]}</span>
+                <span className="text-[13px] font-bold text-muted">{change.field === "main" ? `Amount in ${currency}` : FIELD_LABELS[change.field]}</span>
                 <Before was={change.before} now={change.after} />
               </li>
             ))}
