@@ -12,13 +12,14 @@ const base: CostReview = {
   currency: "PHP",
   description: "Dinner",
   amount: 300000,
+  original: null,
   category: "food",
   spentOn: "2027-05-09",
   payer: ben,
   shares: [
-    { ...maya, amount: 100000, own: null },
-    { ...ben, amount: 100000, own: null },
-    { ...dana, amount: 100000, own: null },
+    { ...maya, amount: 100000, originalAmount: null, own: null },
+    { ...ben, amount: 100000, originalAmount: null, own: null },
+    { ...dana, amount: 100000, originalAmount: null, own: null },
   ],
   uneven: false,
   rest: 300000,
@@ -54,9 +55,9 @@ describe("CostReviewView, new cost", () => {
       amount: 100000,
       payer: maya,
       shares: [
-        { ...maya, amount: 33334, own: null },
-        { ...ben, amount: 33333, own: null },
-        { ...dana, amount: 33333, own: null },
+        { ...maya, amount: 33334, originalAmount: null, own: null },
+        { ...ben, amount: 33333, originalAmount: null, own: null },
+        { ...dana, amount: 33333, originalAmount: null, own: null },
       ],
       extraTakers: [maya],
     });
@@ -90,9 +91,9 @@ describe("CostReviewView, uneven split", () => {
     uneven: true,
     rest: 36000,
     shares: [
-      { ...maya, amount: 79000, own: 70000 },
-      { ...ben, amount: 9000, own: 0 },
-      { ...dana, amount: 39000, own: 30000 },
+      { ...maya, amount: 79000, originalAmount: null, own: 70000 },
+      { ...ben, amount: 9000, originalAmount: null, own: 0 },
+      { ...dana, amount: 39000, originalAmount: null, own: 30000 },
     ],
   };
 

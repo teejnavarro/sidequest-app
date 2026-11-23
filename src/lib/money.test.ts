@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   allocateLike,
   amountText,
+  currencySymbol,
   convertByRate,
   effectiveRateText,
   formatMoney,
   minorDigits,
   parseAmount,
   parseRate,
+  rateText,
   splitByItems,
   splitEqually,
 } from "./money";
@@ -398,5 +400,14 @@ describe("allocateLike", () => {
     const shares = allocateLike(100, w(0, 1, 2), "s0");
     expect(shares[0]?.amount).toBe(0);
     expect(sum(shares)).toBe(100);
+  });
+});
+
+describe("currencySymbol and rateText", () => {
+  it("shows the short sign and a rate as people say it", () => {
+    expect(currencySymbol("PHP")).toBe("₱");
+    expect(currencySymbol("VND")).toBe("₫");
+    expect(currencySymbol("XXXX")).toBe("XXXX");
+    expect(rateText("435", "VND", "PHP")).toBe("₱1 = ₫435");
   });
 });

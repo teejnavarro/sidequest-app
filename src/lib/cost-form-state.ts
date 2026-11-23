@@ -2,7 +2,7 @@ import type { CostDetails } from "@/lib/costs";
 import type { CostErrors, CostInput, CostRaw } from "@/lib/cost-input";
 import { costCategoryOf } from "@/lib/cost-options";
 import { firstNameOf } from "@/lib/display-name";
-import { amountText, formatMoney, splitEqually } from "@/lib/money";
+import { amountText, effectiveRateText, formatMoney, rateText, splitEqually } from "@/lib/money";
 import { dayLabel } from "@/lib/schedule-options";
 
 // What the cost form remembers between tries, and the review shown before saving. Lives
@@ -63,15 +63,19 @@ export function costPeople(
 }
 
 // What a new cost starts as: paid by you, split between everyone, dated today in the trip's
-// time zone, or the trip's first day while the trip hasn't started.
+// time zone, or the trip's first day while the trip hasn't started, in the currency you used
+// last with the latest rate for it (`defaults`, from getNewCostDefaults).
 export function defaultCostValues(options: {
   people: CostPerson[];
   today: string;
   tripStart: string;
+  defaults: { currency: string; rate: string };
 }): CostFormValues {
-  const { people, today, tripStart } = options;
+  const { people, today, tripStart, defaults } = options;
   return {
     ...emptyCostValues,
+    currency: defaults.currency,
+    rate: defaults.rate,
     paidBy: people.find((person) => person.isYou)?.spotId ?? "",
     sharedBy: people.map((person) => person.spotId),
     spentOn: today < tripStart ? tripStart : today,
@@ -83,7 +87,7 @@ export type ReviewPerson ={ spotId: string; name: string; isYou: boolean };
 // One changed field on an edit. Amounts, people and the category are ready to show; the date
 // is shown as "Sat, May 8". Old value first.
 export type CostChange = {
-  field: "amount" | "description" | "paidBy" | "spentOn" | "category";
+  field: "amount" | "main" | "rate" | "description" | "paidBy" | "spentOn" | "category";
   before: string;
   after: string;
 };
@@ -97,11 +101,15 @@ export type CostReview = {
   currency: string;
   description: string;
   amount: number;
+  // A cost in another currency: what was typed, the rate (null when the card amount was typed)
+  // and the rate the amounts work out to ("431.70"). Null for a cost in the trip's currency.
+  original: { currency: string; amount: number; rate: string | null; effectiveRate: string } | null;
   category: string | null;
   spentOn: string;
   payer: ReviewPerson;
-  // `own` is what the person had on an uneven split, null on an equal one.
-  shares: (ReviewPerson & { amount: number; own: number | null })[];
+  // `own` is what the person had on an uneven split, null on an equal one. For a cost in
+  // another currency both are in that currency, and `originalAmount` is the share in it.
+  shares: (ReviewPerson & { amount: number; originalAmount: number | null; own: number | null })[];
   // True when the cost was split by what each person had.
   uneven: boolean;
   // What was left to share equally after the own amounts (the whole amount when equal).
@@ -128,14 +136,19 @@ export type CostFormState = {
 export const CHANGED_NOTICE = "Someone just changed this cost. Check it again.";
 
 // The form values for a saved cost. An equal split opens as equal; anything else opens as an
-// uneven split with every person's full share in their box and nothing left over.
-export function valuesFromCost(saved: CostDetails, amountText_: string): CostFormValues {
+// uneven split with every person's full share in their box and nothing left over. A cost in
+// another currency opens in that currency, with its original amounts and rate (or the card
+// amount), and is checked for equal on the original shares.
+export function valuesFromCost(saved: CostDetails): CostFormValues {
   const spotIds = saved.shares.map((share) => share.spotId);
-  const equal = splitEqually(saved.amount, spotIds, saved.paidBy);
-  const isEqual = equal.every((share, index) => share.amount === saved.shares[index]?.amount);
+  const { original } = saved;
+  const unit = original ?? { amount: saved.amount, currency: saved.currency, rate: null };
+  const part = (share: CostDetails["shares"][number]) => (original ? (share.originalAmount ?? 0) : share.amount);
+  const equal = splitEqually(unit.amount, spotIds, saved.paidBy);
+  const isEqual = equal.every((share, index) => share.amount === part(saved.shares[index]!));
   return {
     description: saved.description,
-    amount: amountText_,
+    amount: amountText(unit.amount, unit.currency),
     paidBy: saved.paidBy,
     sharedBy: spotIds,
     spentOn: saved.spentOn,
@@ -143,11 +156,11 @@ export function valuesFromCost(saved: CostDetails, amountText_: string): CostFor
     split: isEqual ? "equal" : "items",
     own: isEqual
       ? {}
-      : Object.fromEntries(saved.shares.map((share) => [share.spotId, amountText(share.amount, saved.currency)])),
-    currency: "",
-    fx: "rate",
-    rate: "",
-    charged: "",
+      : Object.fromEntries(saved.shares.map((share) => [share.spotId, amountText(part(share), unit.currency)])),
+    currency: original ? original.currency : "",
+    fx: original && original.rate === null ? "charged" : "rate",
+    rate: original?.rate ?? "",
+    charged: original ? amountText(saved.amount, saved.currency) : "",
   };
 }
 
@@ -165,13 +178,17 @@ export function buildCostReview(options: {
   const person = (spotId: string): ReviewPerson =>
     people.find((p) => p.spotId === spotId) ?? { spotId, name: "Someone", isYou: false };
 
+  const { money } = input;
   const shares = input.shares.map((share) => ({
     ...person(share.spotId),
     amount: share.amount,
+    originalAmount: share.originalAmount,
     own: ownParts === null ? null : (ownParts[share.spotId] ?? 0),
   }));
-  // The extra minor unit lives in the equal part only, so take the own amounts out first.
-  const equalPart = (share: (typeof shares)[number]) => share.amount - (share.own ?? 0);
+  // The extra minor unit lives in the equal part only, so take the own amounts out first. On a
+  // cost in another currency the equal part is worked out in that currency.
+  const unitOf = (share: (typeof shares)[number]) => (money.kind === "trip" ? share.amount : (share.originalAmount ?? 0));
+  const equalPart = (share: (typeof shares)[number]) => unitOf(share) - (share.own ?? 0);
   const smallest = Math.min(...shares.map(equalPart));
   const rest = shares.reduce((sum, share) => sum + equalPart(share), 0);
   const extraTakers = shares
@@ -184,7 +201,24 @@ export function buildCostReview(options: {
     const note = (field: CostChange["field"], was: string, now: string) => {
       if (was !== now) changes.push({ field, before: was, after: now });
     };
-    note("amount", formatMoney(before.amount, currency), formatMoney(input.amount, currency));
+    // Amounts are shown in the money they were typed in; when either side is in another
+    // currency, the trip-currency amount and the rate are listed too.
+    const foreign = before.original !== null || money.kind !== "trip";
+    note(
+      "amount",
+      before.original
+        ? formatMoney(before.original.amount, before.original.currency)
+        : formatMoney(before.amount, currency),
+      money.kind === "trip" ? formatMoney(input.amount, currency) : formatMoney(money.original, money.currency),
+    );
+    if (foreign) note("main", formatMoney(before.amount, currency), formatMoney(input.amount, currency));
+    const rateOf = (rate: string | null, other: string, isForeign: boolean) =>
+      !isForeign ? "None" : rate === null ? "Card amount" : rateText(rate, other, currency);
+    note(
+      "rate",
+      rateOf(before.original?.rate ?? null, before.original?.currency ?? "", before.original !== null),
+      rateOf(money.kind === "rate" ? money.rate : null, money.kind === "trip" ? "" : money.currency, money.kind !== "trip"),
+    );
     note("description", before.description, input.description);
     note("paidBy", person(before.paidBy).name, person(input.paidBy).name);
     note("spentOn", dayLabel(before.spentOn), dayLabel(input.spentOn));
@@ -203,6 +237,20 @@ export function buildCostReview(options: {
     currency,
     description: input.description,
     amount: input.amount,
+    original:
+      money.kind === "trip"
+        ? null
+        : {
+            currency: money.currency,
+            amount: money.original,
+            rate: money.kind === "rate" ? money.rate : null,
+            effectiveRate: effectiveRateText({
+              original: money.original,
+              from: money.currency,
+              main: input.amount,
+              to: currency,
+            }),
+          },
     category: input.category,
     spentOn: input.spentOn,
     payer: person(input.paidBy),

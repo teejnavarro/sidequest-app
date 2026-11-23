@@ -214,3 +214,19 @@ export function allocateLike(total: number, weights: Share[], payerId: string): 
   }
   return rows.map((r) => ({ spotId: r.spotId, amount: Number(r.floor) + (bonus.has(r.index) ? 1 : 0) }));
 }
+
+// The short sign for a currency: "₱", "₫", "$". Falls back to the code.
+export function currencySymbol(currency: string): string {
+  try {
+    const parts = new Intl.NumberFormat("en", { style: "currency", currency, currencyDisplay: "narrowSymbol" })
+      .formatToParts(0);
+    return parts.find((part) => part.type === "currency")?.value ?? currency;
+  } catch {
+    return currency;
+  }
+}
+
+// A rate as people say it: "₱1 = ₫435".
+export function rateText(rate: string, from: string, to: string): string {
+  return `${currencySymbol(to)}1 = ${currencySymbol(from)}${rate}`;
+}

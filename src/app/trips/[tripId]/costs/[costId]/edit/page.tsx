@@ -6,7 +6,6 @@ import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember, listCostPeople } from "@/lib/trips";
 import { getCostForMember } from "@/lib/costs";
 import { costPeople, valuesFromCost } from "@/lib/cost-form-state";
-import { amountText } from "@/lib/money";
 import { CostForm } from "@/components/cost-form";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
 import { cardClass, linkClass, screenClass, skeleton } from "@/components/ui";
@@ -38,7 +37,7 @@ async function EditCostContent({ params }: { params: Params }) {
             costId={cost.id}
             currency={cost.currency}
             people={people}
-            values={valuesFromCost(cost, amountText(cost.amount, cost.currency))}
+            values={valuesFromCost(cost)}
             updatedAt={cost.updatedAt.toISOString()}
           />
         </div>

@@ -14,7 +14,6 @@ import {
 } from "@/lib/cost-form-state";
 import { createCost, deleteCost, getCostForMember, updateCost, type CostDetails } from "@/lib/costs";
 import { firstNameOf } from "@/lib/display-name";
-import { amountText } from "@/lib/money";
 import { getTripForMember, listCostPeople } from "@/lib/trips";
 
 // Only these named fields are ever read from the form, plus the trip and cost ids, the mode,
@@ -65,7 +64,7 @@ const DELETE_FAILED = "Couldn't delete the cost. Please try again.";
 function changedState(current: CostDetails): CostFormState {
   return {
     errors: {},
-    values: valuesFromCost(current, amountText(current.amount, current.currency)),
+    values: valuesFromCost(current),
     review: null,
     notice: CHANGED_NOTICE,
     updatedAt: current.updatedAt.toISOString(),

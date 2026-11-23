@@ -225,7 +225,7 @@ describe("whole trips through the cost checks", () => {
             shares,
             updatedAt: new Date(0),
           };
-          const again = validateCostInput(valuesFromCost(saved, amountText(amount, currency)), context);
+          const again = validateCostInput(valuesFromCost(saved), context);
           if (!again.ok) throw new Error(`reopened cost refused: ${JSON.stringify(again.errors)}`);
           expect(again.value.shares).toEqual(shares);
         }

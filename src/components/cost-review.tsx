@@ -6,6 +6,8 @@ import { dayLabel } from "@/lib/schedule-options";
 
 const FIELD_LABELS = {
   amount: "Amount",
+  main: "Amount in trip currency",
+  rate: "Rate",
   description: "What was it?",
   paidBy: "Who paid?",
   spentOn: "Date",

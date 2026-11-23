@@ -65,6 +65,7 @@ const saved = {
   category: "food",
   spentOn: "2027-03-12",
   paidBy: "a",
+  original: null,
   shares: [
     { spotId: "a", amount: 33334, originalAmount: null },
     { spotId: "b", amount: 33333, originalAmount: null },

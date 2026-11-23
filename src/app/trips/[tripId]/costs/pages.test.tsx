@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getTripForMember: vi.fn(),
   listCostPeople: vi.fn(),
   getCostForMember: vi.fn(),
+  getNewCostDefaults: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
   }),
@@ -20,7 +21,10 @@ vi.mock("@/lib/trips", () => ({
   getTripForMember: mocks.getTripForMember,
   listCostPeople: mocks.listCostPeople,
 }));
-vi.mock("@/lib/costs", () => ({ getCostForMember: mocks.getCostForMember }));
+vi.mock("@/lib/costs", () => ({
+  getCostForMember: mocks.getCostForMember,
+  getNewCostDefaults: mocks.getNewCostDefaults,
+}));
 // Show the forms' props as text, so the pages' choices can be read.
 vi.mock("@/components/cost-form", () => ({
   CostForm: (props: Record<string, unknown>) => <pre data-form>{JSON.stringify(props)}</pre>,
@@ -72,9 +76,10 @@ const cost = {
   category: "food",
   spentOn: "2027-05-09",
   paidBy: "b",
+  original: null,
   shares: [
-    { spotId: "a", amount: 62525 },
-    { spotId: "b", amount: 62525 },
+    { spotId: "a", amount: 62525, originalAmount: null },
+    { spotId: "b", amount: 62525, originalAmount: null },
   ],
   updatedAt: new Date("2027-05-09T10:00:00.123Z"),
 };
@@ -87,6 +92,7 @@ beforeEach(() => {
   mocks.getTripForMember.mockResolvedValue(trip);
   mocks.listCostPeople.mockResolvedValue(members);
   mocks.getCostForMember.mockResolvedValue(cost);
+  mocks.getNewCostDefaults.mockResolvedValue({ currency: "PHP", rate: "" });
 });
 
 afterEach(() => {
