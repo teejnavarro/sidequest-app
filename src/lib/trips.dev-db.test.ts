@@ -55,6 +55,8 @@ describe("privacy layer on the dev database", () => {
   async function cleanUp() {
     const { db } = dbModule;
     const { like } = orm;
+    // Costs first (their shares go with them): they point at member rows with no cascade.
+    await db.delete(schema.cost).where(like(schema.cost.createdBy, `${ID_PREFIX}%`));
     // Deleting a trip also deletes its member rows.
     await db.delete(schema.trip).where(like(schema.trip.ownerId, `${ID_PREFIX}%`));
     await db.delete(schema.tripMember).where(like(schema.tripMember.userId, `${ID_PREFIX}%`));
@@ -115,7 +117,7 @@ describe("privacy layer on the dev database", () => {
     await expect(trips.listMyTrips(STRANGER)).resolves.toEqual([]);
     await expect(
       trips.updateTripForMember(tripId, STRANGER, { ...input, name: "Changed by a stranger" }),
-    ).resolves.toBe(false);
+    ).resolves.toBe("not-found");
     await expect(trips.getTripForMember(tripId, OWNER)).resolves.toMatchObject({
       name: input.name,
     });
@@ -125,7 +127,7 @@ describe("privacy layer on the dev database", () => {
     await expect(trips.getTripForMember(`${ID_PREFIX}no-such-trip`, OWNER)).resolves.toBeNull();
     await expect(
       trips.updateTripForMember(`${ID_PREFIX}no-such-trip`, OWNER, input),
-    ).resolves.toBe(false);
+    ).resolves.toBe("not-found");
   });
 
   it("lets a second member see and edit the trip, and the owner stays the owner", async () => {
@@ -142,7 +144,7 @@ describe("privacy layer on the dev database", () => {
       currency: "PHP",
       destination: null,
     };
-    await expect(trips.updateTripForMember(tripId, MEMBER, edited)).resolves.toBe(true);
+    await expect(trips.updateTripForMember(tripId, MEMBER, edited)).resolves.toBe("ok");
 
     const seenByOwner = await trips.getTripForMember(tripId, OWNER);
     expect(seenByOwner).toMatchObject({ ...edited, ownerId: OWNER, ownerName: "Maya Test" });
@@ -324,7 +326,7 @@ describe("privacy layer on the dev database", () => {
       );
       await expect(
         trips.updateTripForMember(withPlace, OWNER, { ...input, name: "Place trip", destination: null }),
-      ).resolves.toBe(true);
+      ).resolves.toBe("ok");
       await expect(trips.getTripForMember(withPlace, OWNER)).resolves.toMatchObject({
         destination: null,
       });
@@ -413,4 +415,38 @@ describe("privacy layer on the dev database", () => {
     });
   });
 
+  it("refuses a currency change once the trip has a cost, but allows the same currency", async () => {
+    const locked = await trips.createTrip(OWNER, { ...input, name: "Locked currency" });
+    const [spot] = await dbModule.db
+      .select({ id: schema.tripMember.id })
+      .from(schema.tripMember)
+      .where(orm.eq(schema.tripMember.tripId, locked));
+    await expect(trips.updateTripForMember(locked, OWNER, { ...input, currency: "PHP" })).resolves.toBe("ok");
+    await expect(trips.updateTripForMember(locked, OWNER, input)).resolves.toBe("ok");
+
+    await dbModule.db.insert(schema.cost).values({
+      id: `${ID_PREFIX}cost-${RUN}`,
+      tripId: locked,
+      description: "Dinner",
+      amount: 5000,
+      currency: "VND",
+      paidBy: spot.id,
+      spentOn: "2027-03-12",
+      createdBy: OWNER,
+      updatedBy: OWNER,
+    });
+    await expect(trips.updateTripForMember(locked, OWNER, { ...input, currency: "PHP" })).resolves.toBe(
+      "currency-locked",
+    );
+    await expect(trips.updateTripForMember(locked, STRANGER, { ...input, currency: "PHP" })).resolves.toBe(
+      "not-found",
+    );
+    await expect(
+      trips.updateTripForMember(locked, OWNER, { ...input, name: "Renamed, same currency" }),
+    ).resolves.toBe("ok");
+    await expect(trips.getTripForMember(locked, OWNER)).resolves.toMatchObject({
+      name: "Renamed, same currency",
+      currency: "VND",
+    });
+  });
 });

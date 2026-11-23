@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember, listTripMembers } from "@/lib/trips";
+import { countCostsForTrip } from "@/lib/costs";
 import { TripForm } from "@/components/trip-form";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
 import { cardClass, helpClass, linkClass, screenClass, skeleton } from "@/components/ui";
@@ -18,6 +19,9 @@ async function EditTripContent({ params }: { params: Promise<{ tripId: string }>
 
   // The owner can only leave after handing the trip to another person, so the hint about that
   // shows only when there is another person (guests can't own a trip).
+  // The currency can't change once the trip has costs.
+  const currencyLocked = (await countCostsForTrip(tripId, user.id)) > 0;
+
   const isOwner = trip.ownerId === user.id;
   const hasOtherPerson = isOwner
     ? (await listTripMembers(tripId, user.id)).filter((member) => !member.isGuest).length > 1
@@ -31,6 +35,7 @@ async function EditTripContent({ params }: { params: Promise<{ tripId: string }>
           <TripForm
             mode="edit"
             tripId={trip.id}
+            currencyLocked={currencyLocked}
             values={{
               name: trip.name,
               startDate: trip.startDate,

@@ -2,12 +2,13 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Plus } from "@phosphor-icons/react/dist/ssr";
+import { CaretRight, Plus } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
-import { listCostsForMember, type CostListItem } from "@/lib/costs";
+import { getBalancesForMember, listCostsForMember, type CostListItem } from "@/lib/costs";
 import { formatMoney } from "@/lib/money";
 import { dayLabel } from "@/lib/schedule-options";
+import { BalanceLine } from "@/components/balance-line";
 import { CostCategoryIcon } from "@/components/cost-category";
 import { cardClass, focusRing, primaryButton, screenClass, skeleton } from "@/components/ui";
 
@@ -68,7 +69,11 @@ async function CostsContent({ params }: { params: Promise<{ tripId: string }> })
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
 
-  const { costs, total } = await listCostsForMember(tripId, user.id);
+  const [{ costs }, balances] = await Promise.all([
+    listCostsForMember(tripId, user.id),
+    getBalancesForMember(tripId, user.id),
+  ]);
+  const myNet = balances.people.find((person) => person.isYou)?.net ?? 0;
 
   const logButton = (
     <Link href={`/trips/${tripId}/costs/new`} className={`${primaryButton} w-full`}>
@@ -91,12 +96,19 @@ async function CostsContent({ params }: { params: Promise<{ tripId: string }> })
 
   return (
     <main className={`${screenClass} flex-1`}>
-      <section aria-label="Total" className={`${cardClass} gap-1 px-5 py-4`}>
-        <p className="text-[13px] font-bold text-muted">Logged so far</p>
-        <p className="font-display text-[30px] leading-none font-bold tabular-nums">
-          {formatMoney(total, trip.currency)}
+      <section aria-label="Your balance" className={`${cardClass} gap-1 px-5 py-4`}>
+        <p className="text-[13px] font-bold text-muted">Your balance for this trip</p>
+        <BalanceLine net={myNet} currency={trip.currency} className="font-display text-[30px] leading-none" />
+        <p className="text-[13px] text-muted">
+          {formatMoney(balances.total, trip.currency)} logged in {count(balances.costCount, "cost")}
         </p>
-        <p className="text-[13px] text-muted">{count(costs.length, "cost")}. Who owes whom comes soon.</p>
+        <Link
+          href={`/trips/${tripId}/costs/balances`}
+          className={`mt-2 flex min-h-11 items-center justify-between gap-2 rounded-full bg-chip px-4 text-sm font-bold ${focusRing}`}
+        >
+          See who owes whom
+          <CaretRight size={16} weight="bold" aria-hidden="true" />
+        </Link>
       </section>
 
       {logButton}

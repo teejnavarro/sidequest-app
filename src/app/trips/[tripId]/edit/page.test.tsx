@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getTripForMember: vi.fn(),
   listTripMembers: vi.fn(),
+  countCostsForTrip: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
   }),
@@ -17,6 +18,7 @@ vi.mock("@/lib/trips", () => ({
   getTripForMember: mocks.getTripForMember,
   listTripMembers: mocks.listTripMembers,
 }));
+vi.mock("@/lib/costs", () => ({ countCostsForTrip: mocks.countCostsForTrip }));
 vi.mock("@/components/trip-form", () => ({ TripForm: () => null }));
 
 // The page is a tree of React elements, which can point back at themselves (a link
@@ -48,6 +50,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.listTripMembers.mockResolvedValue([]);
+  mocks.countCostsForTrip.mockResolvedValue(0);
 });
 
 // The layout's check does not protect this page, so the page must check for itself.
@@ -78,6 +81,29 @@ describe("EditTripPage", () => {
     });
     const page = await renderContent();
     expect(show(page)).toContain("Hội An long weekend");
+  });
+});
+
+describe("EditTripPage currency lock", () => {
+  const trip = {
+    id: "trip-1",
+    name: "Hội An long weekend",
+    startDate: "2027-03-12",
+    endDate: "2027-03-15",
+    timeZone: "Asia/Ho_Chi_Minh",
+    currency: "VND",
+    destination: null,
+    ownerId: "u1",
+    ownerName: "Someone",
+    ownerImage: null,
+  };
+
+  it("passes currencyLocked false while the trip has no costs, and true once it has", async () => {
+    mocks.getTripForMember.mockResolvedValue(trip);
+    expect(show(await renderContent())).toContain('"currencyLocked":false');
+    expect(mocks.countCostsForTrip).toHaveBeenCalledWith("trip-1", "u1");
+    mocks.countCostsForTrip.mockResolvedValue(3);
+    expect(show(await renderContent())).toContain('"currencyLocked":true');
   });
 });
 

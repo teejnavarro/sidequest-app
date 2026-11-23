@@ -16,10 +16,12 @@ const base: CostReview = {
   spentOn: "2027-05-09",
   payer: ben,
   shares: [
-    { ...maya, amount: 100000 },
-    { ...ben, amount: 100000 },
-    { ...dana, amount: 100000 },
+    { ...maya, amount: 100000, own: null },
+    { ...ben, amount: 100000, own: null },
+    { ...dana, amount: 100000, own: null },
   ],
+  uneven: false,
+  rest: 300000,
   extraTakers: [],
   changes: [],
   shareChanges: [],
@@ -41,7 +43,7 @@ describe("CostReviewView, new cost", () => {
   it("writes You for the viewer, one line per person and a total", () => {
     const out = html({ ...base, payer: maya });
     expect(out).toContain("You paid ₱3,000.00");
-    expect(out).toMatch(/>You<\/span><span[^>]*>₱1,000\.00<\/span>/);
+    expect(out).toMatch(/>You<\/span><\/span><span[^>]*>₱1,000\.00<\/span>/);
     expect(out).toContain(">Dana<");
     expect(out).toContain(">Total<");
   });
@@ -52,9 +54,9 @@ describe("CostReviewView, new cost", () => {
       amount: 100000,
       payer: maya,
       shares: [
-        { ...maya, amount: 33334 },
-        { ...ben, amount: 33333 },
-        { ...dana, amount: 33333 },
+        { ...maya, amount: 33334, own: null },
+        { ...ben, amount: 33333, own: null },
+        { ...dana, amount: 33333, own: null },
       ],
       extraTakers: [maya],
     });
@@ -77,6 +79,44 @@ describe("CostReviewView, new cost", () => {
     expect(out).toContain("₫1,000");
     expect(out).not.toContain("₫1,000.00");
     expect(out).toContain("takes the extra dong");
+  });
+});
+
+describe("CostReviewView, uneven split", () => {
+  const uneven: CostReview = {
+    ...base,
+    amount: 186000,
+    payer: ben,
+    uneven: true,
+    rest: 36000,
+    shares: [
+      { ...maya, amount: 79000, own: 70000 },
+      { ...ben, amount: 9000, own: 0 },
+      { ...dana, amount: 39000, own: 30000 },
+    ],
+  };
+
+  it("says own plus shared under each name, and no 'each' in the summary", () => {
+    const out = html(uneven);
+    expect(out).toContain("Ben paid ₱1,860.00, split 3 ways");
+    expect(out).not.toContain("= ₱");
+    expect(out).toContain("₱700.00 own + ₱90.00 shared");
+    expect(out).toContain(">₱90.00 shared<");
+    expect(out).toContain("₱300.00 own + ₱90.00 shared");
+    expect(out).toContain(">₱790.00<");
+    expect(out).not.toContain("doesn&#x27;t split evenly");
+  });
+
+  it("explains the extra centavo from the left-over part only", () => {
+    const out = html({ ...uneven, rest: 36001, extraTakers: [ben] });
+    expect(out).toContain(
+      "₱360.01 left over doesn&#x27;t split evenly 3 ways, so Ben takes the extra centavo. The shares always add up to the total.",
+    );
+  });
+
+  it("shows nothing extra on an equal split", () => {
+    expect(html(base)).not.toContain(" own + ");
+    expect(html(base)).not.toContain(" shared<");
   });
 });
 

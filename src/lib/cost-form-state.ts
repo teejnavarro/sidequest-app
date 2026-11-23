@@ -2,7 +2,7 @@ import type { CostDetails } from "@/lib/costs";
 import type { CostErrors, CostInput, CostRaw } from "@/lib/cost-input";
 import { costCategoryOf } from "@/lib/cost-options";
 import { firstNameOf } from "@/lib/display-name";
-import { formatMoney } from "@/lib/money";
+import { amountText, formatMoney, splitEqually } from "@/lib/money";
 import { dayLabel } from "@/lib/schedule-options";
 
 // What the cost form remembers between tries, and the review shown before saving. Lives
@@ -18,6 +18,8 @@ export const emptyCostValues: CostFormValues = {
   sharedBy: [],
   spentOn: "",
   category: "",
+  split: "equal",
+  own: {},
 };
 
 // A person (or guest) the cost can be paid by or shared with. `userId` only colors the face.
@@ -94,8 +96,13 @@ export type CostReview = {
   category: string | null;
   spentOn: string;
   payer: ReviewPerson;
-  shares: (ReviewPerson & { amount: number })[];
-  // Who got one more minor unit than the smallest share. Empty when it splits evenly.
+  // `own` is what the person had on an uneven split, null on an equal one.
+  shares: (ReviewPerson & { amount: number; own: number | null })[];
+  // True when the cost was split by what each person had.
+  uneven: boolean;
+  // What was left to share equally after the own amounts (the whole amount when equal).
+  rest: number;
+  // Who got one more minor unit than the smallest equal part. Empty when it divides evenly.
   extraTakers: ReviewPerson[];
   // Edits only: what changed, and nothing for a new cost.
   changes: CostChange[];
@@ -116,15 +123,23 @@ export type CostFormState = {
 
 export const CHANGED_NOTICE = "Someone just changed this cost. Check it again.";
 
-// The form values for a saved cost.
-export function valuesFromCost(saved: CostDetails, amountText: string): CostFormValues {
+// The form values for a saved cost. An equal split opens as equal; anything else opens as an
+// uneven split with every person's full share in their box and nothing left over.
+export function valuesFromCost(saved: CostDetails, amountText_: string): CostFormValues {
+  const spotIds = saved.shares.map((share) => share.spotId);
+  const equal = splitEqually(saved.amount, spotIds, saved.paidBy);
+  const isEqual = equal.every((share, index) => share.amount === saved.shares[index]?.amount);
   return {
     description: saved.description,
-    amount: amountText,
+    amount: amountText_,
     paidBy: saved.paidBy,
-    sharedBy: saved.shares.map((share) => share.spotId),
+    sharedBy: spotIds,
     spentOn: saved.spentOn,
     category: saved.category ?? "",
+    split: isEqual ? "equal" : "items",
+    own: isEqual
+      ? {}
+      : Object.fromEntries(saved.shares.map((share) => [share.spotId, amountText(share.amount, saved.currency)])),
   };
 }
 
@@ -132,18 +147,27 @@ export function valuesFromCost(saved: CostDetails, amountText: string): CostForm
 // a name. For an edit, `before` is the cost as it is saved now.
 export function buildCostReview(options: {
   currency: string;
-  input: CostInput;
+  // `ownParts` is what each person had on an uneven split (from validateCostInput), else null.
+  input: CostInput & { ownParts: Record<string, number> | null };
   people: ReviewPerson[];
   before: CostDetails | null;
 }): CostReview {
   const { currency, input, people, before } = options;
+  const { ownParts } = input;
   const person = (spotId: string): ReviewPerson =>
     people.find((p) => p.spotId === spotId) ?? { spotId, name: "Someone", isYou: false };
 
-  const shares = input.shares.map((share) => ({ ...person(share.spotId), amount: share.amount }));
-  const smallest = Math.min(...shares.map((share) => share.amount));
+  const shares = input.shares.map((share) => ({
+    ...person(share.spotId),
+    amount: share.amount,
+    own: ownParts === null ? null : (ownParts[share.spotId] ?? 0),
+  }));
+  // The extra minor unit lives in the equal part only, so take the own amounts out first.
+  const equalPart = (share: (typeof shares)[number]) => share.amount - (share.own ?? 0);
+  const smallest = Math.min(...shares.map(equalPart));
+  const rest = shares.reduce((sum, share) => sum + equalPart(share), 0);
   const extraTakers = shares
-    .filter((share) => share.amount > smallest)
+    .filter((share) => equalPart(share) > smallest)
     .map(({ spotId, name, isYou }) => ({ spotId, name, isYou }));
 
   const changes: CostChange[] = [];
@@ -175,6 +199,8 @@ export function buildCostReview(options: {
     spentOn: input.spentOn,
     payer: person(input.paidBy),
     shares,
+    uneven: ownParts !== null,
+    rest,
     extraTakers,
     changes,
     shareChanges,

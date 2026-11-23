@@ -116,10 +116,21 @@ describe("updateTripForMember", () => {
     expect(params).toEqual(expect.arrayContaining(["trip-1", "u1", input.name]));
   });
 
-  it("says false when nothing changed and true when a row changed", async () => {
-    await expect(updateTripForMember("trip-1", "stranger", input)).resolves.toBe(false);
+  it("only changes the currency while the trip has no costs, inside the same update", async () => {
+    await updateTripForMember("trip-1", "u1", input);
+    const [{ sql }] = fake.queries;
+    expect(sql).toMatch(/"trip"\."currency" = \$\d+ or not exists \(select "id" from "cost"/);
+  });
+
+  it("says not-found for a stranger, currency-locked for a member, ok when a row changed", async () => {
+    await expect(updateTripForMember("trip-1", "stranger", input)).resolves.toBe("not-found");
+    expect(fake.queries).toHaveLength(2);
+    expect(fake.queries[1].sql).toContain('"viewer"."user_id" =');
+    fake.queue = [[], [["trip-1"]]];
+    await expect(updateTripForMember("trip-1", "u1", input)).resolves.toBe("currency-locked");
+    fake.queue = [];
     fake.rows = [["trip-1"]];
-    await expect(updateTripForMember("trip-1", "u1", input)).resolves.toBe(true);
+    await expect(updateTripForMember("trip-1", "u1", input)).resolves.toBe("ok");
   });
 });
 
@@ -219,9 +230,9 @@ describe("people in the list and on the invite", () => {
   it("lists each trip's members with one extra query, never one per trip", async () => {
     fake.queue = [
       [
-        ["t1", "Trip one", "2027-03-12", "2027-03-15", "Asia/Manila", "PHP", null],
-        ["t2", "Trip two", "2027-04-01", "2027-04-02", "Asia/Manila", "PHP", "Cebu"],
-        ["t3", "Trip three", "2027-05-01", "2027-05-02", "Asia/Manila", "PHP", null],
+        ["t1", "Trip one", "2027-03-12", "2027-03-15", "Asia/Manila", "PHP", null, "125000"],
+        ["t2", "Trip two", "2027-04-01", "2027-04-02", "Asia/Manila", "PHP", "Cebu", "-40000"],
+        ["t3", "Trip three", "2027-05-01", "2027-05-02", "Asia/Manila", "PHP", null, null],
       ],
       [
         ["t1", "u1", "Maya", null],
@@ -243,6 +254,8 @@ describe("people in the list and on the invite", () => {
     expect(listed[1].members.map((m) => m.id)).toEqual(["u1"]);
     expect(listed[2].members).toEqual([]);
     expect(listed[1].destination).toBe("Cebu");
+    expect(listed.map((row) => row.myBalance)).toEqual([125000, -40000, null]);
+    expect(first.sql).toContain('"cost"."currency" = "trip"."currency"');
   });
 
   it("asks for people only about the person's own trips, and skips the query when there are none", async () => {
@@ -251,7 +264,7 @@ describe("people in the list and on the invite", () => {
   });
 
   it("never asks for an email or the invite code in the list", async () => {
-    fake.queue = [[["t1", "Trip", "2027-03-12", "2027-03-15", "Asia/Manila", "PHP", null]], []];
+    fake.queue = [[["t1", "Trip", "2027-03-12", "2027-03-15", "Asia/Manila", "PHP", null, null]], []];
     await listMyTrips("u1");
     for (const { sql } of fake.queries) {
       expect(sql).not.toContain("email");
@@ -320,13 +333,13 @@ describe("people lists include guests", () => {
 
   it("keeps guests in every list that counts people", async () => {
     fake.queue = [
-      [["t1", "Trip", "2027-03-12", "2027-03-15", "Asia/Manila", "PHP", null]],
+      [["t1", "Trip", "2027-03-12", "2027-03-15", "Asia/Manila", "PHP", null, null]],
       [],
       [["t1", "Trip", "2027-03-12", "2027-03-15", "Cebu", "Maya"]],
     ];
     await listMyTrips("u1");
     await getTripByInviteCode(CODE);
-    const peopleQueries = fake.queries.filter((q) => q.sql.includes("coalesce"));
+    const peopleQueries = fake.queries.filter((q) => q.sql.includes('"trip_member"."guest_name"'));
     expect(peopleQueries).toHaveLength(2);
     for (const { sql } of peopleQueries) expect(sql).toContain('left join "user"');
   });

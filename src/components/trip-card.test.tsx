@@ -22,6 +22,7 @@ const trip = {
   currency: "PHP",
   destination: null as string | null,
   members: [person(1), person(2), person(3)],
+  myBalance: null as number | null,
 };
 
 // 2027-03-01 at noon in Manila: the trip is 11 days away.
@@ -77,6 +78,16 @@ describe("TripCard", () => {
 
   it("lets a long name wrap", () => {
     expect(html({ name: "A".repeat(80) })).toMatch(/<h2 class="[^"]*wrap-anywhere/);
+  });
+
+  it("shows the viewer's balance for this trip in words, and nothing when there are no costs", () => {
+    expect(html({ myBalance: 125000 })).toMatch(/text-owed[^>]*>You&#x27;re owed ₱1,250.00</);
+    expect(html({ myBalance: -40000 })).toMatch(/text-owe[^>]*>You owe ₱400.00</);
+    const settled = html({ myBalance: 0 });
+    expect(settled).toContain("All settled");
+    expect(settled).not.toMatch(/text-owed|text-owe[ "]/);
+    const none = html();
+    expect(none).not.toMatch(/owed|You owe|All settled/);
   });
 
   it("shows the dates as a route line", () => {

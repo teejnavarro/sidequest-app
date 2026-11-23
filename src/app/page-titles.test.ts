@@ -11,6 +11,7 @@ const pages: [string, string][] = [
   ["src/app/trips/[tripId]/(tabs)/ideas/page.tsx", "Ideas | Sidequest"],
   ["src/app/trips/[tripId]/(tabs)/bookings/page.tsx", "Bookings | Sidequest"],
   ["src/app/trips/[tripId]/(tabs)/costs/page.tsx", "Costs | Sidequest"],
+  ["src/app/trips/[tripId]/costs/balances/page.tsx", "Balances | Sidequest"],
   ["src/app/trips/[tripId]/edit/page.tsx", "Edit trip | Sidequest"],
   ["src/app/trips/[tripId]/invite/page.tsx", "Invite people | Sidequest"],
   ["src/app/trips/[tripId]/delete/page.tsx", "Delete trip | Sidequest"],

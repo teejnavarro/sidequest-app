@@ -1,7 +1,8 @@
 # Project Brief — Sidequest
 
 Approved by the owner on 2026-10-31, and the amended version (stages, payment details, gap
-fixes) approved the same day. Amended again on 2026-11-14 (earlier dates, build in bundles).
+fixes) approved the same day. Amended again on 2026-11-14 (earlier dates, build in bundles)
+and on 2026-11-17 (uneven splits: what each person had, the rest shared equally).
 This brief is the contract; changes need the owner's approval.
 
 ```
@@ -96,7 +97,8 @@ STAGE 1 — Planning (built between 18 December 2026 and mid-January 2027)
                  - Clearly labelled as the plan; Costs shows what was actually paid
   Costs
                  - Shared costs like Splitwise: anyone logs a cost, who paid,
-                   split equally among chosen people; running balances
+                   split equally among chosen people, or by what each
+                   person had with the rest shared equally; running balances
                    (who owes whom); a settle-up summary with the fewest payments
                  - Optional category on each cost: Food, Transport, Lodging,
                    Activities, Shopping, Other
@@ -163,7 +165,7 @@ Out of scope:    - Native iPhone/Android apps or app store publishing
                  - Automatic rule-based scheduling (replaced by the Phase 2 AI draft)
                  - Editing while offline (viewing only)
                  - A combined balance across all trips (possible later)
-                 - Custom split amounts, live exchange rates, maps, travel times,
+                 - Splitting by percent or by shares, live exchange rates, maps, travel times,
                    opening-hours checks, overlap warnings, packing lists, receipt
                    photos for costs, comments on items, pasalubong list
                    (possible later)

@@ -8,7 +8,7 @@ const people = [
   { spotId: "b", name: "Ben", isYou: false },
   { spotId: "c", name: "Dana", isYou: false },
 ];
-const context = { currency: "PHP", spotIds: ["a", "b", "c"] };
+const context = { currency: "PHP", spotIds: ["a", "b", "c"], names: { a: "You", b: "Ben", c: "Dana" } };
 
 function checked(overrides: Record<string, unknown> = {}) {
   const result = validateCostInput(
@@ -55,6 +55,20 @@ describe("buildCostReview for a new cost", () => {
     expect(several.extraTakers.map((p) => p.name)).toEqual(["Maya", "Ben"]);
     const even = buildCostReview({ currency: "PHP", input: checked({ amount: "900" }), people, before: null });
     expect(even.extraTakers).toEqual([]);
+  });
+
+  it("shows what each person had on an uneven split, and the extra unit comes from the equal part only", () => {
+    const uneven = checked({ amount: "1000.01", paidBy: "b", split: "items", own: { a: "700" } });
+    const review = buildCostReview({ currency: "PHP", input: uneven, people, before: null });
+    expect(review.uneven).toBe(true);
+    expect(review.shares.map((s) => s.own)).toEqual([70000, 0, 0]);
+    expect(review.rest).toBe(30001);
+    // equal parts 10001 (Ben, payer), 10000, 10000: only Ben holds the extra unit
+    expect(review.extraTakers.map((p) => p.name)).toEqual(["Ben"]);
+    expect(buildCostReview({ currency: "PHP", input: checked(), people, before: null })).toMatchObject({
+      uneven: false,
+      rest: 100000,
+    });
   });
 
   it("falls back to Someone for a spot it does not know", () => {
@@ -114,8 +128,43 @@ describe("valuesFromCost", () => {
       sharedBy: ["a", "b", "c"],
       spentOn: "2027-03-12",
       category: "food",
+      split: "equal",
+      own: {},
     });
     expect(valuesFromCost({ ...saved, category: null }, "1").category).toBe("");
+  });
+
+  it("reopens an uneven cost as items with every person's full share", () => {
+    const uneven = {
+      ...saved,
+      amount: 186000,
+      paidBy: "b",
+      shares: [
+        { spotId: "a", amount: 98666 },
+        { spotId: "b", amount: 28667 },
+        { spotId: "c", amount: 58667 },
+      ],
+    };
+    const values = valuesFromCost(uneven, "1860.00");
+    expect(values.split).toBe("items");
+    expect(values.own).toEqual({ a: "986.66", b: "286.67", c: "586.67" });
+  });
+
+  it("saves an unchanged uneven cost again with the same shares", () => {
+    const uneven = {
+      ...saved,
+      amount: 186000,
+      paidBy: "b",
+      shares: [
+        { spotId: "a", amount: 79000 },
+        { spotId: "b", amount: 9000 },
+        { spotId: "c", amount: 98000 },
+      ],
+    };
+    const values = valuesFromCost(uneven, "1860.00");
+    const again = validateCostInput(values, context);
+    if (!again.ok) throw new Error(JSON.stringify(again.errors));
+    expect(again.value.shares).toEqual(uneven.shares);
   });
 });
 
@@ -134,6 +183,8 @@ describe("defaultCostValues", () => {
       sharedBy: ["a", "b", "g"],
       spentOn: "2027-05-09",
       category: "",
+      split: "equal",
+      own: {},
     });
   });
 

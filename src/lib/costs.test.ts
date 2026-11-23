@@ -3,6 +3,7 @@ import {
   countCostsForTrip,
   createCost,
   deleteCost,
+  getBalancesForMember,
   getCostForMember,
   listCostsForMember,
   updateCost,
@@ -230,5 +231,52 @@ describe("deleteCost and countCostsForTrip", () => {
     expect(fake.queries[0].sql).toContain('"viewer"."user_id" = $');
     fake.rows = [];
     await expect(countCostsForTrip("trip-1", "stranger")).resolves.toBe(0);
+  });
+});
+
+describe("getBalancesForMember", () => {
+  it("checks membership and the trip currency in the same queries, and returns no email", async () => {
+    await expect(getBalancesForMember("trip-1", "stranger")).resolves.toEqual({
+      people: [],
+      payments: [],
+      total: 0,
+      costCount: 0,
+    });
+    expect(fake.queries).toHaveLength(2);
+    for (const { sql, params } of fake.queries) {
+      expect(sql).toContain('"viewer"."user_id" = $');
+      expect(sql).toContain('"cost"."currency" = "trip"."currency"');
+      expect(sql).not.toContain("email");
+      expect(params).toEqual(expect.arrayContaining(["trip-1", "stranger"]));
+    }
+    expect(fake.queries[0].sql).toMatch(/order by "trip_member"."joined_at" asc/i);
+  });
+
+  it("works out nets and the fewest payments, and keeps a left person who still owes", async () => {
+    // spotId, id, name, image, isGuest, isYou, hasLeft, paid, share
+    fake.queue = [
+      [
+        ["s1", "u1", "Maya Cruz", null, false, true, false, "600000", "322333"],
+        ["s2", "u2", "Bea Lim", null, false, false, false, "244000", "354333"],
+        ["s3", "u3", "Jun Diaz", null, false, false, false, "362000", "321000"],
+        ["s4", "s4", "Dana", null, true, false, true, "100000", "308334"],
+        ["s5", "u5", "Gone Even", null, false, false, true, "0", "0"],
+      ],
+      [["6", "1306000"]],
+    ];
+    const result = await getBalancesForMember("trip-1", "u1");
+    expect(result.people.map((p) => [p.name, p.net, p.hasLeft, p.isGuest, p.isYou])).toEqual([
+      ["Maya", 277667, false, false, true],
+      ["Bea", -110333, false, false, false],
+      ["Jun", 41000, false, false, false],
+      ["Dana", -208334, true, true, false],
+    ]);
+    expect(result.payments).toEqual([
+      { from: "s2", to: "s1", amount: 69333 },
+      { from: "s2", to: "s3", amount: 41000 },
+      { from: "s4", to: "s1", amount: 208334 },
+    ]);
+    expect(result.total).toBe(1306000);
+    expect(result.costCount).toBe(6);
   });
 });

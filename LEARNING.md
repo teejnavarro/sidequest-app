@@ -581,3 +581,52 @@ holds it.
 
 One new empty column, `trip_member.left_at`. The live code ignores it, so the migration can run
 before the new code goes out, with the owner's OK.
+
+## Chapter 13: Who owes whom
+
+### The problem
+
+After a trip with six costs and four people, everyone asks the same thing: "Do I owe anyone, and how
+much?" We could keep a running tally for each person and update it every time a cost is added,
+edited or deleted. That is easy to get wrong, and once it is wrong nobody can tell.
+
+### The idea: a calculator, not a second notebook
+
+We don't store balances at all. Every time you open the page, the app adds up what each person
+paid and what each person's share was, straight from the costs. Paid minus share is the balance.
+Think of a shared tab at a restaurant: if you put in more than you ate, you are owed the
+difference. Because every peso put in was eaten by someone, all the balances always add up to
+exactly zero. Since nothing extra is stored, the balances can never drift away from the costs, and
+this story needed no database change.
+
+### Why "fewest payments" needs one more step
+
+The simple way is "the person who owes most pays the person owed most", over and over. It always
+works, but it is not always the fewest payments. Sometimes a small group already cancels out by
+itself: two people owe exactly what two others are owed. The app first looks for those groups, like
+sorting laundry into matching piles before folding, and settles each group on its own. That gives
+the true fewest. Looking at every possible group gets slow with many people, so above 12 people
+with a balance the app falls back to the simple way.
+
+### Money stays in whole centavos
+
+All amounts are whole numbers of the smallest unit (centavos for pesos), never decimals like 0.1,
+because a computer adds 0.1 and 0.2 and gets 0.30000000000000004. When an amount doesn't divide
+evenly, the extra centavo goes to the person who paid, then the others in order, so the shares
+always add up to the total.
+
+### Uneven splits
+
+Sometimes one person had the expensive dish. You can now type what each person had, and the rest is
+shared equally. Each person's share is their own amount plus an equal part of what is left. These
+shares are saved exactly like equal ones, so balances need no changes. When you reopen the cost,
+every person's full share is in their box, so saving it again changes nothing.
+
+### Two small safety rules
+
+The trip's currency locks once it has costs, so a trip can't mix pesos and yen in one total. And a
+person who left still shows in balances while they owe or are owed money, marked "left the trip".
+
+### No live database update needed
+
+Nothing new is stored, so there is no migration for this story.

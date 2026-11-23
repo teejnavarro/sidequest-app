@@ -99,3 +99,30 @@ export function splitEqually(total: number, spotIds: string[], payerId: string):
   const gets = new Set(order.slice(0, extra));
   return spotIds.map((spotId) => ({ spotId, amount: base + (gets.has(spotId) ? 1 : 0) }));
 }
+
+export type OwnAmount = { spotId: string; own: number }; // own > 0
+
+// An uneven split: each person's share is what they had (their own amount, 0 if none) plus
+// an equal part of what is left over, split with splitEqually. Own amounts for people not in
+// `sharedBy` are ignored. Null when the own amounts add up to more than `total`.
+export function splitByItems(
+  total: number,
+  sharedBy: string[],
+  own: OwnAmount[],
+  payerId: string,
+): { shares: (Share & { own: number; equalPart: number })[]; rest: number } | null {
+  const ownBySpot = new Map(
+    own.filter((o) => sharedBy.includes(o.spotId)).map((o) => [o.spotId, o.own]),
+  );
+  let rest = total;
+  for (const amount of ownBySpot.values()) rest -= amount;
+  if (rest < 0) return null;
+  const equal = splitEqually(rest, sharedBy, payerId);
+  return {
+    rest,
+    shares: equal.map(({ spotId, amount }) => {
+      const mine = ownBySpot.get(spotId) ?? 0;
+      return { spotId, amount: mine + amount, own: mine, equalPart: amount };
+    }),
+  };
+}

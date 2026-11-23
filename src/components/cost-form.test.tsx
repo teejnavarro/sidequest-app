@@ -3,6 +3,18 @@ import { describe, expect, it, vi } from "vitest";
 import { CostForm } from "./cost-form";
 import { emptyCostValues, type CostPerson } from "@/lib/cost-form-state";
 
+// A static render can't run the server action, so a test that needs the state the server
+// sends back (errors) sets `serverState`; every other test gets React's own hook.
+const fake = vi.hoisted(() => ({ serverState: null as unknown }));
+vi.mock("react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react")>();
+  return {
+    ...actual,
+    useActionState: ((action: never, initial: never) =>
+      fake.serverState ? [fake.serverState, () => {}, false] : actual.useActionState(action, initial)) as typeof actual.useActionState,
+  };
+});
+
 vi.mock("@/app/trips/[tripId]/costs/actions", () => ({
   reviewOrSaveCostAction: async () => ({ errors: {}, values: {}, review: null, notice: null, updatedAt: "" }),
 }));
@@ -20,6 +32,8 @@ const filled = {
   sharedBy: ["a", "b"],
   spentOn: "2027-05-09",
   category: "food",
+  split: "equal",
+  own: {},
 };
 
 const form = (extra: Partial<Parameters<typeof CostForm>[0]> = {}) =>
@@ -39,7 +53,7 @@ const form = (extra: Partial<Parameters<typeof CostForm>[0]> = {}) =>
 describe("CostForm", () => {
   it("keeps every field name the server reads, plus the hidden ones", () => {
     const html = form();
-    for (const name of ["description", "amount", "paidBy", "sharedBy", "spentOn", "category", "tripId", "costId", "mode", "step", "updatedAt"]) {
+    for (const name of ["description", "amount", "paidBy", "sharedBy", "split", "spentOn", "category", "tripId", "costId", "mode", "step", "updatedAt"]) {
       expect(html).toContain(`name="${name}"`);
     }
     expect(html).toContain('name="step" value="review"');
@@ -52,7 +66,7 @@ describe("CostForm", () => {
     expect(html).toContain("What was it?");
     expect(html).toContain(">Amount<");
     expect(html).toContain("Who paid?");
-    expect(html).toContain("Split equally between");
+    expect(html).toContain("Split between");
     expect(html).toContain(">Date<");
     expect(html).toContain("Category (optional)");
     expect(html).toContain(">Review<");
@@ -99,6 +113,72 @@ describe("CostForm", () => {
     const html = form({ mode: "edit", updatedAt: "2027-05-09T10:00:00.123Z", values: filled });
     expect(html).toContain('name="mode" value="edit"');
     expect(html).toContain('name="updatedAt" value="2027-05-09T10:00:00.123Z"');
+  });
+});
+
+describe("CostForm, uneven split panel", () => {
+  const items = {
+    ...filled,
+    amount: "1860",
+    sharedBy: ["a", "b", "g"],
+    split: "items",
+    own: { a: "700", b: "", g: "300" },
+  };
+
+  it("starts closed on an equal split: a disclosure button, split=equal, no own boxes", () => {
+    const html = form();
+    expect(html).toContain("Not an even split? Add what each person had");
+    expect(html).toMatch(/aria-expanded="false"/);
+    expect(html).toContain('name="split" value="equal"');
+    expect(html).not.toContain('name="own:');
+  });
+
+  it("opens on load for an uneven cost, with one box per ticked person and split=items", () => {
+    const html = form({ values: items });
+    expect(html).toMatch(/aria-expanded="true"/);
+    expect(html).toContain('name="split" value="items"');
+    expect(html).not.toContain('name="split" value="equal"');
+    expect(html.match(/name="own:/g)).toHaveLength(3);
+    expect(html).toContain('name="own:a" value="700"');
+    expect(html).toContain("Leave a box empty if they only share the rest.");
+    expect(html).toContain("Your amount");
+  });
+
+  it("only offers a box to people who are ticked", () => {
+    const html = form({ values: { ...items, sharedBy: ["a", "b"] } });
+    expect(html.match(/name="own:/g)).toHaveLength(2);
+    expect(html).not.toContain('name="own:g"');
+  });
+
+  it("shows the live helper: left over and the equal part, or over the total in red", () => {
+    expect(form({ values: items })).toContain("₱860.00 left over, shared equally<");
+    expect(form({ values: { ...items, own: { a: "600", g: "300" } } })).toContain(
+      "₱960.00 left over, shared equally: ₱320.00 each",
+    );
+    const over = form({ values: { ...items, own: { a: "1,000", g: "900" } } });
+    expect(over).toContain("That&#x27;s ₱40.00 more than the total.");
+    expect(over).toContain("text-owe");
+    expect(form({ values: { ...items, amount: "1000.01", own: { a: "100" } } })).toContain(
+      "₱900.01 left over, shared equally<",
+    );
+  });
+
+  it("links the server's own-amount error to every box, so a screen reader reads it", () => {
+    const message = "That's ₱40.00 more than the total.";
+    fake.serverState = { errors: { own: message }, values: items, review: null, notice: null, updatedAt: "" };
+    try {
+      const html = form({ values: items });
+      expect(html).toContain('id="own-error"');
+      expect(html).toContain("That&#x27;s ₱40.00 more than the total.");
+      expect(html.match(/aria-describedby="own-error"/g)).toHaveLength(3);
+      expect(html.match(/name="own:[^"]*"[^>]*aria-invalid="true"|aria-invalid="true"[^>]*name="own:/g)).toHaveLength(3);
+    } finally {
+      fake.serverState = null;
+    }
+    // Without an error the boxes are not marked.
+    const clean = form({ values: items });
+    expect(clean).not.toContain('aria-describedby="own-error"');
+    expect(clean).not.toContain('id="own-error"');
   });
 });
 
