@@ -173,6 +173,24 @@ describe("reviewOrSaveCostAction, new cost", () => {
     expect(mocks.createCost).not.toHaveBeenCalled();
   });
 
+  it("reads the currency, fx, rate and charged fields and saves the converted cost", async () => {
+    const send = (extra: Record<string, string>) =>
+      reviewOrSaveCostAction(initial, form({ currency: "VND", amount: "870,000", rate: "435", ...extra }));
+    const review = await send({});
+    expect(review.errors).toEqual({});
+    expect(review.values).toMatchObject({ currency: "VND", fx: "rate", rate: "435", charged: "" });
+    await expect(send({ step: "save" })).rejects.toThrow(LIST);
+    expect(mocks.createCost).toHaveBeenLastCalledWith(
+      "trip-1",
+      "u1",
+      COST_ID,
+      expect.objectContaining({ amount: 200000, money: { kind: "rate", currency: "VND", original: 870000, rate: "435" } }),
+    );
+    const card = await send({ fx: "charged", charged: "bad" });
+    expect(card.errors.charged).toBe("Enter an amount, like 1,250.50.");
+    expect(card.values.fx).toBe("charged");
+  });
+
   it("returns the review with exact shares and the extra centavo on the payer, saving nothing yet", async () => {
     const state = await reviewOrSaveCostAction(initial, form());
     expect(mocks.createCost).not.toHaveBeenCalled();
@@ -193,7 +211,7 @@ describe("reviewOrSaveCostAction, new cost", () => {
     await expect(
       reviewOrSaveCostAction(
         initial,
-        form({ step: "save", createdBy: "u2", updatedBy: "u2", currency: "USD", shares: "9", amountMinor: "1" }),
+        form({ step: "save", createdBy: "u2", updatedBy: "u2", tripCurrency: "USD", shares: "9", amountMinor: "1" }),
       ),
     ).rejects.toThrow(LIST);
     expect(mocks.createCost).toHaveBeenCalledTimes(1);
@@ -335,6 +353,10 @@ describe("reviewOrSaveCostAction, edit", () => {
       category: "food",
       split: "items",
       own: expect.any(Object),
+      currency: "",
+      fx: "rate",
+      rate: "",
+      charged: "",
     });
     expect(state.updatedAt).toBe("2027-03-12T11:00:00.000Z");
     expect(state.review).toBeNull();

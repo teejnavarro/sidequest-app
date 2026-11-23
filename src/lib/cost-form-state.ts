@@ -20,6 +20,10 @@ export const emptyCostValues: CostFormValues = {
   category: "",
   split: "equal",
   own: {},
+  currency: "",
+  fx: "rate",
+  rate: "",
+  charged: "",
 };
 
 // A person (or guest) the cost can be paid by or shared with. `userId` only colors the face.
@@ -140,6 +144,10 @@ export function valuesFromCost(saved: CostDetails, amountText_: string): CostFor
     own: isEqual
       ? {}
       : Object.fromEntries(saved.shares.map((share) => [share.spotId, amountText(share.amount, saved.currency)])),
+    currency: "",
+    fx: "rate",
+    rate: "",
+    charged: "",
   };
 }
 

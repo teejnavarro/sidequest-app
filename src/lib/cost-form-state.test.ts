@@ -131,6 +131,10 @@ describe("valuesFromCost", () => {
       category: "food",
       split: "equal",
       own: {},
+      currency: "",
+      fx: "rate",
+      rate: "",
+      charged: "",
     });
     expect(valuesFromCost({ ...saved, category: null }, "1").category).toBe("");
   });
@@ -186,6 +190,10 @@ describe("defaultCostValues", () => {
       category: "",
       split: "equal",
       own: {},
+      currency: "",
+      fx: "rate",
+      rate: "",
+      charged: "",
     });
   });
 

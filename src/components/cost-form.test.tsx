@@ -34,6 +34,10 @@ const filled = {
   category: "food",
   split: "equal",
   own: {},
+  currency: "",
+  fx: "rate",
+  rate: "",
+  charged: "",
 };
 
 const form = (extra: Partial<Parameters<typeof CostForm>[0]> = {}) =>

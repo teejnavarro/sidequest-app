@@ -38,6 +38,10 @@ function readValues(formData: FormData): CostFormValues {
     category: readText(formData, "category"),
     split: readText(formData, "split") === "items" ? "items" : "equal",
     own: readOwn(formData, sharedBy),
+    currency: readText(formData, "currency"),
+    fx: readText(formData, "fx") === "charged" ? "charged" : "rate",
+    rate: readText(formData, "rate"),
+    charged: readText(formData, "charged"),
   };
 }
 
