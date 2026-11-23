@@ -6,7 +6,18 @@ import { reviewOrSaveCostAction } from "@/app/trips/[tripId]/costs/actions";
 import type { CostFormState, CostFormValues, CostPerson } from "@/lib/cost-form-state";
 import { COST_CATEGORIES } from "@/lib/cost-options";
 import { currencySymbol } from "@/lib/idea-options";
-import { formatMoney, minorDigits, parseAmount, splitByItems, splitEqually } from "@/lib/money";
+import { splitOwnRule } from "@/lib/cost-input";
+import {
+  convertByRate,
+  effectiveRateText,
+  formatMoney,
+  minorDigits,
+  parseAmount,
+  parseRate,
+  rateText,
+  splitEqually,
+} from "@/lib/money";
+import { CURRENCIES } from "@/lib/trip-options";
 import { CostReviewView } from "@/components/cost-review";
 import { Face } from "@/components/face";
 import { Field, describedBy } from "@/components/form-fields";
@@ -89,26 +100,55 @@ function OwnHelper({ helper }: { helper: { over: boolean; text: string } | null 
   );
 }
 
-// The live line under the own-amount boxes: what is left over and the equal part, or how far
-// over the total they are. Feedback only: Save checks and splits again on the server.
-function ownHelper(amount: string, own: Record<string, string>, sharedBy: string[], currency: string) {
+// The live line under the own-amount boxes: what is left over and the equal part, or the same
+// message Save would refuse with. Feedback only: Save checks and splits again on the server.
+function ownHelper(
+  amount: string,
+  own: Record<string, string>,
+  sharedBy: string[],
+  currency: string,
+  people: CostPerson[],
+) {
   const total = parseAmount(amount, currency);
   if (!total.ok || sharedBy.length === 0) return null;
   const owns = sharedBy.flatMap((spotId) => {
     const parsed = parseAmount(own[spotId] ?? "", currency);
     return parsed.ok ? [{ spotId, own: parsed.minor }] : [];
   });
-  const split = splitByItems(total.minor, sharedBy, owns, "");
-  if (!split) {
-    const given = owns.reduce((sum, item) => sum + item.own, 0);
-    return { over: true, text: `That's ${formatMoney(given - total.minor, currency)} more than the total.` };
-  }
+  const names = Object.fromEntries(people.map((person) => [person.spotId, person.isYou ? "You" : person.name]));
+  const split = splitOwnRule({ total: total.minor, sharedBy, own: owns, paidBy: "", currency, names });
+  if ("error" in split) return { over: true, text: split.error };
   if (split.rest === 0) return { over: false, text: "Nothing left over." };
   const parts = splitEqually(split.rest, sharedBy, "").map((part) => part.amount);
   const low = Math.min(...parts);
   const high = Math.max(...parts);
   const each = low === high ? formatMoney(low, currency) : `${formatMoney(low, currency)} to ${formatMoney(high, currency)}`;
   return { over: false, text: `${formatMoney(split.rest, currency)} left over, shared equally: ${each} each` };
+}
+
+// The soft-blue line in the other-currency panel: what the amount comes to, or the rate the
+// card amount works out to. Null while the boxes don't parse. A helper only: the server decides.
+function convertLine(options: {
+  selected: string;
+  trip: string;
+  fx: string;
+  amount: string;
+  rate: string;
+  charged: string;
+}): string | null {
+  const { selected, trip, fx, amount, rate, charged } = options;
+  const original = parseAmount(amount, selected);
+  if (!original.ok) return null;
+  if (fx === "charged") {
+    const main = parseAmount(charged, trip);
+    if (!main.ok || main.minor === 0 || original.minor === 0) return null;
+    const effective = effectiveRateText({ original: original.minor, from: selected, main: main.minor, to: trip });
+    return `Works out to ${rateText(effective, selected, trip)}`;
+  }
+  const parsedRate = parseRate(rate);
+  if (!parsedRate.ok) return null;
+  const main = convertByRate({ original: original.minor, from: selected, to: trip, rate: parsedRate.rate });
+  return main === null ? null : `That's ${formatMoney(main, trip)}`;
 }
 
 // One form for logging and editing a cost. "Review" sends it to the server, which checks it
@@ -124,6 +164,10 @@ export function CostForm(props: CostFormProps) {
   // the boxes stay uncontrolled.
   const [sharedBy, setSharedBy] = useState(values.sharedBy);
   const [amount, setAmount] = useState(values.amount);
+  const [currency, setCurrency] = useState(values.currency || props.currency);
+  const [fx, setFx] = useState(values.fx);
+  const [rate, setRate] = useState(values.rate);
+  const [charged, setCharged] = useState(values.charged);
   const [open, setOpen] = useState(values.split === "items");
   const [own, setOwn] = useState(values.own);
   // When the server sends back new state (a newer copy after "Someone just changed this
@@ -133,6 +177,10 @@ export function CostForm(props: CostFormProps) {
     setShown(state);
     setSharedBy(values.sharedBy);
     setAmount(values.amount);
+    setCurrency(values.currency || props.currency);
+    setFx(values.fx);
+    setRate(values.rate);
+    setCharged(values.charged);
     setOpen(values.split === "items");
     setOwn(values.own);
   }
@@ -153,6 +201,10 @@ export function CostForm(props: CostFormProps) {
         <input type="hidden" name="step" value="save" />
         <input type="hidden" name="description" value={values.description} />
         <input type="hidden" name="amount" value={values.amount} />
+        <input type="hidden" name="currency" value={values.currency} />
+        <input type="hidden" name="fx" value={values.fx} />
+        <input type="hidden" name="rate" value={values.rate} />
+        <input type="hidden" name="charged" value={values.charged} />
         <input type="hidden" name="paidBy" value={values.paidBy} />
         {values.sharedBy.map((spotId) => (
           <input key={spotId} type="hidden" name="sharedBy" value={spotId} />
@@ -180,7 +232,12 @@ export function CostForm(props: CostFormProps) {
     );
   }
 
-  const decimals = minorDigits(props.currency) > 0;
+  const foreign = currency !== props.currency;
+  const decimals = minorDigits(currency) > 0;
+  const tripSymbol = currencySymbol(props.currency);
+  const line = foreign ? convertLine({ selected: currency, trip: props.currency, fx, amount, rate, charged }) : null;
+  const chargedLabel = props.currency === "PHP" ? "Pesos" : props.currency;
+  const currencies = [props.currency, ...CURRENCIES.map((option) => option.value).filter((code) => code !== props.currency)];
 
   return (
     // A new key gives the boxes fresh values when the server sends back a newer copy.
@@ -209,26 +266,120 @@ export function CostForm(props: CostFormProps) {
           />
         </Field>
 
-        <Field id="amount" label="Amount" error={errors.amount}>
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="min-w-6 text-base font-bold text-muted">
-              {currencySymbol(props.currency)}
-            </span>
-            <input
-              id="amount"
-              name="amount"
-              type="text"
-              inputMode={decimals ? "decimal" : "numeric"}
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              placeholder={decimals ? "1,250.50" : "250,000"}
-              autoComplete="off"
-              aria-invalid={errors.amount ? true : undefined}
-              aria-describedby={describedBy("amount", errors.amount)}
-              className={`${inputClass} ${placeholder} flex-1`}
-            />
-          </div>
-        </Field>
+        <div className="grid gap-3">
+          <Field id="amount" label="Amount" error={errors.amount}>
+            <div className="flex items-center gap-2">
+              <div className="relative shrink-0">
+                <select
+                  name="currency"
+                  aria-label="Currency"
+                  value={currency}
+                  onChange={(event) => setCurrency(event.target.value)}
+                  className={`${inputBoxClass} appearance-none pr-9 font-bold`}
+                >
+                  {currencies.map((code) => (
+                    <option key={code} value={code}>
+                      {currencySymbol(code)} {code}
+                    </option>
+                  ))}
+                </select>
+                <CaretDown
+                  size={16}
+                  weight="bold"
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted"
+                />
+              </div>
+              <input
+                id="amount"
+                name="amount"
+                type="text"
+                inputMode={decimals ? "decimal" : "numeric"}
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                placeholder={decimals ? "1,250.50" : "250,000"}
+                autoComplete="off"
+                aria-invalid={errors.amount ? true : undefined}
+                aria-describedby={describedBy("amount", errors.amount)}
+                className={`${inputBoxClass} ${placeholder} min-w-0 flex-1`}
+              />
+            </div>
+          </Field>
+
+          {foreign ? (
+            <div className="grid gap-3 rounded-field bg-chip p-3">
+              <div className="grid grid-cols-2 rounded-full border border-line bg-card p-1">
+                {[
+                  { value: "rate", label: "Use a rate" },
+                  { value: "charged", label: `Card charged ${props.currency === "PHP" ? "pesos" : props.currency}` },
+                ].map((option) => (
+                  <label key={option.value} className="relative">
+                    <input
+                      type="radio"
+                      name="fx"
+                      value={option.value}
+                      checked={fx === option.value}
+                      onChange={() => setFx(option.value)}
+                      className="peer absolute inset-0 size-full cursor-pointer opacity-0"
+                    />
+                    <span className="grid min-h-9 place-items-center rounded-full px-1.5 text-center text-[13px] font-bold peer-checked:bg-blue-soft peer-checked:text-blue-text peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-blue-text">
+                      {option.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              {fx === "charged" ? (
+                <Field id="charged" label={`${chargedLabel} charged`} error={errors.charged} help="From your card or bank app.">
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden="true" className="min-w-6 text-base font-bold text-muted">
+                      {tripSymbol}
+                    </span>
+                    <input
+                      id="charged"
+                      name="charged"
+                      type="text"
+                      inputMode={minorDigits(props.currency) > 0 ? "decimal" : "numeric"}
+                      value={charged}
+                      onChange={(event) => setCharged(event.target.value)}
+                      placeholder={minorDigits(props.currency) > 0 ? "7,412.60" : "7,412"}
+                      autoComplete="off"
+                      aria-invalid={errors.charged ? true : undefined}
+                      aria-describedby={describedBy("charged", errors.charged, "help")}
+                      className={`${inputBoxClass} ${placeholder} min-w-0 flex-1`}
+                    />
+                  </div>
+                </Field>
+              ) : (
+                <Field id="rate" label="Rate" error={errors.rate}>
+                  <div className="flex items-center gap-2 font-bold">
+                    <span>{tripSymbol}1 =</span>
+                    <span aria-hidden="true">{currencySymbol(currency)}</span>
+                    <input
+                      id="rate"
+                      name="rate"
+                      type="text"
+                      inputMode="decimal"
+                      value={rate}
+                      onChange={(event) => setRate(event.target.value)}
+                      placeholder="435"
+                      autoComplete="off"
+                      aria-invalid={errors.rate ? true : undefined}
+                      aria-describedby={describedBy("rate", errors.rate)}
+                      className={`${inputBoxClass} ${placeholder} min-w-0 flex-1`}
+                    />
+                  </div>
+                </Field>
+              )}
+              {line ? <p className="rounded-field bg-blue-soft px-3 py-2 text-sm font-bold text-blue-text">{line}</p> : null}
+            </div>
+          ) : (
+            <>
+              <input type="hidden" name="fx" value={fx} />
+              <input type="hidden" name="rate" value={rate} />
+              <input type="hidden" name="charged" value={charged} />
+            </>
+          )}
+        </div>
 
         <fieldset className="grid min-w-0 gap-1.5 border-0 p-0" aria-describedby={errors.paidBy ? "paidBy-error" : undefined}>
           <legend className={`${labelClass} mb-1.5 p-0`}>Who paid?</legend>
@@ -291,7 +442,7 @@ export function CostForm(props: CostFormProps) {
                       {person.hasLeft ? <span className={`${guestTag} ml-2`}>Left</span> : null}
                     </span>
                     <span aria-hidden="true" className="shrink-0 text-base font-bold text-muted">
-                      {currencySymbol(props.currency)}
+                      {currencySymbol(currency)}
                     </span>
                     <input
                       name={`own:${person.spotId}`}
@@ -308,7 +459,7 @@ export function CostForm(props: CostFormProps) {
                     />
                   </div>
                 ))}
-              <OwnHelper helper={ownHelper(amount, own, sharedBy, props.currency)} />
+              <OwnHelper helper={ownHelper(amount, own, sharedBy, currency, props.people)} />
             </div>
           ) : (
             <input type="hidden" name="split" value="equal" />
