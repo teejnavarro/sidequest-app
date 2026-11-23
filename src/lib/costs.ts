@@ -187,6 +187,11 @@ export async function createCost(
           updatedBy: sql<string>`${userId}::text`.as("updated_by"),
           createdAt: sql<Date>`now()`.as("created_at"),
           updatedAt: sql<Date>`now()`.as("updated_at"),
+          originalAmount: sql<number | null>`null::bigint`.as("original_amount"),
+          originalCurrency: sql<string | null>`null::text`.as("original_currency"),
+          rate: sql<string | null>`null::text`.as("rate"),
+          deletedAt: sql<Date | null>`null::timestamp`.as("deleted_at"),
+          deletedBy: sql<string | null>`null::text`.as("deleted_by"),
         })
         .from(trip)
         .where(
@@ -211,6 +216,7 @@ export async function createCost(
             costId: sql<string>`${cost.id}`.as("cost_id"),
             spotId: sql<string>`${share.spotId}::text`.as("spot_id"),
             amount: sql<number>`${share.amount}::bigint`.as("amount"),
+            originalAmount: sql<number | null>`null::bigint`.as("original_amount"),
           })
           .from(cost)
           .where(justWritten),
@@ -278,6 +284,7 @@ export async function updateCost(
           costId: sql<string>`${cost.id}`.as("cost_id"),
           spotId: sql<string>`${share.spotId}::text`.as("spot_id"),
           amount: sql<number>`${share.amount}::bigint`.as("amount"),
+          originalAmount: sql<number | null>`null::bigint`.as("original_amount"),
         })
         .from(cost)
         .where(justSaved),
