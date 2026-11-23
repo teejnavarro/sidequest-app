@@ -6,6 +6,7 @@ import {
   getBalancesForMember,
   getCostForMember,
   listCostsForMember,
+  restoreCost,
   updateCost,
 } from "./costs";
 import type { CostInput } from "./cost-input";
@@ -74,7 +75,7 @@ describe("listCostsForMember", () => {
   });
 
   it("gives an empty list and a zero total when nothing comes back", async () => {
-    await expect(listCostsForMember("trip-1", "stranger")).resolves.toEqual({ costs: [], total: 0 });
+    await expect(listCostsForMember("trip-1", "stranger")).resolves.toEqual({ costs: [], total: 0, trashCount: 0 });
   });
 
   it("shapes each row, uses first names and adds up the total", async () => {
@@ -214,23 +215,39 @@ describe("updateCost", () => {
 });
 
 describe("deleteCost and countCostsForTrip", () => {
-  it("deletes inside one membership-checked statement, true only when a cost went", async () => {
+  it("trashes inside one membership-checked statement, true only when a cost moved", async () => {
     await expect(deleteCost("trip-1", "c1", "stranger")).resolves.toBe(false);
     fake.rows = [["c1"]];
     await expect(deleteCost("trip-1", "c1", "u1")).resolves.toBe(true);
     for (const { sql } of fake.queries) {
-      expect(sql).toMatch(/^delete from "cost" where/);
+      expect(sql).toMatch(/^update "cost" set /);
+      expect(sql).toContain('"deleted_at" = now()');
+      expect(sql).toContain('"updated_at" = "cost"."updated_at"');
+      expect(sql).toContain('"cost"."deleted_at" is null');
       expect(sql).toContain('"cost"."trip_id" = $');
       expect(sql).toContain('"viewer"."user_id" = $');
     }
   });
 
+  it("restores inside one membership-checked statement, keeping the saved time", async () => {
+    await expect(restoreCost("trip-1", "c1", "stranger")).resolves.toBe(false);
+    fake.rows = [["c1"]];
+    await expect(restoreCost("trip-1", "c1", "u1")).resolves.toBe(true);
+    for (const { sql } of fake.queries) {
+      expect(sql).toMatch(/^update "cost" set /);
+      expect(sql).toContain('"deleted_at" = $');
+      expect(sql).toContain('"updated_at" = "cost"."updated_at"');
+      expect(sql).toContain('"cost"."deleted_at" is not null');
+      expect(sql).toContain('"viewer"."user_id" = $');
+    }
+  });
+
   it("counts a trip's costs with membership in the query", async () => {
-    fake.rows = [["3"]];
-    await expect(countCostsForTrip("trip-1", "u1")).resolves.toBe(3);
+    fake.rows = [["3", "1"]];
+    await expect(countCostsForTrip("trip-1", "u1")).resolves.toEqual({ total: 3, trashed: 1 });
     expect(fake.queries[0].sql).toContain('"viewer"."user_id" = $');
     fake.rows = [];
-    await expect(countCostsForTrip("trip-1", "stranger")).resolves.toBe(0);
+    await expect(countCostsForTrip("trip-1", "stranger")).resolves.toEqual({ total: 0, trashed: 0 });
   });
 });
 

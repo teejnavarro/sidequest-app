@@ -53,7 +53,7 @@ async function renderContent() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
-  mocks.countCostsForTrip.mockResolvedValue(0);
+  mocks.countCostsForTrip.mockResolvedValue({ total: 0, trashed: 0 });
 });
 
 // The layout's check does not protect this page, so the page must check for itself.
@@ -92,9 +92,9 @@ describe("DeleteTripPage", () => {
     mocks.getTripForMember.mockResolvedValue(trip("u1"));
     mocks.listTripMembers.mockResolvedValue(people(2));
     expect(renderToStaticMarkup(await renderContent())).not.toContain("This also deletes");
-    mocks.countCostsForTrip.mockResolvedValue(1);
+    mocks.countCostsForTrip.mockResolvedValue({ total: 1, trashed: 0 });
     expect(renderToStaticMarkup(await renderContent())).toContain("This also deletes 1 cost.");
-    mocks.countCostsForTrip.mockResolvedValue(3);
+    mocks.countCostsForTrip.mockResolvedValue({ total: 3, trashed: 0 });
     expect(renderToStaticMarkup(await renderContent())).toContain("This also deletes 3 costs.");
   });
 

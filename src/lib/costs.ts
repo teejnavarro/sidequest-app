@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, exists, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import { user } from "@/db/auth-schema";
@@ -34,7 +34,7 @@ export type CostListItem = {
   editedBy: string | null; // first name of the last editor, only when it is someone else
 };
 
-export type CostList = { costs: CostListItem[]; total: number };
+export type CostList = { costs: CostListItem[]; total: number; trashCount: number };
 
 export type CostDetails = {
   id: string;
@@ -52,6 +52,11 @@ const payerSpot = alias(tripMember, "payer_spot");
 const payerUser = alias(user, "payer_user");
 const creator = alias(user, "creator");
 const editor = alias(user, "editor");
+const deleter = alias(user, "deleter");
+
+// A cost that is not in the trash. Every read and edit uses it; only the trash list, restore,
+// the currency lock, guest/member cost counts and deleting a trip look at trashed costs.
+const live = isNull(cost.deletedAt);
 
 // All of these spots are in this trip: the count of matching rows equals the count asked for.
 // A person who left only counts when they already paid or share the cost being edited
@@ -72,7 +77,8 @@ function spotsOf(input: CostInput): string[] {
 // share it, the viewer's own share, and who added and last edited it (first names). Plus the
 // total of all of them. A person who is not in the trip gets nothing.
 export async function listCostsForMember(tripId: string, userId: string): Promise<CostList> {
-  const rows = await db
+  const [rows, trashed] = await Promise.all([
+    db
     .select({
       id: cost.id,
       description: cost.description,
@@ -101,8 +107,13 @@ export async function listCostsForMember(tripId: string, userId: string): Promis
     .leftJoin(payerUser, eq(payerUser.id, payerSpot.userId))
     .innerJoin(creator, eq(creator.id, cost.createdBy))
     .innerJoin(editor, eq(editor.id, cost.updatedBy))
-    .where(and(eq(cost.tripId, tripId), isMemberOf(tripId, userId)))
-    .orderBy(desc(cost.spentOn), desc(cost.createdAt), desc(cost.id));
+    .where(and(eq(cost.tripId, tripId), live, isMemberOf(tripId, userId)))
+    .orderBy(desc(cost.spentOn), desc(cost.createdAt), desc(cost.id)),
+    db
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
+      .from(cost)
+      .where(and(eq(cost.tripId, tripId), isNotNull(cost.deletedAt), isMemberOf(tripId, userId))),
+  ]);
 
   const costs = rows.map((row) => ({
     id: row.id,
@@ -123,7 +134,7 @@ export async function listCostsForMember(tripId: string, userId: string): Promis
     addedBy: firstNameOf(row.createdByName),
     editedBy: row.updatedById === row.createdById ? null : firstNameOf(row.updatedByName),
   }));
-  return { costs, total: costs.reduce((sum, item) => sum + item.amount, 0) };
+  return { costs, total: costs.reduce((sum, item) => sum + item.amount, 0), trashCount: trashed[0]?.count ?? 0 };
 }
 
 // One cost with its shares and when it was last saved, or null when it does not exist,
@@ -133,7 +144,7 @@ export async function getCostForMember(
   costId: string,
   userId: string,
 ): Promise<CostDetails | null> {
-  const found = and(eq(cost.id, costId), eq(cost.tripId, tripId), isMemberOf(tripId, userId));
+  const found = and(eq(cost.id, costId), eq(cost.tripId, tripId), live, isMemberOf(tripId, userId));
   const rows = await db
     .select({
       id: cost.id,
@@ -249,7 +260,7 @@ export async function updateCost(
   input: CostInput,
   expectedUpdatedAt: Date,
 ): Promise<"ok" | "changed" | "not-found"> {
-  const mine = and(eq(cost.id, costId), eq(cost.tripId, tripId), isMemberOf(tripId, userId));
+  const mine = and(eq(cost.id, costId), eq(cost.tripId, tripId), live, isMemberOf(tripId, userId));
   const justSaved = and(mine, eq(cost.updatedBy, userId), sql`${cost.updatedAt} = now()`);
 
   const updateRow = db
@@ -298,23 +309,84 @@ export async function updateCost(
   return existing.length > 0 ? "changed" : "not-found";
 }
 
-// Deletes a cost for good, for any member. Its shares go with it (the database cascades).
-// Returns true only when a cost went, so repeating it is harmless.
+// Moves a cost to the trash, for any member. The shares stay, so Restore brings back exactly
+// the same balances. updated_at has $onUpdate, so it is set to itself: trashing is not an edit.
+// Returns true only when a cost moved, so repeating it is harmless.
 export async function deleteCost(tripId: string, costId: string, userId: string): Promise<boolean> {
-  const deleted = await db
-    .delete(cost)
-    .where(and(eq(cost.id, costId), eq(cost.tripId, tripId), isMemberOf(tripId, userId)))
+  const moved = await db
+    .update(cost)
+    .set({ deletedAt: sql`now()`, deletedBy: userId, updatedAt: sql`${cost.updatedAt}` })
+    .where(and(eq(cost.id, costId), eq(cost.tripId, tripId), live, isMemberOf(tripId, userId)))
     .returning({ id: cost.id });
-  return deleted.length > 0;
+  return moved.length > 0;
 }
 
-// How many costs the trip has, for the Delete trip warning. Zero for a stranger.
-export async function countCostsForTrip(tripId: string, userId: string): Promise<number> {
+// Puts a trashed cost back, for any member. True only when a cost came back.
+export async function restoreCost(tripId: string, costId: string, userId: string): Promise<boolean> {
+  const back = await db
+    .update(cost)
+    .set({ deletedAt: null, deletedBy: null, updatedAt: sql`${cost.updatedAt}` })
+    .where(
+      and(eq(cost.id, costId), eq(cost.tripId, tripId), isNotNull(cost.deletedAt), isMemberOf(tripId, userId)),
+    )
+    .returning({ id: cost.id });
+  return back.length > 0;
+}
+
+export type TrashItem = {
+  id: string;
+  description: string;
+  amount: number;
+  currency: string;
+  category: string | null;
+  deletedAt: Date;
+  deletedBy: string; // first name
+  deletedByYou: boolean;
+};
+
+// The trip's trashed costs, newest deletion first. Empty for a stranger.
+export async function listTrashForMember(tripId: string, userId: string): Promise<TrashItem[]> {
   const rows = await db
-    .select({ count: sql<number>`count(*)`.mapWith(Number) })
+    .select({
+      id: cost.id,
+      description: cost.description,
+      amount: cost.amount,
+      currency: cost.currency,
+      category: cost.category,
+      deletedAt: cost.deletedAt,
+      deletedById: deleter.id,
+      deletedByName: deleter.name,
+    })
+    .from(cost)
+    .innerJoin(deleter, eq(deleter.id, cost.deletedBy))
+    .where(and(eq(cost.tripId, tripId), isNotNull(cost.deletedAt), isMemberOf(tripId, userId)))
+    .orderBy(desc(cost.deletedAt), desc(cost.id));
+  return rows.map((row) => ({
+    id: row.id,
+    description: row.description,
+    amount: row.amount,
+    currency: row.currency,
+    category: row.category,
+    deletedAt: row.deletedAt!, // the where clause only lets trashed costs through
+    deletedBy: firstNameOf(row.deletedByName),
+    deletedByYou: row.deletedById === userId,
+  }));
+}
+
+// How many costs the trip has (and how many of them are in the trash), for the Delete trip
+// warning. Deleting the trip deletes both. Zero for a stranger.
+export async function countCostsForTrip(
+  tripId: string,
+  userId: string,
+): Promise<{ total: number; trashed: number }> {
+  const rows = await db
+    .select({
+      total: sql<number>`count(*)`.mapWith(Number),
+      trashed: sql<number>`count(*) filter (where ${cost.deletedAt} is not null)`.mapWith(Number),
+    })
     .from(cost)
     .where(and(eq(cost.tripId, tripId), isMemberOf(tripId, userId)));
-  return rows[0]?.count ?? 0;
+  return { total: rows[0]?.total ?? 0, trashed: rows[0]?.trashed ?? 0 };
 }
 
 export type BalancePerson = {
@@ -342,7 +414,7 @@ const NO_BALANCES: TripBalances = { people: [], payments: [], total: 0, costCoun
 // count. People still in the trip are listed, plus people who left but still have money owed
 // either way. A person who is not in the trip gets nothing.
 export async function getBalancesForMember(tripId: string, userId: string): Promise<TripBalances> {
-  const costInTripCurrency = sql`${cost.currency} = ${trip.currency}`;
+  const costInTripCurrency = sql`${cost.currency} = ${trip.currency} and ${cost.deletedAt} is null`;
   const [rows, totals] = await Promise.all([
     db
       .select({

@@ -90,7 +90,7 @@ export async function listMyTrips(userId: string): Promise<TripListItem[]> {
       timeZone: trip.timeZone,
       currency: trip.currency,
       destination: trip.destination,
-      myBalance: sql<number | null>`case when exists (select 1 from ${cost} where ${cost.tripId} = ${trip.id} and ${cost.currency} = ${trip.currency}) then (select coalesce(sum(${cost.amount}), 0) from ${cost} where ${cost.paidBy} = ${tripMember.id} and ${cost.currency} = ${trip.currency}) - (select coalesce(sum(${costShare.amount}), 0) from ${costShare} inner join ${cost} on ${cost.id} = ${costShare.costId} where ${costShare.spotId} = ${tripMember.id} and ${cost.currency} = ${trip.currency}) else null end`.mapWith(
+      myBalance: sql<number | null>`case when exists (select 1 from ${cost} where ${cost.tripId} = ${trip.id} and ${cost.currency} = ${trip.currency} and ${cost.deletedAt} is null) then (select coalesce(sum(${cost.amount}), 0) from ${cost} where ${cost.paidBy} = ${tripMember.id} and ${cost.currency} = ${trip.currency} and ${cost.deletedAt} is null) - (select coalesce(sum(${costShare.amount}), 0) from ${costShare} inner join ${cost} on ${cost.id} = ${costShare.costId} where ${costShare.spotId} = ${tripMember.id} and ${cost.currency} = ${trip.currency} and ${cost.deletedAt} is null) else null end`.mapWith(
         (value) => (value === null || value === undefined ? null : Number(value)),
       ),
     })
@@ -362,11 +362,17 @@ export type GuestSpot = {
   name: string;
   addedById: string;
   addedByName: string;
-  costCount: number; // how many costs the guest paid or shares
+  costCount: number; // how many costs the guest paid or shares, trashed ones included
+  trashedCostCount: number; // how many of those are in the trash
 };
 
 // How many costs a spot paid or shares. Used inside queries on trip_member.
 const costCountOf = sql<number>`(select count(*) from ${cost} where ${cost.paidBy} = ${tripMember.id} or exists (select 1 from ${costShare} where ${costShare.costId} = ${cost.id} and ${costShare.spotId} = ${tripMember.id}))`.mapWith(
+  Number,
+);
+
+// The same, only the trashed ones.
+const trashedCostCountOf = sql<number>`(select count(*) from ${cost} where ${cost.deletedAt} is not null and (${cost.paidBy} = ${tripMember.id} or exists (select 1 from ${costShare} where ${costShare.costId} = ${cost.id} and ${costShare.spotId} = ${tripMember.id})))`.mapWith(
   Number,
 );
 
@@ -418,6 +424,7 @@ export async function getGuestForEditor(
       addedById: user.id,
       addedByName: user.name,
       costCount: costCountOf,
+      trashedCostCount: trashedCostCountOf,
     })
     .from(tripMember)
     .innerJoin(user, eq(user.id, tripMember.addedBy))
@@ -555,7 +562,8 @@ export type ManagedMember = {
   userId: string;
   name: string;
   image: string | null;
-  costCount: number; // how many costs the person paid or shares
+  costCount: number; // how many costs the person paid or shares, trashed ones included
+  trashedCostCount: number; // how many of those are in the trash
 };
 
 // The spot is a person (not a guest) who is still in this trip and is not its owner, and the
@@ -591,6 +599,7 @@ export async function getMemberForOwner(
       name: user.name,
       image: user.image,
       costCount: costCountOf,
+      trashedCostCount: trashedCostCountOf,
     })
     .from(tripMember)
     .innerJoin(user, eq(user.id, tripMember.userId))

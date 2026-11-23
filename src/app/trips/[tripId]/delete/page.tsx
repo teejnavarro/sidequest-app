@@ -18,11 +18,12 @@ async function DeleteTripContent({ params }: { params: Promise<{ tripId: string 
   const trip = await getTripForMember(tripId, user.id);
   if (!trip || trip.ownerId !== user.id) notFound();
 
-  const [members, costCount] = await Promise.all([
+  const [members, costs] = await Promise.all([
     listTripMembers(tripId, user.id),
     countCostsForTrip(tripId, user.id),
   ]);
   const count = members.length;
+  const costCount = costs.total;
 
   return (
     <>

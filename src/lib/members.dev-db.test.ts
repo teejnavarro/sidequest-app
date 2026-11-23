@@ -186,7 +186,7 @@ describe("members who left, on the dev database", () => {
       await expect(ideas.getIdeaForMember(tripId, ideaId, LEAVER)).resolves.toBeNull();
       await expect(schedule.listScheduleForMember(tripId, LEAVER)).resolves.toEqual([]);
       await expect(schedule.getScheduleItemForMember(tripId, scheduleId, LEAVER)).resolves.toBeNull();
-      await expect(costs.listCostsForMember(tripId, LEAVER)).resolves.toEqual({ costs: [], total: 0 });
+      await expect(costs.listCostsForMember(tripId, LEAVER)).resolves.toEqual({ costs: [], total: 0, trashCount: 0 });
       await expect(costs.getCostForMember(tripId, costRowId, LEAVER)).resolves.toBeNull();
       await expect(ideas.createIdea(tripId, LEAVER, ideaInput)).resolves.toBeNull();
       await expect(
@@ -284,6 +284,7 @@ describe("members who left, on the dev database", () => {
         name: "Lou Test",
         image: null,
         costCount: 1,
+        trashedCostCount: 0,
       });
       await expect(trips.removeMember(t.id, t.leaver, OWNER)).resolves.toBe(true);
       expect((await spotRow(t.leaver)).leftAt).not.toBeNull();
