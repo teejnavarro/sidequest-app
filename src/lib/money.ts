@@ -126,3 +126,91 @@ export function splitByItems(
     }),
   };
 }
+
+export type ParsedRate = { ok: true; rate: string } | { ok: false; error: string };
+
+// Turns typed text such as "435", "2.65" or "1,234.5" into a clean rate string: no commas,
+// no leading zeros, no trailing fraction zeros. Up to 7 whole digits and 6 decimals, above zero.
+export function parseRate(raw: string): ParsedRate {
+  const badFormat = { ok: false, error: "Enter a rate, like 435." } as const;
+  const match = /^([\d,]*)(?:\.(\d*))?$/.exec(raw.trim());
+  if (!match) return badFormat;
+  const groupedWhole = match[1] ?? "";
+  if (groupedWhole.includes(",") && !/^[1-9]\d{0,2}(,\d{3})+$/.test(groupedWhole)) return badFormat;
+  const whole = groupedWhole.replace(/,/g, "").replace(/^0+/, "");
+  const fraction = (match[2] ?? "").replace(/0+$/, "");
+  if (whole.length > 7) return { ok: false, error: "That rate is too large." };
+  if (fraction.length > 6 || (whole === "" && fraction === "")) return badFormat;
+  return { ok: true, rate: `${whole || "0"}${fraction ? `.${fraction}` : ""}` };
+}
+
+// Splits a clean rate string into a whole number and its decimal places: "2.65" -> 265n, 2.
+function rateParts(rate: string): { int: bigint; places: number } {
+  const [whole = "0", fraction = ""] = rate.split(".");
+  return { int: BigInt(whole + fraction), places: fraction.length };
+}
+
+// Round-half-up integer division for positive BigInts.
+function divRound(numerator: bigint, denominator: bigint): bigint {
+  return (BigInt(2) * numerator + denominator) / (BigInt(2) * denominator);
+}
+
+// Converts `original` (minor units of `from`) into minor units of `to` at "1 `to` = rate `from`",
+// e.g. 870000 dong at "435" -> 200000 centavos. Null when the result is under 1 or over the
+// largest amount parseAmount accepts.
+export function convertByRate(args: {
+  original: number;
+  from: string;
+  to: string;
+  rate: string;
+}): number | null {
+  const { int, places } = rateParts(args.rate);
+  if (int === BigInt(0)) return null;
+  const result = divRound(
+    BigInt(args.original) * BigInt(10) ** BigInt(minorDigits(args.to) + places),
+    BigInt(10) ** BigInt(minorDigits(args.from)) * int,
+  );
+  if (result < BigInt(1) || result > BigInt(MAX_MAJOR_UNITS) * BigInt(10) ** BigInt(minorDigits(args.to))) {
+    return null;
+  }
+  return Number(result);
+}
+
+// The rate a card charge implies ("1 `to` = N `from`"), to 2 decimals, half up: 3,200,000 dong
+// charged as 7,412.60 pesos -> "431.70". For display only.
+export function effectiveRateText(args: {
+  original: number;
+  from: string;
+  main: number;
+  to: string;
+}): string {
+  const hundredths = divRound(
+    BigInt(args.original) * BigInt(10) ** BigInt(minorDigits(args.to)) * BigInt(100),
+    BigInt(args.main) * BigInt(10) ** BigInt(minorDigits(args.from)),
+  );
+  const text = String(hundredths).padStart(3, "0");
+  return `${text.slice(0, -2)}.${text.slice(-2)}`;
+}
+
+// Splits `total` in proportion to `weights` (largest remainder). Shares always add up to
+// `total`, a zero weight gets 0, and ties go to the payer first, then list order, so equal
+// weights give the same result as splitEqually.
+export function allocateLike(total: number, weights: Share[], payerId: string): Share[] {
+  const sum = weights.reduce((acc, w) => acc + BigInt(w.amount), BigInt(0));
+  if (sum === BigInt(0)) return weights.map(({ spotId }) => ({ spotId, amount: 0 }));
+  const rows = weights.map((w, index) => {
+    const product = BigInt(total) * BigInt(w.amount);
+    return { spotId: w.spotId, index, floor: product / sum, rem: product % sum };
+  });
+  let left = total - rows.reduce((acc, r) => acc + Number(r.floor), 0);
+  const rank = (spotId: string, index: number) => (spotId === payerId ? -1 : index);
+  const order = [...rows].sort(
+    (a, b) => (a.rem === b.rem ? 0 : a.rem > b.rem ? -1 : 1) || rank(a.spotId, a.index) - rank(b.spotId, b.index),
+  );
+  const bonus = new Set<number>();
+  for (const row of order) {
+    if (left-- <= 0) break;
+    bonus.add(row.index);
+  }
+  return rows.map((r) => ({ spotId: r.spotId, amount: Number(r.floor) + (bonus.has(r.index) ? 1 : 0) }));
+}
