@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COST_CATEGORIES, costCategoryOf, isCostCategory } from "./cost-options";
-import { validateCostInput } from "./cost-input";
+import { splitOwnRule, validateCostInput } from "./cost-input";
 
 const context = { currency: "PHP", spotIds: ["a", "b", "c"], names: { a: "You", b: "Ben", c: "Dana" } };
 
@@ -40,9 +40,9 @@ describe("uneven splits (own amounts)", () => {
     if (!ok.ok) throw new Error(JSON.stringify(ok.errors));
     // rest 860 / 3 = 286.66 and 2 centavos over: the payer (Ben) and then You take one each
     expect(ok.value.shares).toEqual([
-      { spotId: "a", amount: 98667 },
-      { spotId: "b", amount: 28667 },
-      { spotId: "c", amount: 58666 },
+      { spotId: "a", amount: 98667, originalAmount: null },
+      { spotId: "b", amount: 28667, originalAmount: null },
+      { spotId: "c", amount: 58666, originalAmount: null },
     ]);
     expect(ok.value.shares.reduce((s, x) => s + x.amount, 0)).toBe(186000);
     expect(ok.value.ownParts).toEqual({ a: 70000, c: 30000 });
@@ -125,6 +125,36 @@ describe("uneven splits (own amounts)", () => {
   });
 });
 
+describe("splitOwnRule", () => {
+  const names = { a: "You", b: "Ben", c: "Dana" };
+  const rule = (total: number, own: { spotId: string; own: number }[], currency = "PHP") =>
+    splitOwnRule({ total, sharedBy: ["a", "b", "c"], own, paidBy: "a", currency, names });
+
+  it("gives the shares and what was left over", () => {
+    expect(rule(10000, [{ spotId: "a", own: 4000 }])).toEqual({
+      shares: [
+        { spotId: "a", amount: 6000 },
+        { spotId: "b", amount: 2000 },
+        { spotId: "c", amount: 2000 },
+      ],
+      rest: 6000,
+    });
+  });
+
+  it("refuses a left-over centavo that three people can't share", () => {
+    expect(rule(1, [])).toEqual({
+      error: "₱0.01 left over can't be shared by 3 people. Add it to someone's amount.",
+    });
+  });
+
+  it("keeps the exact current messages for too much and a zero share", () => {
+    expect(rule(1000, [{ spotId: "a", own: 1500 }])).toEqual({ error: "That's ₱5.00 more than the total." });
+    expect(rule(1000, [{ spotId: "a", own: 500 }, { spotId: "b", own: 500 }])).toEqual({
+      error: "Dana's share comes to ₱0.00. Untick Dana or add an amount.",
+    });
+  });
+});
+
 describe("cost categories", () => {
   it("lists the six categories in order, each with an icon", () => {
     expect(COST_CATEGORIES.map((c) => c.value)).toEqual([
@@ -156,11 +186,12 @@ describe("validateCostInput", () => {
         category: "food",
         spentOn: "2027-03-12",
         shares: [
-          { spotId: "a", amount: 33334 },
-          { spotId: "b", amount: 33333 },
-          { spotId: "c", amount: 33333 },
+          { spotId: "a", amount: 33334, originalAmount: null },
+          { spotId: "b", amount: 33333, originalAmount: null },
+          { spotId: "c", amount: 33333, originalAmount: null },
         ],
         ownParts: null,
+        money: { kind: "trip" },
       },
     });
   });
@@ -219,7 +250,7 @@ describe("validateCostInput", () => {
     expect(errorsFor({ sharedBy: [] }).sharedBy).toBe("Pick who shares it.");
     expect(errorsFor({ sharedBy: undefined }).sharedBy).toBe("Pick who shares it.");
     expect(errorsFor({ sharedBy: ["a", "stranger"] }).sharedBy).toBe("Pick who shares it.");
-    expect(valueFor({ sharedBy: "b" }).shares).toEqual([{ spotId: "b", amount: 100000 }]);
+    expect(valueFor({ sharedBy: "b" }).shares).toEqual([{ spotId: "b", amount: 100000, originalAmount: null }]);
   });
 
   it("needs a real day between 2000 and 2100", () => {
@@ -239,5 +270,130 @@ describe("validateCostInput", () => {
   it("reports every problem at once, and treats non-text values as empty", () => {
     const errors = errorsFor({ description: 5, amount: null, paidBy: {}, sharedBy: 7, spentOn: [], category: 1 });
     expect(Object.keys(errors).sort()).toEqual(["amount", "description", "paidBy", "sharedBy", "spentOn"]);
+  });
+});
+
+describe("validateCostInput in another currency", () => {
+  const sum = (items: { amount: number }[]) => items.reduce((total, item) => total + item.amount, 0);
+  const sumOriginal = (items: { originalAmount: number | null }[]) =>
+    items.reduce((total, item) => total + (item.originalAmount ?? 0), 0);
+  const vnd = { currency: "VND", amount: "870,000", fx: "rate", rate: "435" };
+
+  it("refuses a currency that is not in the list", () => {
+    expect(errorsFor({ currency: "XXX" }).currency).toBe("Pick a currency from the list.");
+  });
+
+  it("treats an empty or the trip's own currency exactly as before", () => {
+    const plain = valueFor({});
+    expect(valueFor({ currency: "" })).toEqual(plain);
+    expect(valueFor({ currency: "PHP", fx: "charged", rate: "9", charged: "1" })).toEqual(plain);
+    expect(plain.money).toEqual({ kind: "trip" });
+  });
+
+  it("converts by rate and keeps the shares adding up in both currencies", () => {
+    const v = valueFor(vnd);
+    expect(v.amount).toBe(200000);
+    expect(v.money).toEqual({ kind: "rate", currency: "VND", original: 870000, rate: "435" });
+    expect(v.shares.map((s) => s.amount)).toEqual([66667, 66667, 66666]);
+    expect(v.shares.map((s) => s.originalAmount)).toEqual([290000, 290000, 290000]);
+    expect(sum(v.shares)).toBe(200000);
+    expect(sumOriginal(v.shares)).toBe(870000);
+  });
+
+  it("takes the card amount when the card charge is typed", () => {
+    const v = valueFor({ currency: "VND", amount: "3,200,000", fx: "charged", charged: "7,412.60", rate: "bad" });
+    expect(v.amount).toBe(741260);
+    expect(v.money).toEqual({ kind: "charged", currency: "VND", original: 3200000 });
+    expect(sum(v.shares)).toBe(741260);
+    expect(sumOriginal(v.shares)).toBe(3200000);
+  });
+
+  it("splits unevenly in the cost's own currency, then converts (the worked example)", () => {
+    const four = { currency: "PHP", spotIds: ["a", "b", "c", "d"], names: { a: "You", b: "Ben", c: "Dana", d: "Eli" } };
+    const v = valueFor(
+      { ...vnd, sharedBy: ["a", "b", "c", "d"], split: "items", own: { a: "300,000", b: "200,000", d: "100,000" } },
+      four,
+    );
+    expect(v.shares.map((s) => s.originalAmount)).toEqual([367500, 267500, 67500, 167500]);
+    expect(v.shares.map((s) => s.amount)).toEqual([84483, 61494, 15517, 38506]);
+    expect(v.ownParts).toEqual({ a: 300000, b: 200000, d: 100000 });
+  });
+
+  it("puts a bad rate or card amount on the right box", () => {
+    expect(errorsFor({ ...vnd, rate: "abc" }).rate).toBe("Enter a rate, like 435.");
+    expect(errorsFor({ ...vnd, rate: "" }).rate).toBe("Enter a rate, like 435.");
+    expect(errorsFor({ ...vnd, amount: "1", rate: "1000" }).rate).toBe("That rate makes it less than ₱0.01.");
+    expect(errorsFor({ currency: "USD", amount: "1,000,000,000", fx: "rate", rate: "0.001" }).rate).toBe(
+      "That's too large.",
+    );
+    const charged = errorsFor({ ...vnd, fx: "charged", charged: "" });
+    expect(charged.charged).toBe("Enter an amount, like 1,250.50.");
+    expect(charged.rate).toBeUndefined();
+  });
+
+  it("refuses a share that converts to ₱0.00", () => {
+    const tiny = { currency: "VND", amount: "100,000", fx: "charged", charged: "0.02" };
+    expect(errorsFor(tiny).sharedBy).toBe(
+      "Dana's share comes to ₱0.00 in PHP. Add to their amount or untick them.",
+    );
+    const own = errorsFor({ ...tiny, split: "items", own: { a: "1" } });
+    expect(own.own).toContain("share comes to ₱0.00 in PHP.");
+  });
+
+  it("checks the own amounts in the selected currency", () => {
+    expect(errorsFor({ ...vnd, split: "items", own: { a: "900,000" } }).own).toBe(
+      "That's ₫30,000 more than the total.",
+    );
+  });
+});
+
+// The rate message is picked with a rough estimate, but the line is exact: a converted amount
+// rounds half up, so exactly half a centavo saves as ₱0.01 and anything under it is refused.
+describe("rate limits and other money paths", () => {
+  const solo = { sharedBy: ["a"], fx: "rate" };
+
+  it("saves exactly half a centavo as ₱0.01, and refuses anything under it as too small", () => {
+    // ₫1 at ₱1 = ₫200 is exactly ₱0.005.
+    expect(valueFor({ ...solo, currency: "VND", amount: "1", rate: "200" }).amount).toBe(1);
+    expect(errorsFor({ ...solo, currency: "VND", amount: "1", rate: "200.000001" }).rate).toBe(
+      "That rate makes it less than ₱0.01.",
+    );
+  });
+
+  it("names the smallest amount in a zero-decimal trip currency", () => {
+    const yen = { ...context, currency: "JPY", spotIds: ["a"] };
+    // ₱1.00 at ¥1 = ₱2 is exactly ¥0.5.
+    expect(valueFor({ ...solo, currency: "PHP", amount: "1", rate: "2" }, yen).amount).toBe(1);
+    expect(errorsFor({ ...solo, currency: "PHP", amount: "1", rate: "2.000001" }, yen).rate).toBe(
+      "That rate makes it less than ¥1.",
+    );
+  });
+
+  it("takes the largest amount exactly, and calls anything over it too large", () => {
+    const top = { ...solo, currency: "USD", amount: "1,000,000,000" };
+    expect(valueFor({ ...top, rate: "1" }).amount).toBe(100_000_000_000);
+    expect(errorsFor({ ...top, rate: "0.999999" }).rate).toBe("That's too large.");
+  });
+
+  it("reads a rate typed with thousands commas and stores it without them", () => {
+    const v = valueFor({ ...solo, currency: "VND", amount: "1,234,500", rate: "1,234.5" });
+    expect(v.amount).toBe(100000);
+    expect(v.money).toEqual({ kind: "rate", currency: "VND", original: 1234500, rate: "1234.5" });
+    expect(errorsFor({ ...solo, currency: "VND", amount: "1,234,500", rate: "1,23" }).rate).toBe(
+      "Enter a rate, like 435.",
+    );
+  });
+
+  it("takes a card amount in whole units when the trip currency has no decimals", () => {
+    const dongTrip = { ...context, currency: "VND", spotIds: ["a", "b"] };
+    const yen = { currency: "JPY", amount: "10,000", fx: "charged", sharedBy: ["a", "b"] };
+    const v = valueFor({ ...yen, charged: "1,700,001" }, dongTrip);
+    expect(v.amount).toBe(1700001);
+    expect(v.money).toEqual({ kind: "charged", currency: "JPY", original: 10000 });
+    expect(v.shares).toEqual([
+      { spotId: "a", amount: 850001, originalAmount: 5000 },
+      { spotId: "b", amount: 850000, originalAmount: 5000 },
+    ]);
+    expect(errorsFor({ ...yen, charged: "1,700,000.50" }, dongTrip).charged).toBe("Enter an amount, like 1,250.");
   });
 });

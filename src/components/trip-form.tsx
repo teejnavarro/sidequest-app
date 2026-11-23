@@ -202,7 +202,7 @@ export function TripForm(props: TripFormProps) {
         <Field
           id="currency"
           label="Main currency"
-          help={currencyLocked ? "Can't change once costs are logged." : "Costs are added up in this currency."}
+          help={currencyLocked ? "Can't change once costs are logged, including any in the trash." : "Costs are added up in this currency."}
           error={errors.currency}
         >
           <SelectBox>

@@ -229,10 +229,39 @@ export const cost = pgTable(
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
+    // Foreign-currency cost: the amount in `original_currency`, and the rate typed as
+    // "1 <trip currency> = <rate> <original currency>" (null when the card amount was typed).
+    originalAmount: bigint("original_amount", { mode: "number" }),
+    originalCurrency: text("original_currency"),
+    rate: text("rate"),
+    // Trash: set by Delete, cleared by Restore. No cascade from user, like created_by.
+    deletedAt: timestamp("deleted_at"),
+    deletedBy: text("deleted_by").references(() => user.id),
   },
   (table) => [
     index("cost_tripId_idx").on(table.tripId),
     check("cost_amount_positive", sql`${table.amount} > 0`),
+    check(
+      "cost_original_pair",
+      sql`(${table.originalAmount} is null) = (${table.originalCurrency} is null)`,
+    ),
+    check(
+      "cost_original_positive",
+      sql`${table.originalAmount} is null or ${table.originalAmount} > 0`,
+    ),
+    check(
+      "cost_original_differs",
+      sql`${table.originalCurrency} is null or ${table.originalCurrency} <> ${table.currency}`,
+    ),
+    check(
+      "cost_rate_needs_original",
+      sql`${table.rate} is null or ${table.originalAmount} is not null`,
+    ),
+    check(
+      "cost_rate_format",
+      sql`${table.rate} is null or ${table.rate} ~ '^[0-9]{1,7}(\\.[0-9]{1,6})?$'`,
+    ),
+    check("cost_deleted_pair", sql`(${table.deletedAt} is null) = (${table.deletedBy} is null)`),
   ],
 );
 
@@ -248,10 +277,16 @@ export const costShare = pgTable(
       .notNull()
       .references(() => tripMember.id),
     amount: bigint("amount", { mode: "number" }).notNull(),
+    // The share in the cost's original currency; set only when cost.original_amount is set.
+    originalAmount: bigint("original_amount", { mode: "number" }),
   },
   (table) => [
     primaryKey({ columns: [table.costId, table.spotId] }),
     index("cost_share_spotId_idx").on(table.spotId),
     check("cost_share_amount_nonnegative", sql`${table.amount} >= 0`),
+    check(
+      "cost_share_original_nonnegative",
+      sql`${table.originalAmount} is null or ${table.originalAmount} >= 0`,
+    ),
   ],
 );

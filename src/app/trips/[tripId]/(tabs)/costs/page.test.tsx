@@ -56,7 +56,7 @@ beforeEach(() => {
   seq = 0;
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
   mocks.getTripForMember.mockResolvedValue(trip);
-  mocks.listCostsForMember.mockResolvedValue({ costs: [], total: 0 });
+  mocks.listCostsForMember.mockResolvedValue({ costs: [], total: 0, trashCount: 0 });
   mocks.getBalancesForMember.mockResolvedValue(balances(0));
 });
 
@@ -92,11 +92,55 @@ describe("the Costs tab", () => {
     expect(html).not.toContain("Your balance for this trip");
   });
 
-  const twoCosts = () =>
+  const twoCosts = (trashCount = 0) =>
     mocks.listCostsForMember.mockResolvedValue({
       costs: [cost("Dinner", "2027-05-09"), cost("Taxi", "2027-05-09", { amount: 25050 })],
       total: 125050,
+      trashCount,
     });
+
+  it("shows the original under the amount of a cost in another currency, and only then", async () => {
+    mocks.listCostsForMember.mockResolvedValue({
+      costs: [
+        cost("Dinner", "2027-05-09", { amount: 200000, original: { amount: 870000, currency: "VND" } }),
+        cost("Taxi", "2027-05-09", { original: null }),
+      ],
+      total: 300000,
+      trashCount: 0,
+    });
+    const html = await render();
+    expect(html).toContain('₱2,000.00</span><span class="text-xs text-muted">₫870,000</span>');
+    expect(html.match(/text-xs text-muted">₫/g)).toHaveLength(1);
+  });
+
+  it("hides the Trash link when the trash is empty, and shows the CSV download as a plain link", async () => {
+    twoCosts(0);
+    const html = await render();
+    expect(html).not.toContain("Trash (");
+    expect(html).not.toContain("/costs/trash");
+    expect(html).toMatch(/<a href="\/trips\/trip-1\/costs\/export" download=""[^>]*>[^]*Download costs \(CSV\)/);
+  });
+
+  it("shows Trash (2) with a link to the trash page when two costs are in it", async () => {
+    twoCosts(2);
+    const html = await render();
+    expect(html).toContain('href="/trips/trip-1/costs/trash"');
+    expect(html).toMatch(/Trash \((<!-- -->)?2(<!-- -->)?\)/);
+  });
+
+  it("shows the Trash link, but no download, when there are no costs and the trash has some", async () => {
+    mocks.listCostsForMember.mockResolvedValue({ costs: [], total: 0, trashCount: 1 });
+    const html = await render();
+    expect(html).toContain("No costs yet.");
+    expect(html).toContain('href="/trips/trip-1/costs/trash"');
+    expect(html).not.toContain("Download costs");
+  });
+
+  it("shows neither link on an empty trip with an empty trash", async () => {
+    const html = await render();
+    expect(html).not.toContain("/costs/trash");
+    expect(html).not.toContain("Download costs");
+  });
 
   it("shows what you are owed in green words, the total and the count, and the link", async () => {
     twoCosts();

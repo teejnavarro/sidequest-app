@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  allocateLike,
   amountText,
+  currencySymbol,
+  convertByRate,
+  effectiveRateText,
   formatMoney,
   minorDigits,
   parseAmount,
+  parseRate,
+  rateText,
   splitByItems,
   splitEqually,
 } from "./money";
@@ -290,5 +296,118 @@ describe("splitByItems", () => {
       expect(result.shares.reduce((s, x) => s + x.amount, 0)).toBe(total);
       for (const share of result.shares) expect(share.amount).toBe(share.own + share.equalPart);
     }
+  });
+});
+
+describe("parseRate", () => {
+  const rate = (raw: string) => {
+    const result = parseRate(raw);
+    return result.ok ? result.rate : result.error;
+  };
+
+  it("normalizes what was typed", () => {
+    expect(rate("435")).toBe("435");
+    expect(rate("0435")).toBe("435");
+    expect(rate("435.50")).toBe("435.5");
+    expect(rate("435.0")).toBe("435");
+    expect(rate("1,234.5")).toBe("1234.5");
+    expect(rate(" 2.65 ")).toBe("2.65");
+    expect(rate("0.0435")).toBe("0.0435");
+    expect(rate(".5")).toBe("0.5");
+  });
+
+  it("refuses bad text and zero", () => {
+    for (const raw of ["", "abc", "12,34", "0", "0.000", "1 000", "-5", "."]) {
+      expect(rate(raw)).toBe("Enter a rate, like 435.");
+    }
+  });
+
+  it("enforces 7 whole digits and 6 decimals", () => {
+    expect(rate("9999999")).toBe("9999999");
+    expect(rate("10000000")).toBe("That rate is too large.");
+    expect(rate("1.123456")).toBe("1.123456");
+    expect(rate("1.1234567")).toBe("Enter a rate, like 435.");
+    expect(rate("1.1234560")).toBe("1.123456");
+  });
+});
+
+describe("convertByRate", () => {
+  const convert = (original: number, from: string, to: string, rate: string) =>
+    convertByRate({ original, from, to, rate });
+
+  it("converts dong to pesos", () => {
+    expect(convert(870000, "VND", "PHP", "435")).toBe(200000);
+    expect(convert(250000, "VND", "PHP", "435")).toBe(57471);
+  });
+
+  it("rounds half up", () => {
+    // 1 / 2 pesos' worth: 5 dong at 200 = 0.025 pesos = 2.5 centavos -> 3
+    expect(convert(5, "VND", "PHP", "200")).toBe(3);
+    expect(convert(7, "VND", "PHP", "200")).toBe(4); // 3.5 centavos
+  });
+
+  it("uses the target's digits (JPY has none)", () => {
+    expect(convert(10000, "PHP", "JPY", "0.4")).toBe(250);
+    expect(convert(10000, "PHP", "JPY", "2.65")).toBe(38);
+  });
+
+  it("handles decimal rates", () => {
+    expect(convert(265, "USD", "PHP", "2.65")).toBe(100);
+    expect(convert(4350, "PHP", "VND", "0.0435")).toBe(1000);
+  });
+
+  it("returns null when too small or too large", () => {
+    expect(convert(1, "VND", "PHP", "1000")).toBe(null);
+    expect(convert(1_000_000_000_00, "VND", "PHP", "0.0001")).toBe(null);
+  });
+});
+
+describe("effectiveRateText", () => {
+  it("shows the rate a card charge implies", () => {
+    expect(effectiveRateText({ original: 3200000, from: "VND", main: 741260, to: "PHP" })).toBe(
+      "431.70",
+    );
+    expect(effectiveRateText({ original: 870000, from: "VND", main: 200000, to: "PHP" })).toBe(
+      "435.00",
+    );
+  });
+});
+
+describe("allocateLike", () => {
+  const w = (...amounts: number[]) => amounts.map((amount, i) => ({ spotId: `s${i}`, amount }));
+  const sum = (shares: { amount: number }[]) => shares.reduce((s, x) => s + x.amount, 0);
+
+  it("gives the worked example", () => {
+    const shares = allocateLike(200000, w(367500, 267500, 67500, 167500), "s0");
+    expect(shares.map((s) => s.amount)).toEqual([84483, 61494, 15517, 38506]);
+  });
+
+  it("always sums exactly", () => {
+    for (const total of [1, 7, 99999, 200001]) {
+      expect(sum(allocateLike(total, w(3, 5, 11, 1), "s2"))).toBe(total);
+    }
+  });
+
+  it("matches splitEqually for equal weights, payer first", () => {
+    for (const payer of ["s0", "s1", "s2", "other"]) {
+      const ids = ["s0", "s1", "s2"];
+      const expected = splitEqually(100, ids, payer);
+      expect(allocateLike(100, w(50, 50, 50), payer)).toEqual(expected);
+    }
+  });
+
+  it("gives a zero weight nothing", () => {
+    const shares = allocateLike(100, w(0, 1, 2), "s0");
+    expect(shares[0]?.amount).toBe(0);
+    expect(sum(shares)).toBe(100);
+  });
+});
+
+describe("currencySymbol and rateText", () => {
+  it("shows the short sign and a rate as people say it", () => {
+    expect(currencySymbol("PHP")).toBe("₱");
+    expect(currencySymbol("VND")).toBe("₫");
+    expect(currencySymbol("XXXX")).toBe("XXXX");
+    expect(rateText("435", "VND", "PHP")).toBe("₱1 = ₫435");
   });
 });

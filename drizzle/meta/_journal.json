@@ -71,6 +71,13 @@
       "when": 1794633394014,
       "tag": "0009_bumpy_roughhouse",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795402450294,
+      "tag": "0010_hard_la_nuit",
+      "breakpoints": true
     }
   ]
 }

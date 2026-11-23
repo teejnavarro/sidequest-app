@@ -20,7 +20,7 @@ async function EditTripContent({ params }: { params: Promise<{ tripId: string }>
   // The owner can only leave after handing the trip to another person, so the hint about that
   // shows only when there is another person (guests can't own a trip).
   // The currency can't change once the trip has costs.
-  const currencyLocked = (await countCostsForTrip(tripId, user.id)) > 0;
+  const currencyLocked = (await countCostsForTrip(tripId, user.id)).total > 0;
 
   const isOwner = trip.ownerId === user.id;
   const hasOtherPerson = isOwner

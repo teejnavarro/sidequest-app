@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareItems, dayLabel, formatTime, sortKey, tripDays, whenLabel } from "./schedule-options";
+import { compareItems, dayLabel, dayTimeLabel, formatTime, sortKey, tripDays, whenLabel } from "./schedule-options";
 
 describe("tripDays", () => {
   it("lists a one-day trip", () => {
@@ -33,6 +33,18 @@ describe("tripDays", () => {
 describe("dayLabel", () => {
   it("writes the weekday, month and day", () => {
     expect(dayLabel("2027-05-09")).toBe("Sun, May 9");
+  });
+});
+
+describe("dayTimeLabel", () => {
+  it("writes the day and the 24-hour time on the given time zone's clock", () => {
+    const at = new Date("2026-11-23T06:05:00Z");
+    expect(dayTimeLabel(at, "Asia/Manila")).toBe("Mon, Nov 23, 14:05");
+    expect(dayTimeLabel(at, "America/Los_Angeles")).toBe("Sun, Nov 22, 22:05");
+  });
+
+  it("writes midnight as 00:00, not 24:00", () => {
+    expect(dayTimeLabel(new Date("2026-11-22T16:00:00Z"), "Asia/Manila")).toBe("Mon, Nov 23, 00:00");
   });
 });
 

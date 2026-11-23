@@ -50,7 +50,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.listTripMembers.mockResolvedValue([]);
-  mocks.countCostsForTrip.mockResolvedValue(0);
+  mocks.countCostsForTrip.mockResolvedValue({ total: 0, trashed: 0 });
 });
 
 // The layout's check does not protect this page, so the page must check for itself.
@@ -102,7 +102,7 @@ describe("EditTripPage currency lock", () => {
     mocks.getTripForMember.mockResolvedValue(trip);
     expect(show(await renderContent())).toContain('"currencyLocked":false');
     expect(mocks.countCostsForTrip).toHaveBeenCalledWith("trip-1", "u1");
-    mocks.countCostsForTrip.mockResolvedValue(3);
+    mocks.countCostsForTrip.mockResolvedValue({ total: 3, trashed: 0 });
     expect(show(await renderContent())).toContain('"currencyLocked":true');
   });
 });

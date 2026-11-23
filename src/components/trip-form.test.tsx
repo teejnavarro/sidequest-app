@@ -35,7 +35,7 @@ describe("TripForm", () => {
     expect(locked).toContain('<input type="hidden" name="currency" value="VND"/>');
     expect(locked.match(/name="currency"/g)).toHaveLength(1);
     expect(locked).toMatch(/<select id="currency"[^>]*disabled/);
-    expect(locked).toContain("Can&#x27;t change once costs are logged.");
+    expect(locked).toContain("Can&#x27;t change once costs are logged, including any in the trash.");
     const open = renderToStaticMarkup(<TripForm mode="edit" tripId="t1" values={trip} />);
     expect(open).not.toContain('type="hidden" name="currency"');
     expect(open).toMatch(/<select id="currency" name="currency"/);

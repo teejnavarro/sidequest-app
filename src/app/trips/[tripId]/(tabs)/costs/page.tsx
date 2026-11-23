@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CaretRight, Plus } from "@phosphor-icons/react/dist/ssr";
+import { CaretRight, DownloadSimple, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getBalancesForMember, listCostsForMember, type CostListItem } from "@/lib/costs";
@@ -10,7 +10,7 @@ import { formatMoney } from "@/lib/money";
 import { dayLabel } from "@/lib/schedule-options";
 import { BalanceLine } from "@/components/balance-line";
 import { CostCategoryIcon } from "@/components/cost-category";
-import { cardClass, focusRing, primaryButton, screenClass, skeleton } from "@/components/ui";
+import { cardClass, focusRing, linkClass, primaryButton, screenClass, skeleton } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Costs | Sidequest" };
 
@@ -29,7 +29,12 @@ function CostRow({ cost, tripId }: { cost: CostListItem; tripId: string }) {
           <CostCategoryIcon category={cost.category} />
         </span>
         <span className="text-[15px] font-bold wrap-anywhere">{cost.description}</span>
-        <span className="text-[15px] font-bold tabular-nums">{formatMoney(cost.amount, cost.currency)}</span>
+        <span className="grid justify-items-end tabular-nums">
+          <span className="text-[15px] font-bold">{formatMoney(cost.amount, cost.currency)}</span>
+          {cost.original ? (
+            <span className="text-xs text-muted">{formatMoney(cost.original.amount, cost.original.currency)}</span>
+          ) : null}
+        </span>
         <span className="col-span-2 text-[13px] text-muted wrap-anywhere">
           {cost.payer.isYou ? "You" : cost.payer.name}
           {cost.payer.hasLeft ? <span className="text-muted"> (left the trip)</span> : null} paid · split {count(cost.shareCount, "way")} ·{" "}
@@ -47,6 +52,28 @@ function CostRow({ cost, tripId }: { cost: CostListItem; tripId: string }) {
         </span>
       </Link>
     </li>
+  );
+}
+
+// The quiet links under the list. The download is a plain link, so it isn't prefetched. The
+// trash link only shows when something is in the trash.
+function CostLinks({ tripId, trashCount, download }: { tripId: string; trashCount: number; download: boolean }) {
+  if (trashCount === 0 && !download) return null;
+  return (
+    <div className="flex flex-wrap gap-x-[18px] gap-y-1">
+      {trashCount > 0 ? (
+        <Link href={`/trips/${tripId}/costs/trash`} className={linkClass}>
+          <Trash size={18} aria-hidden="true" />
+          Trash ({trashCount})
+        </Link>
+      ) : null}
+      {download ? (
+        <a href={`/trips/${tripId}/costs/export`} download className={linkClass}>
+          <DownloadSimple size={18} aria-hidden="true" />
+          Download costs (CSV)
+        </a>
+      ) : null}
+    </div>
   );
 }
 
@@ -69,7 +96,7 @@ async function CostsContent({ params }: { params: Promise<{ tripId: string }> })
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
 
-  const [{ costs }, balances] = await Promise.all([
+  const [{ costs, trashCount }, balances] = await Promise.all([
     listCostsForMember(tripId, user.id),
     getBalancesForMember(tripId, user.id),
   ]);
@@ -90,6 +117,7 @@ async function CostsContent({ params }: { params: Promise<{ tripId: string }> })
           <p>Log the first one: who paid, and who shares it.</p>
           {logButton}
         </section>
+        <CostLinks tripId={tripId} trashCount={trashCount} download={false} />
       </main>
     );
   }
@@ -125,6 +153,8 @@ async function CostsContent({ params }: { params: Promise<{ tripId: string }> })
           </div>
         ))}
       </section>
+
+      <CostLinks tripId={tripId} trashCount={trashCount} download />
     </main>
   );
 }

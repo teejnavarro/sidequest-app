@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { deleteCostAction, reviewOrSaveCostAction } from "./actions";
+import { deleteCostAction, restoreCostAction, reviewOrSaveCostAction } from "./actions";
 import { emptyCostValues, type CostFormState } from "@/lib/cost-form-state";
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createCost: vi.fn(),
   updateCost: vi.fn(),
   deleteCost: vi.fn(),
+  restoreCost: vi.fn(),
   getCostForMember: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn((url: string) => {
@@ -27,6 +28,7 @@ vi.mock("@/lib/costs", () => ({
   createCost: mocks.createCost,
   updateCost: mocks.updateCost,
   deleteCost: mocks.deleteCost,
+  restoreCost: mocks.restoreCost,
   getCostForMember: mocks.getCostForMember,
 }));
 
@@ -65,10 +67,11 @@ const saved = {
   category: "food",
   spentOn: "2027-03-12",
   paidBy: "a",
+  original: null,
   shares: [
-    { spotId: "a", amount: 33334 },
-    { spotId: "b", amount: 33333 },
-    { spotId: "g", amount: 33333 },
+    { spotId: "a", amount: 33334, originalAmount: null },
+    { spotId: "b", amount: 33333, originalAmount: null },
+    { spotId: "g", amount: 33333, originalAmount: null },
   ],
   updatedAt: new Date(OPENED),
 };
@@ -105,9 +108,9 @@ describe("reviewOrSaveCostAction, uneven split", () => {
     await expect(reviewOrSaveCostAction(initial, form({ ...own, step: "save" }))).rejects.toThrow(LIST);
     const input = mocks.createCost.mock.calls[0][3];
     expect(input.shares).toEqual([
-      { spotId: "a", amount: 98667 },
-      { spotId: "b", amount: 28667 },
-      { spotId: "g", amount: 58666 },
+      { spotId: "a", amount: 98667, originalAmount: null },
+      { spotId: "b", amount: 28667, originalAmount: null },
+      { spotId: "g", amount: 58666, originalAmount: null },
     ]);
   });
 
@@ -173,6 +176,24 @@ describe("reviewOrSaveCostAction, new cost", () => {
     expect(mocks.createCost).not.toHaveBeenCalled();
   });
 
+  it("reads the currency, fx, rate and charged fields and saves the converted cost", async () => {
+    const send = (extra: Record<string, string>) =>
+      reviewOrSaveCostAction(initial, form({ currency: "VND", amount: "870,000", rate: "435", ...extra }));
+    const review = await send({});
+    expect(review.errors).toEqual({});
+    expect(review.values).toMatchObject({ currency: "VND", fx: "rate", rate: "435", charged: "" });
+    await expect(send({ step: "save" })).rejects.toThrow(LIST);
+    expect(mocks.createCost).toHaveBeenLastCalledWith(
+      "trip-1",
+      "u1",
+      COST_ID,
+      expect.objectContaining({ amount: 200000, money: { kind: "rate", currency: "VND", original: 870000, rate: "435" } }),
+    );
+    const card = await send({ fx: "charged", charged: "bad" });
+    expect(card.errors.charged).toBe("Enter an amount, like 1,250.50.");
+    expect(card.values.fx).toBe("charged");
+  });
+
   it("returns the review with exact shares and the extra centavo on the payer, saving nothing yet", async () => {
     const state = await reviewOrSaveCostAction(initial, form());
     expect(mocks.createCost).not.toHaveBeenCalled();
@@ -193,7 +214,7 @@ describe("reviewOrSaveCostAction, new cost", () => {
     await expect(
       reviewOrSaveCostAction(
         initial,
-        form({ step: "save", createdBy: "u2", updatedBy: "u2", currency: "USD", shares: "9", amountMinor: "1" }),
+        form({ step: "save", createdBy: "u2", updatedBy: "u2", tripCurrency: "USD", shares: "9", amountMinor: "1" }),
       ),
     ).rejects.toThrow(LIST);
     expect(mocks.createCost).toHaveBeenCalledTimes(1);
@@ -204,11 +225,12 @@ describe("reviewOrSaveCostAction, new cost", () => {
       category: "food",
       spentOn: "2027-03-12",
       shares: [
-        { spotId: "a", amount: 33334 },
-        { spotId: "b", amount: 33333 },
-        { spotId: "g", amount: 33333 },
+        { spotId: "a", amount: 33334, originalAmount: null },
+        { spotId: "b", amount: 33333, originalAmount: null },
+        { spotId: "g", amount: 33333, originalAmount: null },
       ],
       ownParts: null,
+      money: { kind: "trip" },
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1/costs");
   });
@@ -218,7 +240,7 @@ describe("reviewOrSaveCostAction, new cost", () => {
     expect(state.errors.sharedBy).toBe("Pick who shares it.");
     expect(mocks.createCost).not.toHaveBeenCalled();
     await expect(reviewOrSaveCostAction(initial, form({ step: "save", amount: "250" }, ["b"]))).rejects.toThrow(LIST);
-    expect(mocks.createCost).toHaveBeenLastCalledWith("trip-1", "u1", COST_ID, expect.objectContaining({ amount: 25000, shares: [{ spotId: "b", amount: 25000 }] }));
+    expect(mocks.createCost).toHaveBeenLastCalledWith("trip-1", "u1", COST_ID, expect.objectContaining({ amount: 25000, shares: [{ spotId: "b", amount: 25000, originalAmount: null }] }));
   });
 
   it("uses the trip's currency, so a zero-decimal trip takes whole amounts only", async () => {
@@ -334,6 +356,10 @@ describe("reviewOrSaveCostAction, edit", () => {
       category: "food",
       split: "items",
       own: expect.any(Object),
+      currency: "",
+      fx: "rate",
+      rate: "",
+      charged: "",
     });
     expect(state.updatedAt).toBe("2027-03-12T11:00:00.000Z");
     expect(state.review).toBeNull();
@@ -409,6 +435,42 @@ describe("deleteCostAction", () => {
     mocks.deleteCost.mockRejectedValue(new Error("database down"));
     await expect(deleteCostAction({}, form())).resolves.toEqual({
       error: "Couldn't delete the cost. Please try again.",
+    });
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+});
+
+describe("restoreCostAction", () => {
+  const form = (extra: Record<string, string> = {}) =>
+    formWith({ tripId: "trip-1", costId: COST_ID, ...extra }, []);
+
+  it("restores nothing when signed out", async () => {
+    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    await expect(restoreCostAction({}, form())).rejects.toThrow("redirect:/");
+    expect(mocks.restoreCost).not.toHaveBeenCalled();
+  });
+
+  it("goes back without restoring when an id is missing", async () => {
+    await expect(restoreCostAction({}, formWith({ costId: COST_ID }, []))).rejects.toThrow("redirect:/trips");
+    await expect(restoreCostAction({}, formWith({ tripId: "trip-1" }, []))).rejects.toThrow(LIST);
+    expect(mocks.restoreCost).not.toHaveBeenCalled();
+  });
+
+  it("restores as the signed-in person, ignoring extra fields, and goes to the Costs tab", async () => {
+    await expect(restoreCostAction({}, form({ userId: "u2" }))).rejects.toThrow(LIST);
+    expect(mocks.restoreCost).toHaveBeenCalledWith("trip-1", COST_ID, "u1");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1/costs");
+  });
+
+  it("ends in the same place when nothing was restored", async () => {
+    mocks.restoreCost.mockResolvedValue(false);
+    await expect(restoreCostAction({}, form())).rejects.toThrow(LIST);
+  });
+
+  it("shows a plain message when the restore throws", async () => {
+    mocks.restoreCost.mockRejectedValue(new Error("database down"));
+    await expect(restoreCostAction({}, form())).resolves.toEqual({
+      error: "Couldn't restore the cost. Please try again.",
     });
     expect(mocks.redirect).not.toHaveBeenCalled();
   });

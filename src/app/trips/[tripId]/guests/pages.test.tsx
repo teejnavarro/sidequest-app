@@ -43,7 +43,7 @@ async function renderContent(page: (p: typeof props) => ReactElement) {
 }
 
 const TRIP = { id: "trip-1", name: "Saigon barkada", ownerId: "owner" };
-const GUEST = { spotId: "spot-1", name: "Lito", addedById: "u2", addedByName: "Ben Santos", costCount: 0 };
+const GUEST = { spotId: "spot-1", name: "Lito", addedById: "u2", addedByName: "Ben Santos", costCount: 0, trashedCostCount: 0 };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -105,6 +105,9 @@ describe("Edit guest", () => {
     expect(out).not.toContain("Remove guest");
     mocks.getGuestForEditor.mockResolvedValue({ ...GUEST, costCount: 1 });
     expect(await html()).toContain("Lito is part of 1 cost, so they");
+    expect(await html()).not.toContain("in the trash");
+    mocks.getGuestForEditor.mockResolvedValue({ ...GUEST, costCount: 2, trashedCostCount: 1 });
+    expect(await html()).toContain("Lito is part of 2 costs (1 in the trash), so they can&#x27;t be removed.");
   });
 
   it("names the adder's first name and the trip owner for another editor", async () => {

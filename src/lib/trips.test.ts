@@ -377,13 +377,14 @@ describe("addGuest", () => {
 
 describe("changing a guest", () => {
   it("getGuestForEditor checks guest, trip, member and adder-or-owner in the query", async () => {
-    fake.rows = [["spot-1", "Lia", "u2", "Ben", "2"]];
+    fake.rows = [["spot-1", "Lia", "u2", "Ben", "2", "1"]];
     await expect(getGuestForEditor("trip-1", "spot-1", "u2")).resolves.toEqual({
       spotId: "spot-1",
       name: "Lia",
       addedById: "u2",
       addedByName: "Ben",
       costCount: 2,
+      trashedCostCount: 1,
     });
     const { sql, params } = fake.queries[0];
     expect(sql).toContain('"trip_member"."user_id" is null');

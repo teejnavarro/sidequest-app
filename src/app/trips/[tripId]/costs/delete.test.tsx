@@ -54,7 +54,10 @@ describe("Delete cost page", () => {
   it("asks first, with Keep cost as the main button and Delete cost as the red one", async () => {
     const html = await run();
     expect(html).toContain("Delete Dinner &lt;b&gt;?");
-    expect(html).toContain("This deletes it for everyone. You can&#x27;t undo this.");
+    expect(html).toContain(
+      "It moves to the trash for everyone and stops counting in balances. Anyone in the trip can put it back.",
+    );
+    expect(html).not.toContain("You can&#x27;t undo this");
     const keep = html.match(/<a [^>]*href="\/trips\/trip-1\/costs\/cost-1\/edit"[^>]*>Keep cost<\/a>/)?.[0] ?? "";
     expect(keep).toContain("bg-amber");
     expect(html).toContain("data-delete");

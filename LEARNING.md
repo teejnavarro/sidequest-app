@@ -630,3 +630,44 @@ person who left still shows in balances while they owe or are owed money, marked
 ### No live database update needed
 
 Nothing new is stored, so there is no migration for this story.
+
+## Chapter 14: Other currencies, the trash and spreadsheets
+
+### The problem
+
+On a trip to Vietnam most costs are in dong, but the group settles up in pesos. Someone also taps
+Delete by mistake, and someone wants the costs in a spreadsheet.
+
+### Convert once, keep both receipts
+
+When you log a dong cost, the app works out the peso amount once, on Save, and stores it next to
+the dong amount and the rate. Balances and settle-up only read the peso number, so they didn't
+change at all. Think of a peso receipt with the dong receipt stapled behind it: the staple is the
+rate. We did not convert every time a page loads, because a rate or a rounding rule that changes
+later would quietly change old balances.
+
+You can also type what the card was charged in pesos. Banks add a fee, so that peso amount is the
+truth and the rate is only shown for reference.
+
+### Splitting after converting: the largest remainder
+
+If you split 870,000 dong four ways in dong first, each share converts to pesos with leftover
+fractions of a centavo, and the four peso shares might add up to a centavo too much or too little.
+So the app splits in dong, then hands out the peso total in proportion, giving the spare centavos
+to the shares with the biggest leftover fractions. It is like dividing a pizza: cut it as fairly as
+you can, and give the odd slice to whoever was shorted the most. The shares always add up to the
+exact total. All of this uses whole numbers (BigInt), never decimals.
+
+### The trash is a mark, not a move
+
+Delete now stamps "deleted at" and "deleted by" on the cost instead of removing it, like putting a
+paper in a recycling bin instead of shredding it. Every place that reads costs skips marked ones,
+so balances and lists ignore it. Restore wipes the stamp. A few places must still see trashed costs:
+the currency lock (otherwise you could restore a peso cost into a yen trip), the "this guest is in a
+cost" check, and deleting a whole trip.
+
+### Spreadsheets and accents
+
+The CSV is built on the server, only for members. It starts with an invisible marker (a BOM) so Excel
+shows "Bún Chả" correctly. A description that starts with = + - or @ gets an apostrophe in front, so
+Excel never runs it as a formula.

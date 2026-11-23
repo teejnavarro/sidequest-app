@@ -34,6 +34,10 @@ const filled = {
   category: "food",
   split: "equal",
   own: {},
+  currency: "",
+  fx: "rate",
+  rate: "",
+  charged: "",
 };
 
 const form = (extra: Partial<Parameters<typeof CostForm>[0]> = {}) =>
@@ -94,7 +98,7 @@ describe("CostForm", () => {
     expect(html).toContain('value="Dinner"');
     expect(html).toContain('value="1250.50"');
     expect(html).toContain('value="2027-05-09"');
-    expect(html).toContain(">₱<");
+    expect(html).toContain('<option value="PHP" selected="">₱ PHP</option>');
     for (const label of ["No category", "Food", "Transport", "Lodging", "Activities", "Shopping", "Other"]) {
       expect(html).toContain(`>${label}</option>`);
     }
@@ -105,7 +109,7 @@ describe("CostForm", () => {
     expect(form()).toContain('inputMode="decimal"');
     const vnd = form({ currency: "VND" });
     expect(vnd).toContain('inputMode="numeric"');
-    expect(vnd).toContain(">₫<");
+    expect(vnd).toContain('<option value="VND" selected="">₫ VND</option>');
     expect(vnd).toContain('placeholder="250,000"');
   });
 
@@ -171,10 +175,17 @@ describe("CostForm, uneven split panel", () => {
     );
   });
 
-  it("pins today's wording when the leftover is smaller than the group", () => {
-    // Save refuses this case (SQ-014 decision B); the helper still shows the split as is.
+  it("shows the left-over error Save would give, not a part of 0 to 1 each", () => {
     const tiny = { ...items, amount: "2", own: {} };
-    expect(form({ values: tiny, currency: "VND" })).toContain("₫2 left over, shared equally: ₫0 to ₫1 each<");
+    const html = form({ values: tiny, currency: "VND" });
+    expect(html).toContain("₫2 left over can&#x27;t be shared by 3 people. Add it to someone&#x27;s amount.");
+    expect(html).not.toContain("₫0 to ₫1 each");
+    expect(html).toMatch(/bg-card text-owe">₫2 left over/);
+  });
+
+  it("names the person whose share would be 0, the way Save does", () => {
+    const html = form({ values: { ...items, amount: "1000", own: { a: "1000" }, sharedBy: ["a", "b"] }, currency: "VND" });
+    expect(html).toContain("Ben&#x27;s share comes to ₫0. Untick Ben or add an amount.");
   });
 
   it("gives one person in the split the whole leftover as their part", () => {
@@ -204,7 +215,7 @@ describe("CostForm, uneven split panel", () => {
 
   it("leaves every other box and dropdown full width", () => {
     const html = form({ values: items });
-    expect(html.match(/<input[^>]*name="amount"[^>]*>/)![0]).toContain("w-full");
+    expect(html.match(/<input[^>]*name="amount"[^>]*>/)![0]).toContain("flex-1");
     expect(html.match(/<select[^>]*name="category"[^>]*>/)![0]).toContain("w-full");
   });
 
@@ -233,6 +244,92 @@ describe("CostForm, uneven split panel", () => {
     const clean = form({ values: items });
     expect(clean).not.toContain('aria-describedby="own-error"');
     expect(clean).not.toContain('id="own-error"');
+  });
+});
+
+describe("CostForm, another currency", () => {
+  const vnd = { ...filled, amount: "870000", currency: "VND", rate: "435" };
+
+  it("shows no panel for the trip currency, and the select lists it first", () => {
+    const html = form({ values: filled });
+    expect(html).not.toContain("Use a rate");
+    expect(html).not.toContain('id="rate"');
+    expect(html).toContain('<select name="currency" aria-label="Currency"');
+    expect(html.match(/<option value="[A-Z]{3}"/g)).toHaveLength(17);
+    expect(html).toMatch(/<select name="currency"[^>]*>[^]*?<option value="PHP" selected="">/);
+    // Hidden twins keep the four fields in the form either way.
+    expect(html).toContain('name="fx" value="rate"');
+  });
+
+  it("opens the panel when another currency is picked, with a rate box and the live line", () => {
+    const html = form({ values: vnd });
+    expect(html).toContain('<option value="VND" selected="">₫ VND</option>');
+    expect(html).toContain("Use a rate");
+    expect(html).toContain("Card charged pesos");
+    expect(html).toMatch(/name="fx"[^>]*checked=""[^>]*value="rate"|checked=""[^>]*name="fx"|name="fx" checked="" value="rate"/);
+    expect(html).toContain("₱1 =");
+    expect(html).toContain('name="rate"');
+    expect(html).toContain('placeholder="435"');
+    expect(html).toContain("That&#x27;s ₱2,000.00");
+    expect(html).not.toContain('name="charged"');
+  });
+
+  it("shows the card amount box and what the rate works out to", () => {
+    const html = form({ values: { ...vnd, amount: "3200000", fx: "charged", charged: "7412.60" } });
+    expect(html).toContain("Pesos charged");
+    expect(html).toContain("From your card or bank app.");
+    expect(html).toContain('name="charged"');
+    expect(html).not.toContain('name="rate"');
+    expect(html).toContain("Works out to ₱1 = ₫431.70");
+  });
+
+  it("hides the live line while the boxes don't parse", () => {
+    expect(form({ values: { ...vnd, rate: "" } })).not.toContain("That&#x27;s ₱");
+    expect(form({ values: { ...vnd, rate: "abc" } })).not.toContain("That&#x27;s ₱");
+  });
+
+  it("names the trip currency in the panel when it is not pesos", () => {
+    const html = form({ currency: "USD", values: { ...vnd, fx: "charged" } });
+    expect(html).toContain("Card charged USD");
+    expect(html).toContain("USD charged");
+  });
+
+  it("follows the picked currency in the amount placeholder and the own boxes", () => {
+    const html = form({ values: { ...vnd, split: "items", own: { a: "300000" } } });
+    expect(html).toContain('placeholder="250,000"');
+    expect(html).toContain('inputMode="numeric"');
+    expect(html).toMatch(/shrink-0 text-base font-bold text-muted">₫<\/span><input[^>]*name="own:a"/);
+  });
+
+  it("carries all four fields in the review's hidden inputs", () => {
+    const values = { ...vnd, fx: "charged", charged: "7412.60" };
+    const review = {
+      kind: "new", currency: "PHP", description: "Dinner", amount: 741260, original: null, category: null,
+      spentOn: "2027-05-09", payer: { spotId: "b", name: "Ben", isYou: false },
+      shares: [{ spotId: "a", name: "Maya", isYou: true, amount: 741260, originalAmount: null, own: null }],
+      uneven: false, rest: 741260, extraTakers: [], changes: [], shareChanges: [],
+    };
+    fake.serverState = { errors: {}, values, review, notice: null, updatedAt: "" };
+    try {
+      const html = form({ values });
+      expect(html).toContain('name="currency" value="VND"');
+      expect(html).toContain('name="fx" value="charged"');
+      expect(html).toContain('name="rate" value="435"');
+      expect(html).toContain('name="charged" value="7412.60"');
+    } finally {
+      fake.serverState = null;
+    }
+  });
+
+  it("links a rate or card amount error to its box", () => {
+    fake.serverState = { errors: { rate: "That's too large." }, values: vnd, review: null, notice: null, updatedAt: "" };
+    try {
+      const html = form({ values: vnd });
+      expect(html).toContain('id="rate-error"');
+      expect(html).toContain('aria-describedby="rate-error"');
+    } finally {
+      fake.serverState = null;
+    }
   });
 });
 

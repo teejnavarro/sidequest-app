@@ -38,8 +38,9 @@ async function EditGuestContent({ params }: { params: Params }) {
         </div>
         {guest.costCount > 0 ? (
           <p className={`${helpClass} wrap-anywhere`}>
-            {guest.name} is part of {guest.costCount} {guest.costCount === 1 ? "cost" : "costs"}, so they
-            can&apos;t be removed.
+            {guest.name} is part of {guest.costCount} {guest.costCount === 1 ? "cost" : "costs"}
+            {guest.trashedCostCount > 0 ? ` (${guest.trashedCostCount} in the trash)` : ""}, so they can&apos;t be
+            removed.
           </p>
         ) : (
           <>

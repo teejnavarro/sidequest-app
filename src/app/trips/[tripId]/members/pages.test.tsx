@@ -51,7 +51,7 @@ async function renderContent(page: (p: typeof props) => ReactElement) {
 }
 
 const TRIP = { id: "trip-1", name: "Saigon barkada", ownerId: "owner" };
-const MEMBER = { spotId: "spot-1", userId: "u2", name: "Bea Santos", image: null, costCount: 0 };
+const MEMBER = { spotId: "spot-1", userId: "u2", name: "Bea Santos", image: null, costCount: 0, trashedCostCount: 0 };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -112,6 +112,9 @@ describe("Member", () => {
     expect(await html()).toContain("Part of 1 cost<");
     mocks.getMemberForOwner.mockResolvedValue({ ...MEMBER, costCount: 3 });
     expect(await html()).toContain("Part of 3 costs");
+    expect(await html()).not.toContain("in the trash");
+    mocks.getMemberForOwner.mockResolvedValue({ ...MEMBER, costCount: 2, trashedCostCount: 1 });
+    expect(await html()).toContain("Part of 2 costs (1 in the trash)");
   });
 });
 

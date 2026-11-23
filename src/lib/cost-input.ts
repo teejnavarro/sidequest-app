@@ -1,17 +1,42 @@
 import { isBlankLooking } from "@/lib/display-name";
 import { isCostCategory } from "@/lib/cost-options";
-import { formatMoney, parseAmount, splitByItems, splitEqually, type Share } from "@/lib/money";
+import { CURRENCIES } from "@/lib/trip-options";
+import {
+  allocateLike,
+  convertByRate,
+  formatMoney,
+  minorDigits,
+  parseAmount,
+  parseRate,
+  splitByItems,
+  splitEqually,
+  type OwnAmount,
+  type Share,
+} from "@/lib/money";
 import { isCalendarDay } from "@/lib/trip-dates";
 
-// What a checked cost looks like: the amount in minor units and the equal shares, which
-// always come from splitEqually and add up to the amount.
+// How the cost was entered. "trip": in the trip's currency. "rate": in another currency,
+// converted at "1 <trip currency> = rate <currency>". "charged": in another currency, with the
+// trip-currency amount the card was charged typed in. `original` is minor units of `currency`.
+export type CostMoney =
+  | { kind: "trip" }
+  | { kind: "rate"; currency: string; original: number; rate: string }
+  | { kind: "charged"; currency: string; original: number };
+
+// A person's part: `amount` in the trip currency, and `originalAmount` in the cost's own
+// currency (null when the cost is in the trip currency).
+export type CostShare = Share & { originalAmount: number | null };
+
+// What a checked cost looks like: the amount in the trip currency (minor units) and the shares,
+// which always add up to the amount.
 export type CostInput = {
   description: string;
   amount: number;
   paidBy: string; // a spot id
   category: string | null;
   spentOn: string; // "YYYY-MM-DD"
-  shares: Share[]; // in the trip's list order
+  shares: CostShare[]; // in the trip's list order
+  money: CostMoney;
 };
 
 // What the form holds: everything is text.
@@ -24,6 +49,11 @@ export type CostRaw = {
   category: string;
   split: string; // "equal" or "items"
   own: Record<string, string>; // spot id -> what that person had, as typed
+  // `amount` and `own` are in this currency; "" means the trip's currency.
+  currency: string;
+  fx: string; // "rate" or "charged", for a currency other than the trip's
+  rate: string; // "1 <trip currency> = rate <currency>", as typed
+  charged: string; // the trip-currency amount the card charged, as typed
 };
 
 export type CostField = keyof CostRaw;
@@ -70,8 +100,37 @@ export function validateCostInput(
     errors.description = `Keep it to ${DESCRIPTION_MAX} characters or fewer.`;
   }
 
-  const parsed = parseAmount(text(raw.amount), context.currency);
+  // The cost's own currency: the trip's when empty or the same.
+  const typedCurrency = text(raw.currency);
+  const known = CURRENCIES.some((option) => option.value === typedCurrency);
+  if (typedCurrency !== "" && !known) errors.currency = "Pick a currency from the list.";
+  const selected = known ? typedCurrency : context.currency;
+  const foreign = selected !== context.currency;
+
+  const parsed = parseAmount(text(raw.amount), selected);
   if (!parsed.ok) errors.amount = parsed.error;
+
+  // The amount in the trip currency: typed (trip cost), typed as the card charge, or converted.
+  let main: number | null = !foreign && parsed.ok ? parsed.minor : null;
+  let money: CostMoney = { kind: "trip" };
+  if (foreign && parsed.ok) {
+    if (text(raw.fx) === "charged") {
+      const charged = parseAmount(text(raw.charged), context.currency);
+      if (!charged.ok) errors.charged = charged.error;
+      else {
+        main = charged.minor;
+        money = { kind: "charged", currency: selected, original: parsed.minor };
+      }
+    } else {
+      const rate = parseRate(text(raw.rate));
+      if (!rate.ok) errors.rate = rate.error;
+      else {
+        main = convertByRate({ original: parsed.minor, from: selected, to: context.currency, rate: rate.rate });
+        if (main === null) errors.rate = rateRangeError(parsed.minor, selected, rate.rate, context.currency);
+        else money = { kind: "rate", currency: selected, original: parsed.minor, rate: rate.rate };
+      }
+    }
+  }
 
   const paidBy = text(raw.paidBy);
   if (!context.spotIds.includes(paidBy)) errors.paidBy = "Pick who paid.";
@@ -91,28 +150,65 @@ export function validateCostInput(
   const category = text(raw.category);
   if (category !== "" && !isCostCategory(category)) errors.category = "Pick a category from the list.";
 
-  // Uneven split: what each person had, then the rest shared equally. Only when asked for.
+  // The split is worked out in the cost's own currency; a foreign cost is then converted share
+  // by share, so the shares always add up to the trip-currency amount.
   let shares: Share[] | null = null;
   let ownParts: Record<string, number> | null = null;
   if (text(raw.split) === "items" && parsed.ok && !errors.sharedBy) {
-    const outcome = splitOwn(textRecord(raw.own), { ...context, total: parsed.minor, sharedBy, paidBy });
+    const outcome = splitOwn(textRecord(raw.own), {
+      ...context,
+      currency: selected,
+      total: parsed.minor,
+      sharedBy,
+      paidBy,
+    });
     if ("error" in outcome) errors.own = outcome.error;
     else ({ shares, ownParts } = outcome);
   }
 
-  if (Object.keys(errors).length > 0 || !parsed.ok) return { ok: false, errors };
+  if (Object.keys(errors).length > 0 || !parsed.ok || main === null) return { ok: false, errors };
+  const own = shares ?? splitEqually(parsed.minor, sharedBy, paidBy);
+  let finalShares: CostShare[];
+  if (!foreign) {
+    finalShares = own.map((share) => ({ ...share, originalAmount: null }));
+  } else {
+    finalShares = allocateLike(main, own, paidBy).map((share, index) => ({
+      ...share,
+      originalAmount: own[index]!.amount,
+    }));
+    const empty = finalShares.find((share) => share.amount === 0 && share.originalAmount! > 0)?.spotId;
+    if (empty) {
+      const who = context.names[empty] === "You";
+      const label = context.names[empty] ?? "Someone";
+      const message = `${who ? "Your" : `${label}'s`} share comes to ${formatMoney(0, context.currency)} in ${context.currency}. Add to ${who ? "your" : "their"} amount or untick ${who ? "yourself" : "them"}.`;
+      if (ownParts === null) errors.sharedBy = message;
+      else errors.own = message;
+      return { ok: false, errors };
+    }
+  }
   return {
     ok: true,
     value: {
       description,
-      amount: parsed.minor,
+      amount: main,
       paidBy,
       category: category === "" ? null : category,
       spentOn,
-      shares: shares ?? splitEqually(parsed.minor, sharedBy, paidBy),
+      shares: finalShares,
+      money,
       ownParts,
     },
   };
+}
+
+// Why a rate gave no usable amount: under one minor unit of the trip currency, or over the
+// largest amount. Only picks the message (the check itself is exact, in convertByRate).
+function rateRangeError(original: number, from: string, rate: string, to: string): string {
+  const approx = original / 10 ** minorDigits(from) / Number(rate);
+  if (approx * 10 ** minorDigits(to) < 1) {
+    return `That rate makes it less than ${formatMoney(1, to)}.`;
+  }
+  return "That's too large.";
 }
 
 // Works out an uneven split from the typed own amounts, or says what is wrong with them. The
@@ -152,14 +248,35 @@ function splitOwn(
       };
     }
   }
-  const result = splitByItems(
+  const outcome = splitOwnRule({
     total,
     sharedBy,
-    Object.entries(own).map(([spotId, minor]) => ({ spotId, own: minor })),
+    own: Object.entries(own).map(([spotId, minor]) => ({ spotId, own: minor })),
     paidBy,
-  );
+    currency,
+    names,
+  });
+  if ("error" in outcome) return outcome;
+  return { shares: outcome.shares, ownParts: own };
+}
+
+// The rule for an uneven split, shared by the server (splitOwn) and the form's helper line, so
+// both say the same thing: what each person had plus an equal part of the rest. Amounts are in
+// `currency`. Either the shares (and what was left over to share), or the first problem.
+export function splitOwnRule(options: {
+  total: number;
+  sharedBy: string[];
+  own: OwnAmount[];
+  paidBy: string;
+  currency: string;
+  names: Record<string, string>;
+}): { error: string } | { shares: Share[]; rest: number } {
+  const { total, sharedBy, own, paidBy, currency, names } = options;
+  const name = (id: string) => names[id] ?? "Someone";
+  const you = (id: string) => name(id) === "You";
+  const result = splitByItems(total, sharedBy, own, paidBy);
   if (!result) {
-    const given = Object.values(own).reduce((sum, minor) => sum + minor, 0);
+    const given = own.reduce((sum, item) => sum + item.own, 0);
     return { error: `That's ${formatMoney(given - total, currency)} more than the total.` };
   }
   // No one ticked may end with a share of 0 (owner decision 2026-11-20), so a reopened uneven
@@ -178,5 +295,5 @@ function splitOwn(
       error: `${formatMoney(result.rest, currency)} left over can't be shared by ${sharedBy.length} people. Add it to someone's amount.`,
     };
   }
-  return { shares: result.shares.map(({ spotId, amount }) => ({ spotId, amount })), ownParts: own };
+  return { shares: result.shares.map(({ spotId, amount }) => ({ spotId, amount })), rest: result.rest };
 }

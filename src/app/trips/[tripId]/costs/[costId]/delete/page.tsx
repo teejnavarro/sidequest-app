@@ -30,7 +30,9 @@ async function DeleteCostContent({ params }: { params: Params }) {
           <h2 id="delete-title" className="text-[19px] wrap-anywhere">
             Delete {cost.description}?
           </h2>
-          <p>This deletes it for everyone. You can&apos;t undo this.</p>
+          <p>
+            It moves to the trash for everyone and stops counting in balances. Anyone in the trip can put it back.
+          </p>
           <div className="grid gap-3">
             <Link href={`/trips/${trip.id}/costs/${cost.id}/edit`} className={`${primaryButton} w-full`}>
               Keep cost

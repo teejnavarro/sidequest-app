@@ -172,6 +172,7 @@ describe("guests on the dev database", () => {
       addedById: ADDER,
       addedByName: "Ada Test",
       costCount: 0,
+      trashedCostCount: 0,
     });
     await expect(trips.getGuestForEditor(tripId, dana, OWNER)).resolves.toMatchObject({ spotId: dana });
     await expect(trips.getGuestForEditor(tripId, dana, OTHER)).resolves.toBeNull();
