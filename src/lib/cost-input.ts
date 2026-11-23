@@ -1,6 +1,13 @@
 import { isBlankLooking } from "@/lib/display-name";
 import { isCostCategory } from "@/lib/cost-options";
-import { formatMoney, parseAmount, splitByItems, splitEqually, type Share } from "@/lib/money";
+import {
+  formatMoney,
+  parseAmount,
+  splitByItems,
+  splitEqually,
+  type OwnAmount,
+  type Share,
+} from "@/lib/money";
 import { isCalendarDay } from "@/lib/trip-dates";
 
 // How the cost was entered. "trip": in the trip's currency. "rate": in another currency,
@@ -169,14 +176,35 @@ function splitOwn(
       };
     }
   }
-  const result = splitByItems(
+  const outcome = splitOwnRule({
     total,
     sharedBy,
-    Object.entries(own).map(([spotId, minor]) => ({ spotId, own: minor })),
+    own: Object.entries(own).map(([spotId, minor]) => ({ spotId, own: minor })),
     paidBy,
-  );
+    currency,
+    names,
+  });
+  if ("error" in outcome) return outcome;
+  return { shares: outcome.shares, ownParts: own };
+}
+
+// The rule for an uneven split, shared by the server (splitOwn) and the form's helper line, so
+// both say the same thing: what each person had plus an equal part of the rest. Amounts are in
+// `currency`. Either the shares (and what was left over to share), or the first problem.
+export function splitOwnRule(options: {
+  total: number;
+  sharedBy: string[];
+  own: OwnAmount[];
+  paidBy: string;
+  currency: string;
+  names: Record<string, string>;
+}): { error: string } | { shares: Share[]; rest: number } {
+  const { total, sharedBy, own, paidBy, currency, names } = options;
+  const name = (id: string) => names[id] ?? "Someone";
+  const you = (id: string) => name(id) === "You";
+  const result = splitByItems(total, sharedBy, own, paidBy);
   if (!result) {
-    const given = Object.values(own).reduce((sum, minor) => sum + minor, 0);
+    const given = own.reduce((sum, item) => sum + item.own, 0);
     return { error: `That's ${formatMoney(given - total, currency)} more than the total.` };
   }
   // No one ticked may end with a share of 0 (owner decision 2026-11-20), so a reopened uneven
@@ -195,5 +223,5 @@ function splitOwn(
       error: `${formatMoney(result.rest, currency)} left over can't be shared by ${sharedBy.length} people. Add it to someone's amount.`,
     };
   }
-  return { shares: result.shares.map(({ spotId, amount }) => ({ spotId, amount })), ownParts: own };
+  return { shares: result.shares.map(({ spotId, amount }) => ({ spotId, amount })), rest: result.rest };
 }

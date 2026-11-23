@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COST_CATEGORIES, costCategoryOf, isCostCategory } from "./cost-options";
-import { validateCostInput } from "./cost-input";
+import { splitOwnRule, validateCostInput } from "./cost-input";
 
 const context = { currency: "PHP", spotIds: ["a", "b", "c"], names: { a: "You", b: "Ben", c: "Dana" } };
 
@@ -122,6 +122,36 @@ describe("uneven splits (own amounts)", () => {
     const e = errorsFor(items({ a: "9999" }, { amount: "" }));
     expect(e.amount).toBeDefined();
     expect(e.own).toBeUndefined();
+  });
+});
+
+describe("splitOwnRule", () => {
+  const names = { a: "You", b: "Ben", c: "Dana" };
+  const rule = (total: number, own: { spotId: string; own: number }[], currency = "PHP") =>
+    splitOwnRule({ total, sharedBy: ["a", "b", "c"], own, paidBy: "a", currency, names });
+
+  it("gives the shares and what was left over", () => {
+    expect(rule(10000, [{ spotId: "a", own: 4000 }])).toEqual({
+      shares: [
+        { spotId: "a", amount: 6000 },
+        { spotId: "b", amount: 2000 },
+        { spotId: "c", amount: 2000 },
+      ],
+      rest: 6000,
+    });
+  });
+
+  it("refuses a left-over centavo that three people can't share", () => {
+    expect(rule(1, [])).toEqual({
+      error: "₱0.01 left over can't be shared by 3 people. Add it to someone's amount.",
+    });
+  });
+
+  it("keeps the exact current messages for too much and a zero share", () => {
+    expect(rule(1000, [{ spotId: "a", own: 1500 }])).toEqual({ error: "That's ₱5.00 more than the total." });
+    expect(rule(1000, [{ spotId: "a", own: 500 }, { spotId: "b", own: 500 }])).toEqual({
+      error: "Dana's share comes to ₱0.00. Untick Dana or add an amount.",
+    });
   });
 });
 
