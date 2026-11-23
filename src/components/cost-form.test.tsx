@@ -171,6 +171,43 @@ describe("CostForm, uneven split panel", () => {
     );
   });
 
+  it("pins today's wording when the leftover is smaller than the group", () => {
+    // Save refuses this case (SQ-014 decision B); the helper still shows the split as is.
+    const tiny = { ...items, amount: "2", own: {} };
+    expect(form({ values: tiny, currency: "VND" })).toContain("₫2 left over, shared equally: ₫0 to ₫1 each<");
+  });
+
+  it("gives one person in the split the whole leftover as their part", () => {
+    const solo = { ...items, sharedBy: ["a"], amount: "1000", own: { a: "400" } };
+    const html = form({ values: solo, currency: "VND" });
+    expect(html.match(/name="own:/g)).toHaveLength(1);
+    expect(html).toContain("₫600 left over, shared equally: ₫600 each<");
+  });
+
+  it("says nothing is left over when the own amounts use up the total", () => {
+    const html = form({ values: { ...items, own: { a: "1000", b: "560", g: "300" } } });
+    expect(html).toContain(">Nothing left over.<");
+    expect(html).not.toContain("shared equally");
+  });
+
+  it("keeps a long name with its Guest and Left tags before the symbol, and the symbol can't shrink", () => {
+    const crew: CostPerson[] = [
+      ...people,
+      { spotId: "c", userId: "c", name: "Christopher", image: null, isGuest: true, isYou: false, hasLeft: true },
+    ];
+    const html = form({ people: crew, values: { ...items, sharedBy: ["a", "c"] }, currency: "VND" });
+    const panel = html.slice(html.indexOf('id="own-panel"'));
+    const row = panel.slice(panel.indexOf("Christopher"), panel.indexOf('name="own:c"'));
+    expect(row).toMatch(/^Christopher<span[^>]*>Guest<\/span><span[^>]*>Left<\/span><\/span>/);
+    expect(row).toMatch(/<span aria-hidden="true" class="shrink-0[^"]*">₫<\/span><input/);
+  });
+
+  it("leaves every other box and dropdown full width", () => {
+    const html = form({ values: items });
+    expect(html.match(/<input[^>]*name="amount"[^>]*>/)![0]).toContain("w-full");
+    expect(html.match(/<select[^>]*name="category"[^>]*>/)![0]).toContain("w-full");
+  });
+
   it("gives the own box a fixed width without w-full, so names keep their room", () => {
     const html = form({ values: items });
     const own = html.match(/<input[^>]*name="own:a"[^>]*>/)![0];
