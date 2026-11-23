@@ -151,7 +151,7 @@ describe("CostForm, uneven split panel", () => {
   });
 
   it("shows the live helper: left over and the equal part, or over the total in red", () => {
-    expect(form({ values: items })).toContain("₱860.00 left over, shared equally<");
+    expect(form({ values: items })).toContain("₱860.00 left over, shared equally: ₱286.66 to ₱286.67 each<");
     expect(form({ values: { ...items, own: { a: "600", g: "300" } } })).toContain(
       "₱960.00 left over, shared equally: ₱320.00 each",
     );
@@ -159,7 +159,15 @@ describe("CostForm, uneven split panel", () => {
     expect(over).toContain("That&#x27;s ₱40.00 more than the total.");
     expect(over).toContain("text-owe");
     expect(form({ values: { ...items, amount: "1000.01", own: { a: "100" } } })).toContain(
-      "₱900.01 left over, shared equally<",
+      "₱900.01 left over, shared equally: ₱300.00 to ₱300.01 each<",
+    );
+  });
+
+  it("says each person's part in VND, even and uneven", () => {
+    const vnd = { ...items, amount: "100002", own: {} };
+    expect(form({ values: vnd, currency: "VND" })).toContain("₫100,002 left over, shared equally: ₫33,334 each<");
+    expect(form({ values: { ...vnd, amount: "100000" }, currency: "VND" })).toContain(
+      "₫100,000 left over, shared equally: ₫33,333 to ₫33,334 each<",
     );
   });
 

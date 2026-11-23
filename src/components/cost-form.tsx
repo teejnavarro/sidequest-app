@@ -6,7 +6,7 @@ import { reviewOrSaveCostAction } from "@/app/trips/[tripId]/costs/actions";
 import type { CostFormState, CostFormValues, CostPerson } from "@/lib/cost-form-state";
 import { COST_CATEGORIES } from "@/lib/cost-options";
 import { currencySymbol } from "@/lib/idea-options";
-import { formatMoney, minorDigits, parseAmount, splitByItems } from "@/lib/money";
+import { formatMoney, minorDigits, parseAmount, splitByItems, splitEqually } from "@/lib/money";
 import { CostReviewView } from "@/components/cost-review";
 import { Face } from "@/components/face";
 import { Field, describedBy } from "@/components/form-fields";
@@ -104,9 +104,11 @@ function ownHelper(amount: string, own: Record<string, string>, sharedBy: string
     return { over: true, text: `That's ${formatMoney(given - total.minor, currency)} more than the total.` };
   }
   if (split.rest === 0) return { over: false, text: "Nothing left over." };
-  const left = formatMoney(split.rest, currency);
-  const each = split.rest % sharedBy.length === 0 ? `: ${formatMoney(split.rest / sharedBy.length, currency)} each` : "";
-  return { over: false, text: `${left} left over, shared equally${each}` };
+  const parts = splitEqually(split.rest, sharedBy, "").map((part) => part.amount);
+  const low = Math.min(...parts);
+  const high = Math.max(...parts);
+  const each = low === high ? formatMoney(low, currency) : `${formatMoney(low, currency)} to ${formatMoney(high, currency)}`;
+  return { over: false, text: `${formatMoney(split.rest, currency)} left over, shared equally: ${each} each` };
 }
 
 // One form for logging and editing a cost. "Review" sends it to the server, which checks it
