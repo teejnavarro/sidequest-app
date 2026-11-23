@@ -163,6 +163,15 @@ describe("CostForm, uneven split panel", () => {
     );
   });
 
+  it("gives the own box a fixed width without w-full, so names keep their room", () => {
+    const html = form({ values: items });
+    const own = html.match(/<input[^>]*name="own:a"[^>]*>/)![0];
+    expect(own).toContain("w-28");
+    expect(own).toContain("shrink-0");
+    expect(own).not.toContain("w-full");
+    expect(html.match(/<input[^>]*name="description"[^>]*>/)![0]).toContain("w-full");
+  });
+
   it("links the server's own-amount error to every box, so a screen reader reads it", () => {
     const message = "That's ₱40.00 more than the total.";
     fake.serverState = { errors: { own: message }, values: items, review: null, notice: null, updatedAt: "" };

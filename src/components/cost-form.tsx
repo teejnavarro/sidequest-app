@@ -14,6 +14,7 @@ import {
   errorClass,
   focusRing,
   guestTag,
+  inputBoxClass,
   inputClass,
   labelClass,
   primaryButton,
@@ -287,7 +288,7 @@ export function CostForm(props: CostFormProps) {
                       {person.isGuest ? <span className={`${guestTag} ml-2`}>Guest</span> : null}
                       {person.hasLeft ? <span className={`${guestTag} ml-2`}>Left</span> : null}
                     </span>
-                    <span aria-hidden="true" className="text-base font-bold text-muted">
+                    <span aria-hidden="true" className="shrink-0 text-base font-bold text-muted">
                       {currencySymbol(props.currency)}
                     </span>
                     <input
@@ -301,7 +302,7 @@ export function CostForm(props: CostFormProps) {
                       aria-describedby={errors.own ? "own-error" : undefined}
                       autoComplete="off"
                       placeholder="0"
-                      className={`${inputClass} ${placeholder} w-28 text-right tabular-nums`}
+                      className={`${inputBoxClass} ${placeholder} w-28 shrink-0 text-right tabular-nums`}
                     />
                   </div>
                 ))}

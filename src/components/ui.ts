@@ -11,7 +11,9 @@ export const primaryButton = `${button} min-h-12 bg-amber px-[22px] text-on-ambe
 export const quietButton = `${button} min-h-12 bg-chip px-[22px] text-ink`;
 export const smallQuietButton = `${button} min-h-11 bg-chip px-4 text-sm text-ink`;
 
-export const inputClass = `min-h-12 w-full rounded-field border border-muted bg-card px-3.5 text-base text-ink ${focus}`;
+// The input look without a width, for a box that sets its own (a width and `w-full` would clash).
+export const inputBoxClass = `min-h-12 rounded-field border border-muted bg-card px-3.5 text-base text-ink ${focus}`;
+export const inputClass = `${inputBoxClass} w-full`;
 // A dropdown: the same box as an input, with the native arrow removed. Put it in a
 // `relative` wrapper with a caret icon that ignores pointer events, and leave room for it.
 export const selectClass = `${inputClass} appearance-none pr-10`;
