@@ -221,6 +221,7 @@ describe("whole trips through the cost checks", () => {
             category: null,
             spentOn: "2027-05-09",
             paidBy,
+            original: null,
             shares,
             updatedAt: new Date(0),
           };

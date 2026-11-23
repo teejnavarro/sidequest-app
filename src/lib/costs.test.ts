@@ -50,10 +50,11 @@ const input: CostInput = {
   category: "food",
   spentOn: "2027-03-12",
   shares: [
-    { spotId: "spot-a", amount: 33334 },
-    { spotId: "spot-b", amount: 33333 },
-    { spotId: "spot-c", amount: 33333 },
+    { spotId: "spot-a", amount: 33334, originalAmount: null },
+    { spotId: "spot-b", amount: 33333, originalAmount: null },
+    { spotId: "spot-c", amount: 33333, originalAmount: null },
   ],
+  money: { kind: "trip" },
 };
 
 beforeEach(() => {
@@ -80,9 +81,9 @@ describe("listCostsForMember", () => {
 
   it("shapes each row, uses first names and adds up the total", async () => {
     fake.rows = [
-      ["c1", "Taxi", 25050, "PHP", null, "2027-03-13", "spot-b", "Ben Cruz", false, false, false, "2", null, "u1", "Ana Reyes", "u2", "Ben Cruz"],
-      ["c2", "Dinner", 100000, "PHP", "food", "2027-03-12", "spot-a", "Ana Reyes", false, true, false, "3", "33334", "u1", "Ana Reyes", "u1", "Ana Reyes"],
-      ["c3", "Tour", 5, "PHP", "activities", "2027-03-12", "spot-g", "Dana", true, false, false, "1", "5", "u1", "Ana Reyes", "u1", "Ana Reyes"],
+      ["c1", "Taxi", 25050, "PHP", null, null, null, "2027-03-13", "spot-b", "Ben Cruz", false, false, false, "2", null, "u1", "Ana Reyes", "u2", "Ben Cruz"],
+      ["c2", "Dinner", 100000, "PHP", null, null, "food", "2027-03-12", "spot-a", "Ana Reyes", false, true, false, "3", "33334", "u1", "Ana Reyes", "u1", "Ana Reyes"],
+      ["c3", "Tour", 5, "PHP", null, null, "activities", "2027-03-12", "spot-g", "Dana", true, false, false, "1", "5", "u1", "Ana Reyes", "u1", "Ana Reyes"],
     ];
     const list = await listCostsForMember("trip-1", "u1");
     expect(list.total).toBe(125055);
@@ -91,6 +92,7 @@ describe("listCostsForMember", () => {
       description: "Taxi",
       amount: 25050,
       currency: "PHP",
+      original: null,
       category: null,
       spentOn: "2027-03-13",
       payer: { spotId: "spot-b", name: "Ben Cruz", isGuest: false, isYou: false, hasLeft: false },
@@ -118,15 +120,16 @@ describe("getCostForMember", () => {
   it("reads the shares with the same checks and keeps the saved time", async () => {
     const updatedAt = new Date("2027-03-12T10:00:00.123Z");
     fake.queue = [
-      [["c1", "Dinner", 100000, "PHP", "food", "2027-03-12", "spot-a", updatedAt.toISOString().replace("T", " ").replace("Z", "")]],
-      [["spot-a", 50000], ["spot-b", 50000]],
+      [["c1", "Dinner", 100000, "PHP", null, null, null, "food", "2027-03-12", "spot-a", updatedAt.toISOString().replace("T", " ").replace("Z", "")]],
+      [["spot-a", 50000, null], ["spot-b", 50000, null]],
     ];
     const found = await getCostForMember("trip-1", "c1", "u1");
     expect(found).toMatchObject({
       id: "c1",
       amount: 100000,
       paidBy: "spot-a",
-      shares: [{ spotId: "spot-a", amount: 50000 }, { spotId: "spot-b", amount: 50000 }],
+      original: null,
+      shares: [{ spotId: "spot-a", amount: 50000, originalAmount: null }, { spotId: "spot-b", amount: 50000, originalAmount: null }],
     });
     expect(found?.updatedAt.getTime()).toBe(updatedAt.getTime());
     expect(fake.queries[1].sql).toContain('"viewer"."user_id" = $');

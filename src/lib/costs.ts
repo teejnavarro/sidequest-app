@@ -6,7 +6,7 @@ import { user } from "@/db/auth-schema";
 import { cost, costShare, trip, tripMember } from "@/db/trip-schema";
 import { firstNameOf } from "@/lib/display-name";
 import { isMemberOf } from "@/lib/ideas";
-import type { CostInput } from "@/lib/cost-input";
+import type { CostInput, CostMoney } from "@/lib/cost-input";
 import { type Payment, balancesOf, settleUp } from "@/lib/balances";
 
 // The privacy layer for shared costs, next to trips.ts and ideas.ts. Same rules: every
@@ -25,6 +25,7 @@ export type CostListItem = {
   description: string;
   amount: number; // minor units of `currency`
   currency: string;
+  original: { amount: number; currency: string } | null; // minor units of its own currency
   category: string | null;
   spentOn: string; // "YYYY-MM-DD"
   payer: { spotId: string; name: string; isGuest: boolean; isYou: boolean; hasLeft: boolean };
@@ -33,6 +34,21 @@ export type CostListItem = {
   addedBy: string; // first name
   editedBy: string | null; // first name of the last editor, only when it is someone else
 };
+
+// The foreign-currency columns for a cost: all null for a cost in the trip's currency.
+function originalColumns(money: CostMoney) {
+  if (money.kind === "trip") return { amount: null, currency: null, rate: null };
+  return {
+    amount: money.original,
+    currency: money.currency,
+    rate: money.kind === "rate" ? money.rate : null,
+  };
+}
+
+// What a cost was in its own currency, for showing under the trip-currency amount.
+function originalOf(row: { amount: number | null; currency: string | null }) {
+  return row.amount === null || row.currency === null ? null : { amount: row.amount, currency: row.currency };
+}
 
 export type CostList = { costs: CostListItem[]; total: number; trashCount: number };
 
@@ -44,7 +60,8 @@ export type CostDetails = {
   category: string | null;
   spentOn: string;
   paidBy: string; // a spot id
-  shares: { spotId: string; amount: number }[]; // in the trip's list order
+  original: { amount: number; currency: string; rate: string | null } | null;
+  shares: { spotId: string; amount: number; originalAmount: number | null }[]; // in the trip's list order
   updatedAt: Date;
 };
 
@@ -84,6 +101,8 @@ export async function listCostsForMember(tripId: string, userId: string): Promis
       description: cost.description,
       amount: cost.amount,
       currency: cost.currency,
+      originalAmount: cost.originalAmount,
+      originalCurrency: cost.originalCurrency,
       category: cost.category,
       spentOn: cost.spentOn,
       payerSpotId: payerSpot.id,
@@ -120,6 +139,7 @@ export async function listCostsForMember(tripId: string, userId: string): Promis
     description: row.description,
     amount: row.amount,
     currency: row.currency,
+    original: originalOf({ amount: row.originalAmount, currency: row.originalCurrency }),
     category: row.category,
     spentOn: row.spentOn,
     payer: {
@@ -151,6 +171,9 @@ export async function getCostForMember(
       description: cost.description,
       amount: cost.amount,
       currency: cost.currency,
+      originalAmount: cost.originalAmount,
+      originalCurrency: cost.originalCurrency,
+      rate: cost.rate,
       category: cost.category,
       spentOn: cost.spentOn,
       paidBy: cost.paidBy,
@@ -162,13 +185,15 @@ export async function getCostForMember(
   const row = rows[0];
   if (!row) return null;
   const shares = await db
-    .select({ spotId: costShare.spotId, amount: costShare.amount })
+    .select({ spotId: costShare.spotId, amount: costShare.amount, originalAmount: costShare.originalAmount })
     .from(costShare)
     .innerJoin(cost, eq(cost.id, costShare.costId))
     .innerJoin(tripMember, eq(tripMember.id, costShare.spotId))
     .where(and(eq(costShare.costId, costId), found))
     .orderBy(asc(tripMember.joinedAt), asc(tripMember.id));
-  return { ...row, shares };
+  const { originalAmount, originalCurrency, rate, ...rest } = row;
+  const original = originalOf({ amount: originalAmount, currency: originalCurrency });
+  return { ...rest, original: original && { ...original, rate }, shares };
 }
 
 // Adds a cost and its shares, only if the person is in the trip and every spot in it belongs
@@ -181,6 +206,7 @@ export async function createCost(
   id: string,
   input: CostInput,
 ): Promise<"ok" | "not-found"> {
+  const original = originalColumns(input.money);
   const insertCost = db
     .insert(cost)
     .select(
@@ -198,9 +224,9 @@ export async function createCost(
           updatedBy: sql<string>`${userId}::text`.as("updated_by"),
           createdAt: sql<Date>`now()`.as("created_at"),
           updatedAt: sql<Date>`now()`.as("updated_at"),
-          originalAmount: sql<number | null>`null::bigint`.as("original_amount"),
-          originalCurrency: sql<string | null>`null::text`.as("original_currency"),
-          rate: sql<string | null>`null::text`.as("rate"),
+          originalAmount: sql<number | null>`${original.amount}::bigint`.as("original_amount"),
+          originalCurrency: sql<string | null>`${original.currency}::text`.as("original_currency"),
+          rate: sql<string | null>`${original.rate}::text`.as("rate"),
           deletedAt: sql<Date | null>`null::timestamp`.as("deleted_at"),
           deletedBy: sql<string | null>`null::text`.as("deleted_by"),
         })
@@ -227,7 +253,7 @@ export async function createCost(
             costId: sql<string>`${cost.id}`.as("cost_id"),
             spotId: sql<string>`${share.spotId}::text`.as("spot_id"),
             amount: sql<number>`${share.amount}::bigint`.as("amount"),
-            originalAmount: sql<number | null>`null::bigint`.as("original_amount"),
+            originalAmount: sql<number | null>`${share.originalAmount}::bigint`.as("original_amount"),
           })
           .from(cost)
           .where(justWritten),
@@ -263,6 +289,7 @@ export async function updateCost(
   const mine = and(eq(cost.id, costId), eq(cost.tripId, tripId), live, isMemberOf(tripId, userId));
   const justSaved = and(mine, eq(cost.updatedBy, userId), sql`${cost.updatedAt} = now()`);
 
+  const original = originalColumns(input.money);
   const updateRow = db
     .update(cost)
     .set({
@@ -271,6 +298,9 @@ export async function updateCost(
       paidBy: input.paidBy,
       category: input.category,
       spentOn: input.spentOn,
+      originalAmount: original.amount,
+      originalCurrency: original.currency,
+      rate: original.rate,
       updatedBy: userId,
       updatedAt: sql`now()`,
     })
@@ -295,7 +325,7 @@ export async function updateCost(
           costId: sql<string>`${cost.id}`.as("cost_id"),
           spotId: sql<string>`${share.spotId}::text`.as("spot_id"),
           amount: sql<number>`${share.amount}::bigint`.as("amount"),
-          originalAmount: sql<number | null>`null::bigint`.as("original_amount"),
+          originalAmount: sql<number | null>`${share.originalAmount}::bigint`.as("original_amount"),
         })
         .from(cost)
         .where(justSaved),

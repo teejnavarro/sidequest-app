@@ -27,10 +27,11 @@ const saved: CostDetails = {
   category: "food",
   spentOn: "2027-03-12",
   paidBy: "a",
+  original: null,
   shares: [
-    { spotId: "a", amount: 33334 },
-    { spotId: "b", amount: 33333 },
-    { spotId: "c", amount: 33333 },
+    { spotId: "a", amount: 33334, originalAmount: null },
+    { spotId: "b", amount: 33333, originalAmount: null },
+    { spotId: "c", amount: 33333, originalAmount: null },
   ],
   updatedAt: new Date("2027-03-12T10:00:00.000Z"),
 };
@@ -110,7 +111,7 @@ describe("buildCostReview for an edit", () => {
       currency: "PHP",
       input: checked({ amount: "1000", sharedBy: ["a", "b"], paidBy: "a" }),
       people,
-      before: { ...saved, shares: [{ spotId: "a", amount: 100000 }] },
+      before: { ...saved, shares: [{ spotId: "a", amount: 100000, originalAmount: null }] },
     });
     expect(added.shareChanges.map((c) => [c.person.name, c.before, c.after])).toEqual([
       ["Maya", 100000, 50000],
@@ -140,9 +141,9 @@ describe("valuesFromCost", () => {
       amount: 186000,
       paidBy: "b",
       shares: [
-        { spotId: "a", amount: 98666 },
-        { spotId: "b", amount: 28667 },
-        { spotId: "c", amount: 58667 },
+        { spotId: "a", amount: 98666, originalAmount: null },
+        { spotId: "b", amount: 28667, originalAmount: null },
+        { spotId: "c", amount: 58667, originalAmount: null },
       ],
     };
     const values = valuesFromCost(uneven, "1860.00");
@@ -156,9 +157,9 @@ describe("valuesFromCost", () => {
       amount: 186000,
       paidBy: "b",
       shares: [
-        { spotId: "a", amount: 79000 },
-        { spotId: "b", amount: 9000 },
-        { spotId: "c", amount: 98000 },
+        { spotId: "a", amount: 79000, originalAmount: null },
+        { spotId: "b", amount: 9000, originalAmount: null },
+        { spotId: "c", amount: 98000, originalAmount: null },
       ],
     };
     const values = valuesFromCost(uneven, "1860.00");

@@ -3,15 +3,28 @@ import { isCostCategory } from "@/lib/cost-options";
 import { formatMoney, parseAmount, splitByItems, splitEqually, type Share } from "@/lib/money";
 import { isCalendarDay } from "@/lib/trip-dates";
 
-// What a checked cost looks like: the amount in minor units and the equal shares, which
-// always come from splitEqually and add up to the amount.
+// How the cost was entered. "trip": in the trip's currency. "rate": in another currency,
+// converted at "1 <trip currency> = rate <currency>". "charged": in another currency, with the
+// trip-currency amount the card was charged typed in. `original` is minor units of `currency`.
+export type CostMoney =
+  | { kind: "trip" }
+  | { kind: "rate"; currency: string; original: number; rate: string }
+  | { kind: "charged"; currency: string; original: number };
+
+// A person's part: `amount` in the trip currency, and `originalAmount` in the cost's own
+// currency (null when the cost is in the trip currency).
+export type CostShare = Share & { originalAmount: number | null };
+
+// What a checked cost looks like: the amount in the trip currency (minor units) and the shares,
+// which always add up to the amount.
 export type CostInput = {
   description: string;
   amount: number;
   paidBy: string; // a spot id
   category: string | null;
   spentOn: string; // "YYYY-MM-DD"
-  shares: Share[]; // in the trip's list order
+  shares: CostShare[]; // in the trip's list order
+  money: CostMoney;
 };
 
 // What the form holds: everything is text.
@@ -109,7 +122,11 @@ export function validateCostInput(
       paidBy,
       category: category === "" ? null : category,
       spentOn,
-      shares: shares ?? splitEqually(parsed.minor, sharedBy, paidBy),
+      shares: (shares ?? splitEqually(parsed.minor, sharedBy, paidBy)).map((share) => ({
+        ...share,
+        originalAmount: null,
+      })),
+      money: { kind: "trip" },
       ownParts,
     },
   };

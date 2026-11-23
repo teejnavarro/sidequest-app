@@ -64,7 +64,7 @@ describe("shared costs on the dev database", () => {
   let otherTripSpot: string;
 
   const shareOf = (spots: string[], total: number, payer: string) =>
-    money.splitEqually(total, spots, payer);
+    money.splitEqually(total, spots, payer).map((share) => ({ ...share, originalAmount: null }));
 
   function input(overrides: Partial<import("./cost-input").CostInput> = {}) {
     const spotIds = [ownerSpot, adderSpot, dana];
@@ -75,6 +75,7 @@ describe("shared costs on the dev database", () => {
       category: "food",
       spentOn: "2027-03-12",
       shares: shareOf(spotIds, 100000, ownerSpot),
+      money: { kind: "trip" as const },
       ...overrides,
     };
   }
@@ -191,7 +192,7 @@ describe("shared costs on the dev database", () => {
         tripA,
         OWNER,
         costId("foreign-share"),
-        input({ shares: [{ spotId: ownerSpot, amount: 50000 }, { spotId: otherTripSpot, amount: 50000 }] }),
+        input({ shares: [{ spotId: ownerSpot, amount: 50000, originalAmount: null }, { spotId: otherTripSpot, amount: 50000, originalAmount: null }] }),
       ),
     ).resolves.toBe("not-found");
     expect((await costRows(tripA)).length).toBe(before);
@@ -219,7 +220,7 @@ describe("shared costs on the dev database", () => {
       tripA,
       OWNER,
       id,
-      input({ description: "Hijack", amount: 5, shares: [{ spotId: eli, amount: 5 }] }),
+      input({ description: "Hijack", amount: 5, shares: [{ spotId: eli, amount: 5, originalAmount: null }] }),
     );
     const [row] = (await costRows(tripA)).filter((r) => r.id === id);
     expect(row).toMatchObject({ description: "Taxi", amount: 100000 });
@@ -485,6 +486,7 @@ describe("shared costs on the dev database", () => {
         category: null,
         spentOn: "2027-03-12",
         shares: shareOf(among, amount, paidBy),
+        money: { kind: "trip" as const },
       });
     await log("bal-hotel", 600000, maya, [maya, bea, jun, dan]);
     await log("bal-pho", 180000, bea, [maya, bea, jun, dan]);
@@ -499,7 +501,8 @@ describe("shared costs on the dev database", () => {
       paidBy: otherTripSpot,
       category: null,
       spentOn: "2027-03-12",
-      shares: [{ spotId: otherTripSpot, amount: 999999 }],
+      shares: [{ spotId: otherTripSpot, amount: 999999, originalAmount: null }],
+      money: { kind: "trip" as const },
     });
 
     const seen = await costs.getBalancesForMember(tripC, OWNER);
@@ -551,6 +554,7 @@ describe("shared costs on the dev database", () => {
         category: null,
         spentOn: "2027-03-12",
         shares: shareOf([maya, ada], amount, maya),
+        money: { kind: "trip" as const },
       });
     const keep = costId("trash-keep");
     const gone = costId("trash-gone");
@@ -573,6 +577,7 @@ describe("shared costs on the dev database", () => {
       category: null,
       spentOn: "2027-03-12",
       shares: shareOf([maya, ada], 100000, maya),
+      money: { kind: "trip" as const },
     };
     await expect(costs.updateCost(t, gone, OWNER, edit, savedBefore!.updatedAt)).resolves.toBe("not-found");
     await dbModule.db.delete(schema.cost).where(orm.eq(schema.cost.id, keep));
@@ -618,6 +623,75 @@ describe("shared costs on the dev database", () => {
     expect(await costRows(t)).toEqual([]);
   }, 60_000);
 
+  it("saves, opens and lists a foreign-currency cost, and clears it when switched back", async () => {
+    const spots = [ownerSpot, adderSpot];
+    const dong = (id: string, kind: "rate" | "charged") =>
+      costs.createCost(
+        tripA,
+        OWNER,
+        id,
+        input({
+          description: "Pho",
+          amount: 200000,
+          shares: [
+            { spotId: ownerSpot, amount: 100000, originalAmount: 435000 },
+            { spotId: adderSpot, amount: 100000, originalAmount: 435000 },
+          ],
+          money:
+            kind === "rate"
+              ? { kind: "rate", currency: "VND", original: 870000, rate: "435" }
+              : { kind: "charged", currency: "VND", original: 870000 },
+        }),
+      );
+    const rateId = costId("vnd-rate");
+    const chargedId = costId("vnd-charged");
+    await dong(rateId, "rate");
+    await dong(chargedId, "charged");
+
+    const opened = await costs.getCostForMember(tripA, rateId, OWNER);
+    expect(opened).toMatchObject({
+      amount: 200000,
+      currency: "PHP",
+      original: { amount: 870000, currency: "VND", rate: "435" },
+    });
+    expect(opened!.shares.map((x) => [x.amount, x.originalAmount])).toEqual([
+      [100000, 435000],
+      [100000, 435000],
+    ]);
+    expect((await costs.getCostForMember(tripA, chargedId, OWNER))!.original).toEqual({
+      amount: 870000,
+      currency: "VND",
+      rate: null,
+    });
+    const listed = (await costs.listCostsForMember(tripA, OWNER)).costs.find((c) => c.id === rateId);
+    expect(listed!.original).toEqual({ amount: 870000, currency: "VND" });
+
+    // The same save sent twice still saves once.
+    await Promise.all([dong(rateId, "rate"), dong(rateId, "rate")]);
+    expect((await costRows(tripA)).filter((r) => r.id === rateId)).toHaveLength(1);
+    expect(await shareRows(rateId)).toHaveLength(2);
+
+    // Back to the trip currency: every original is cleared, shares too.
+    await expect(
+      costs.updateCost(
+        tripA,
+        rateId,
+        OWNER,
+        input({
+          description: "Pho",
+          amount: 200000,
+          shares: shareOf(spots, 200000, ownerSpot),
+        }),
+        opened!.updatedAt,
+      ),
+    ).resolves.toBe("ok");
+    const back = await costs.getCostForMember(tripA, rateId, OWNER);
+    expect(back!.original).toBeNull();
+    expect(back!.shares.every((x) => x.originalAmount === null)).toBe(true);
+    const row = (await costRows(tripA)).find((r) => r.id === rateId)!;
+    expect([row.originalAmount, row.originalCurrency, row.rate]).toEqual([null, null, null]);
+  });
+
   it("removes a trip's costs and shares when the trip is deleted", async () => {
     const id = costId("with-trip");
     await costs.createCost(tripB, OWNER_TWO, id, {
@@ -626,7 +700,8 @@ describe("shared costs on the dev database", () => {
       paidBy: otherTripSpot,
       category: null,
       spentOn: "2027-03-12",
-      shares: [{ spotId: otherTripSpot, amount: 5000 }],
+      shares: [{ spotId: otherTripSpot, amount: 5000, originalAmount: null }],
+      money: { kind: "trip" as const },
     });
     expect(await shareRows(id)).toHaveLength(1);
     await expect(trips.deleteTripForOwner(tripB, OWNER_TWO)).resolves.toBe(true);

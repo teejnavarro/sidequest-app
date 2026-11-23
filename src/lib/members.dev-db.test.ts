@@ -163,7 +163,8 @@ describe("members who left, on the dev database", () => {
         paidBy: leaverSpot,
         category: null,
         spentOn: "2027-03-12",
-        shares: money.splitEqually(90000, [ownerSpot, beaSpot, leaverSpot], leaverSpot),
+        shares: money.splitEqually(90000, [ownerSpot, beaSpot, leaverSpot], leaverSpot).map((s) => ({ ...s, originalAmount: null })),
+        money: { kind: "trip" as const },
       });
       await setLeft(leaverSpot, true);
     });
@@ -206,7 +207,8 @@ describe("members who left, on the dev database", () => {
           paidBy: ownerSpot,
           category: null,
           spentOn: "2027-03-12",
-          shares: [{ spotId: ownerSpot, amount: 100 }],
+          shares: [{ spotId: ownerSpot, amount: 100, originalAmount: null }],
+          money: { kind: "trip" as const },
         }),
       ).resolves.toBe("not-found");
     });
@@ -276,7 +278,8 @@ describe("members who left, on the dev database", () => {
         paidBy: t.owner,
         category: null,
         spentOn: "2027-03-12",
-        shares: money.splitEqually(50000, [t.owner, t.leaver], t.owner),
+        shares: money.splitEqually(50000, [t.owner, t.leaver], t.owner).map((s) => ({ ...s, originalAmount: null })),
+        money: { kind: "trip" as const },
       });
       await expect(trips.getMemberForOwner(t.id, t.leaver, OWNER)).resolves.toEqual({
         spotId: t.leaver,
@@ -410,7 +413,8 @@ describe("members who left, on the dev database", () => {
         paidBy,
         category: null,
         spentOn: "2027-03-12",
-        shares: money.splitEqually(30000, spots, paidBy),
+        shares: money.splitEqually(30000, spots, paidBy).map((s) => ({ ...s, originalAmount: null })),
+        money: { kind: "trip" as const },
       });
       await costs.createCost(t.id, OWNER, costId("with-lou"), input(t.leaver, [t.owner, t.bea, t.leaver]));
       await costs.createCost(t.id, OWNER, costId("without-lou"), input(t.owner, [t.owner, t.bea]));
@@ -440,7 +444,8 @@ describe("members who left, on the dev database", () => {
         paidBy,
         category: null,
         spentOn: "2027-03-12",
-        shares: money.splitEqually(60000, spots, paidBy),
+        shares: money.splitEqually(60000, spots, paidBy).map((s) => ({ ...s, originalAmount: null })),
+        money: { kind: "trip" as const },
       });
       await costs.createCost(t.id, OWNER, costId("kept"), base(t.owner, [t.owner, t.leaver]));
       await trips.removeMember(t.id, t.leaver, OWNER);
@@ -506,7 +511,8 @@ describe("members who left, on the dev database", () => {
         paidBy: t.owner,
         category: null,
         spentOn: "2027-03-12",
-        shares: money.splitEqually(20000, [t.owner, t.bea], t.owner),
+        shares: money.splitEqually(20000, [t.owner, t.bea], t.owner).map((s) => ({ ...s, originalAmount: null })),
+        money: { kind: "trip" as const },
       };
       await costs.createCost(t.id, LEAVER, costRow, costInput);
       await trips.addGuest(t.id, LEAVER, "Lou's Friend");

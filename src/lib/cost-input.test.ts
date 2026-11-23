@@ -40,9 +40,9 @@ describe("uneven splits (own amounts)", () => {
     if (!ok.ok) throw new Error(JSON.stringify(ok.errors));
     // rest 860 / 3 = 286.66 and 2 centavos over: the payer (Ben) and then You take one each
     expect(ok.value.shares).toEqual([
-      { spotId: "a", amount: 98667 },
-      { spotId: "b", amount: 28667 },
-      { spotId: "c", amount: 58666 },
+      { spotId: "a", amount: 98667, originalAmount: null },
+      { spotId: "b", amount: 28667, originalAmount: null },
+      { spotId: "c", amount: 58666, originalAmount: null },
     ]);
     expect(ok.value.shares.reduce((s, x) => s + x.amount, 0)).toBe(186000);
     expect(ok.value.ownParts).toEqual({ a: 70000, c: 30000 });
@@ -156,11 +156,12 @@ describe("validateCostInput", () => {
         category: "food",
         spentOn: "2027-03-12",
         shares: [
-          { spotId: "a", amount: 33334 },
-          { spotId: "b", amount: 33333 },
-          { spotId: "c", amount: 33333 },
+          { spotId: "a", amount: 33334, originalAmount: null },
+          { spotId: "b", amount: 33333, originalAmount: null },
+          { spotId: "c", amount: 33333, originalAmount: null },
         ],
         ownParts: null,
+        money: { kind: "trip" },
       },
     });
   });
@@ -219,7 +220,7 @@ describe("validateCostInput", () => {
     expect(errorsFor({ sharedBy: [] }).sharedBy).toBe("Pick who shares it.");
     expect(errorsFor({ sharedBy: undefined }).sharedBy).toBe("Pick who shares it.");
     expect(errorsFor({ sharedBy: ["a", "stranger"] }).sharedBy).toBe("Pick who shares it.");
-    expect(valueFor({ sharedBy: "b" }).shares).toEqual([{ spotId: "b", amount: 100000 }]);
+    expect(valueFor({ sharedBy: "b" }).shares).toEqual([{ spotId: "b", amount: 100000, originalAmount: null }]);
   });
 
   it("needs a real day between 2000 and 2100", () => {

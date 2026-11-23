@@ -66,9 +66,9 @@ const saved = {
   spentOn: "2027-03-12",
   paidBy: "a",
   shares: [
-    { spotId: "a", amount: 33334 },
-    { spotId: "b", amount: 33333 },
-    { spotId: "g", amount: 33333 },
+    { spotId: "a", amount: 33334, originalAmount: null },
+    { spotId: "b", amount: 33333, originalAmount: null },
+    { spotId: "g", amount: 33333, originalAmount: null },
   ],
   updatedAt: new Date(OPENED),
 };
@@ -105,9 +105,9 @@ describe("reviewOrSaveCostAction, uneven split", () => {
     await expect(reviewOrSaveCostAction(initial, form({ ...own, step: "save" }))).rejects.toThrow(LIST);
     const input = mocks.createCost.mock.calls[0][3];
     expect(input.shares).toEqual([
-      { spotId: "a", amount: 98667 },
-      { spotId: "b", amount: 28667 },
-      { spotId: "g", amount: 58666 },
+      { spotId: "a", amount: 98667, originalAmount: null },
+      { spotId: "b", amount: 28667, originalAmount: null },
+      { spotId: "g", amount: 58666, originalAmount: null },
     ]);
   });
 
@@ -204,11 +204,12 @@ describe("reviewOrSaveCostAction, new cost", () => {
       category: "food",
       spentOn: "2027-03-12",
       shares: [
-        { spotId: "a", amount: 33334 },
-        { spotId: "b", amount: 33333 },
-        { spotId: "g", amount: 33333 },
+        { spotId: "a", amount: 33334, originalAmount: null },
+        { spotId: "b", amount: 33333, originalAmount: null },
+        { spotId: "g", amount: 33333, originalAmount: null },
       ],
       ownParts: null,
+      money: { kind: "trip" },
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1/costs");
   });
@@ -218,7 +219,7 @@ describe("reviewOrSaveCostAction, new cost", () => {
     expect(state.errors.sharedBy).toBe("Pick who shares it.");
     expect(mocks.createCost).not.toHaveBeenCalled();
     await expect(reviewOrSaveCostAction(initial, form({ step: "save", amount: "250" }, ["b"]))).rejects.toThrow(LIST);
-    expect(mocks.createCost).toHaveBeenLastCalledWith("trip-1", "u1", COST_ID, expect.objectContaining({ amount: 25000, shares: [{ spotId: "b", amount: 25000 }] }));
+    expect(mocks.createCost).toHaveBeenLastCalledWith("trip-1", "u1", COST_ID, expect.objectContaining({ amount: 25000, shares: [{ spotId: "b", amount: 25000, originalAmount: null }] }));
   });
 
   it("uses the trip's currency, so a zero-decimal trip takes whole amounts only", async () => {
