@@ -6,7 +6,7 @@ import { reviewOrSaveCostAction } from "@/app/trips/[tripId]/costs/actions";
 import type { CostFormState, CostFormValues, CostPerson } from "@/lib/cost-form-state";
 import { COST_CATEGORIES } from "@/lib/cost-options";
 import { currencySymbol } from "@/lib/idea-options";
-import { formatMoney, minorDigits, parseAmount, splitByItems } from "@/lib/money";
+import { formatMoney, minorDigits, parseAmount, splitByItems, splitEqually } from "@/lib/money";
 import { CostReviewView } from "@/components/cost-review";
 import { Face } from "@/components/face";
 import { Field, describedBy } from "@/components/form-fields";
@@ -14,6 +14,7 @@ import {
   errorClass,
   focusRing,
   guestTag,
+  inputBoxClass,
   inputClass,
   labelClass,
   primaryButton,
@@ -103,9 +104,11 @@ function ownHelper(amount: string, own: Record<string, string>, sharedBy: string
     return { over: true, text: `That's ${formatMoney(given - total.minor, currency)} more than the total.` };
   }
   if (split.rest === 0) return { over: false, text: "Nothing left over." };
-  const left = formatMoney(split.rest, currency);
-  const each = split.rest % sharedBy.length === 0 ? `: ${formatMoney(split.rest / sharedBy.length, currency)} each` : "";
-  return { over: false, text: `${left} left over, shared equally${each}` };
+  const parts = splitEqually(split.rest, sharedBy, "").map((part) => part.amount);
+  const low = Math.min(...parts);
+  const high = Math.max(...parts);
+  const each = low === high ? formatMoney(low, currency) : `${formatMoney(low, currency)} to ${formatMoney(high, currency)}`;
+  return { over: false, text: `${formatMoney(split.rest, currency)} left over, shared equally: ${each} each` };
 }
 
 // One form for logging and editing a cost. "Review" sends it to the server, which checks it
@@ -287,7 +290,7 @@ export function CostForm(props: CostFormProps) {
                       {person.isGuest ? <span className={`${guestTag} ml-2`}>Guest</span> : null}
                       {person.hasLeft ? <span className={`${guestTag} ml-2`}>Left</span> : null}
                     </span>
-                    <span aria-hidden="true" className="text-base font-bold text-muted">
+                    <span aria-hidden="true" className="shrink-0 text-base font-bold text-muted">
                       {currencySymbol(props.currency)}
                     </span>
                     <input
@@ -301,7 +304,7 @@ export function CostForm(props: CostFormProps) {
                       aria-describedby={errors.own ? "own-error" : undefined}
                       autoComplete="off"
                       placeholder="0"
-                      className={`${inputClass} ${placeholder} w-28 text-right tabular-nums`}
+                      className={`${inputBoxClass} ${placeholder} w-28 shrink-0 text-right tabular-nums`}
                     />
                   </div>
                 ))}
