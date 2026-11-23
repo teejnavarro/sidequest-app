@@ -96,6 +96,9 @@ describe("DeleteTripPage", () => {
     expect(renderToStaticMarkup(await renderContent())).toContain("This also deletes 1 cost.");
     mocks.countCostsForTrip.mockResolvedValue({ total: 3, trashed: 0 });
     expect(renderToStaticMarkup(await renderContent())).toContain("This also deletes 3 costs.");
+    expect(renderToStaticMarkup(await renderContent())).not.toContain("in the trash");
+    mocks.countCostsForTrip.mockResolvedValue({ total: 5, trashed: 1 });
+    expect(renderToStaticMarkup(await renderContent())).toContain("This also deletes 5 costs, including 1 in the trash.");
   });
 
   it("counts guests among the people it affects", async () => {

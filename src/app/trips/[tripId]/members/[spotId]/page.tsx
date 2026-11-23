@@ -38,6 +38,7 @@ async function MemberContent({ params }: { params: Params }) {
               {member.costCount > 0 ? (
                 <span className={helpClass}>
                   Part of {member.costCount} {member.costCount === 1 ? "cost" : "costs"}
+                  {member.trashedCostCount > 0 ? ` (${member.trashedCostCount} in the trash)` : ""}
                 </span>
               ) : null}
             </span>

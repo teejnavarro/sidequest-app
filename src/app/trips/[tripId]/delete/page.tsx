@@ -24,6 +24,7 @@ async function DeleteTripContent({ params }: { params: Promise<{ tripId: string 
   ]);
   const count = members.length;
   const costCount = costs.total;
+  const trashed = costs.trashed;
 
   return (
     <>
@@ -39,7 +40,10 @@ async function DeleteTripContent({ params }: { params: Promise<{ tripId: string 
               : "This deletes it for good. You can't undo this."}
           </p>
           {costCount > 0 && (
-            <p>This also deletes {costCount} {costCount === 1 ? "cost" : "costs"}.</p>
+            <p>
+              This also deletes {costCount} {costCount === 1 ? "cost" : "costs"}
+              {trashed > 0 ? `, including ${trashed} in the trash` : ""}.
+            </p>
           )}
           <div className="grid gap-3">
             <Link href={`/trips/${trip.id}/edit`} className={`${primaryButton} w-full`}>
