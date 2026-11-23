@@ -368,6 +368,7 @@ export type TrashItem = {
   description: string;
   amount: number;
   currency: string;
+  original: { amount: number; currency: string } | null; // minor units of its own currency
   category: string | null;
   deletedAt: Date;
   deletedBy: string; // first name
@@ -382,6 +383,8 @@ export async function listTrashForMember(tripId: string, userId: string): Promis
       description: cost.description,
       amount: cost.amount,
       currency: cost.currency,
+      originalAmount: cost.originalAmount,
+      originalCurrency: cost.originalCurrency,
       category: cost.category,
       deletedAt: cost.deletedAt,
       deletedById: deleter.id,
@@ -396,6 +399,7 @@ export async function listTrashForMember(tripId: string, userId: string): Promis
     description: row.description,
     amount: row.amount,
     currency: row.currency,
+    original: originalOf({ amount: row.originalAmount, currency: row.originalCurrency }),
     category: row.category,
     deletedAt: row.deletedAt!, // the where clause only lets trashed costs through
     deletedBy: firstNameOf(row.deletedByName),

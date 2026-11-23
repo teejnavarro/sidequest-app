@@ -12,7 +12,7 @@ import {
   type CostFormValues,
   type DeleteCostState,
 } from "@/lib/cost-form-state";
-import { createCost, deleteCost, getCostForMember, updateCost, type CostDetails } from "@/lib/costs";
+import { createCost, deleteCost, getCostForMember, restoreCost, updateCost, type CostDetails } from "@/lib/costs";
 import { firstNameOf } from "@/lib/display-name";
 import { getTripForMember, listCostPeople } from "@/lib/trips";
 
@@ -59,6 +59,7 @@ const COST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const listAddress = (tripId: string) => `/trips/${tripId}/costs`;
 const SAVE_FAILED = "Couldn't save the cost. Please try again.";
 const DELETE_FAILED = "Couldn't delete the cost. Please try again.";
+const RESTORE_FAILED = "Couldn't restore the cost. Please try again.";
 
 // What the person sees again after a stale save: the cost as it is now.
 function changedState(current: CostDetails): CostFormState {
@@ -177,6 +178,29 @@ export async function deleteCostAction(
     await deleteCost(tripId, costId, user.id);
   } catch {
     return { error: DELETE_FAILED };
+  }
+
+  revalidatePath(listAddress(tripId));
+  redirect(listAddress(tripId));
+}
+
+// Puts a trashed cost back. Like delete, it reads only the two ids, and it ends on the Costs
+// tab even when nothing was restored (someone else got there first).
+export async function restoreCostAction(
+  _prev: DeleteCostState,
+  formData: FormData,
+): Promise<DeleteCostState> {
+  const user = await getCurrentUser();
+
+  const tripId = readText(formData, "tripId");
+  const costId = readText(formData, "costId");
+  if (tripId === "") redirect("/trips");
+  if (costId === "") redirect(listAddress(tripId));
+
+  try {
+    await restoreCost(tripId, costId, user.id);
+  } catch {
+    return { error: RESTORE_FAILED };
   }
 
   revalidatePath(listAddress(tripId));

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { deleteCostAction, reviewOrSaveCostAction } from "./actions";
+import { deleteCostAction, restoreCostAction, reviewOrSaveCostAction } from "./actions";
 import { emptyCostValues, type CostFormState } from "@/lib/cost-form-state";
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createCost: vi.fn(),
   updateCost: vi.fn(),
   deleteCost: vi.fn(),
+  restoreCost: vi.fn(),
   getCostForMember: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn((url: string) => {
@@ -27,6 +28,7 @@ vi.mock("@/lib/costs", () => ({
   createCost: mocks.createCost,
   updateCost: mocks.updateCost,
   deleteCost: mocks.deleteCost,
+  restoreCost: mocks.restoreCost,
   getCostForMember: mocks.getCostForMember,
 }));
 
@@ -433,6 +435,42 @@ describe("deleteCostAction", () => {
     mocks.deleteCost.mockRejectedValue(new Error("database down"));
     await expect(deleteCostAction({}, form())).resolves.toEqual({
       error: "Couldn't delete the cost. Please try again.",
+    });
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+});
+
+describe("restoreCostAction", () => {
+  const form = (extra: Record<string, string> = {}) =>
+    formWith({ tripId: "trip-1", costId: COST_ID, ...extra }, []);
+
+  it("restores nothing when signed out", async () => {
+    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    await expect(restoreCostAction({}, form())).rejects.toThrow("redirect:/");
+    expect(mocks.restoreCost).not.toHaveBeenCalled();
+  });
+
+  it("goes back without restoring when an id is missing", async () => {
+    await expect(restoreCostAction({}, formWith({ costId: COST_ID }, []))).rejects.toThrow("redirect:/trips");
+    await expect(restoreCostAction({}, formWith({ tripId: "trip-1" }, []))).rejects.toThrow(LIST);
+    expect(mocks.restoreCost).not.toHaveBeenCalled();
+  });
+
+  it("restores as the signed-in person, ignoring extra fields, and goes to the Costs tab", async () => {
+    await expect(restoreCostAction({}, form({ userId: "u2" }))).rejects.toThrow(LIST);
+    expect(mocks.restoreCost).toHaveBeenCalledWith("trip-1", COST_ID, "u1");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1/costs");
+  });
+
+  it("ends in the same place when nothing was restored", async () => {
+    mocks.restoreCost.mockResolvedValue(false);
+    await expect(restoreCostAction({}, form())).rejects.toThrow(LIST);
+  });
+
+  it("shows a plain message when the restore throws", async () => {
+    mocks.restoreCost.mockRejectedValue(new Error("database down"));
+    await expect(restoreCostAction({}, form())).resolves.toEqual({
+      error: "Couldn't restore the cost. Please try again.",
     });
     expect(mocks.redirect).not.toHaveBeenCalled();
   });

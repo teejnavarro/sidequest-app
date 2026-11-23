@@ -76,6 +76,21 @@ export function dayLabel(day: string): string {
   return LONG.format(utcDate(day));
 }
 
+// "Mon, Nov 23, 14:05": a moment on the clock of the given time zone, 24-hour.
+export function dayTimeLabel(at: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(at);
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("weekday")}, ${part("month")} ${part("day")}, ${part("hour")}:${part("minute")}`;
+}
+
 // Every day from the trip's first to its last, both included. UTC arithmetic keeps a day
 // from moving with the viewer's time zone or a clock change.
 export function tripDays(start: string, end: string): TripDay[] {

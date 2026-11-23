@@ -596,7 +596,7 @@ describe("shared costs on the dev database", () => {
 
     const trash = await costs.listTrashForMember(t, OWNER);
     expect(trash).toHaveLength(1);
-    expect(trash[0]).toMatchObject({ id: gone, description: "Taxi", deletedBy: "Ada", deletedByYou: false });
+    expect(trash[0]).toMatchObject({ id: gone, description: "Taxi", deletedBy: "Ada", deletedByYou: false, original: null });
     expect(trash[0]!.deletedAt).toBeInstanceOf(Date);
     expect((await costs.listTrashForMember(t, ADDER))[0]).toMatchObject({ deletedByYou: true });
     await expect(costs.listTrashForMember(t, STRANGER)).resolves.toEqual([]);
