@@ -671,3 +671,59 @@ cost" check, and deleting a whole trip.
 The CSV is built on the server, only for members. It starts with an invisible marker (a BOM) so Excel
 shows "Bún Chả" correctly. A description that starts with = + - or @ gets an apostrophe in front, so
 Excel never runs it as a formula.
+
+## Chapter 15: Paying each other back, privately
+
+### The problem
+
+Settle-up says "Ben pays Ana 1,200 pesos". To actually do it, Ben needs Ana's GCash number or QR
+code, and afterwards the app should know the money moved. Both bring a worry: payment details and
+receipt screenshots are private, and a trip group is a mix of friends and friends of friends.
+
+### A payment is just one more line in the sum
+
+You may remember that balances are never stored: the app adds up what each person paid and their
+share of every cost. A recorded payment is one more number in that sum. When Ben pays Ana 1,200,
+Ben's balance goes up by 1,200 and Ana's goes down by 1,200. Everything still adds up to zero, and
+settle-up (which only reads the balances) just shows what is left. Think of a shared tab: paying
+someone back is like writing a small cost where Ben paid and only Ana shares it. Deleting a payment
+removes the line, so the balances go back to exactly what they were. Payments only count in the
+trip's own currency, like costs.
+
+### The bank locker: check on every request
+
+Pictures (QR codes and receipts) live in a private storage area that has no web address anyone can
+open. Think of a bank locker: the bank checks your ID every single time you ask, not just the first
+time you came in. The app does the same. A picture is only ever handed over by a small page of ours
+that first asks "who is this, and are they allowed?" The answer comes from the database on every
+request. That is why someone who leaves a trip loses access straight away: their next request
+simply fails the check. A "secret link" could not do that, because anyone who kept the link would
+keep the access. Every refusal looks the same (a plain "not found"), so a stranger can't even tell
+whether a picture exists.
+
+The rules are also written inside the database questions themselves, not in a separate "may they?"
+step that someone could forget to call. Your payment details can be seen by you and by people who are
+in a trip with you right now. A receipt can be seen only by the two people in the payment, not even
+by the rest of the group.
+
+### Shrinking pictures on the phone
+
+A phone photo can be several megabytes. Before a picture uploads, your phone redraws it smaller (at
+most 1280 pixels on the long side) and saves it as a JPEG. This makes uploads quick and keeps our
+storage small. It also has a privacy bonus: a redrawn picture does not carry the hidden extras of the
+original, such as the place where a photo was taken. The server still checks again that what arrives
+really is a small JPEG, because it never trusts the phone.
+
+### Never take the amount from the screen
+
+The Pay page fills in the amount you owe, and lets you lower it for a part payment. But the amount
+on the screen could be old (someone may have added a cost a minute ago), so when you press Save the
+server works the balances out again and refuses anything above what is really owed. The same goes
+for who is allowed to save: it is decided in the database, not by what the page showed.
+
+### Your action items
+
+- Add your GCash, Maya or bank details on Profile (with a QR if you like) and look at them from a
+  second account in the same trip.
+- Record a part payment and check that settle-up shows only what is left.
+- Delete the payment and see that the balances go back.
