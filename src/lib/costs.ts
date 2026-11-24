@@ -3,7 +3,7 @@ import { and, asc, desc, eq, exists, inArray, isNotNull, isNull, sql } from "dri
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import { user } from "@/db/auth-schema";
-import { cost, costShare, trip, tripMember } from "@/db/trip-schema";
+import { cost, costShare, payment, trip, tripMember } from "@/db/trip-schema";
 import { firstNameOf } from "@/lib/display-name";
 import { isMemberOf } from "@/lib/ideas";
 import type { CostInput, CostMoney } from "@/lib/cost-input";
@@ -431,7 +431,7 @@ export type BalancePerson = {
   isGuest: boolean;
   isYou: boolean;
   hasLeft: boolean;
-  net: number; // paid - share in minor units; > 0 is owed, < 0 owes
+  net: number; // paid - share + sent - received, minor units; > 0 is owed, < 0 owes
 };
 
 export type TripBalances = {
@@ -449,6 +449,7 @@ const NO_BALANCES: TripBalances = { people: [], payments: [], total: 0, costCoun
 // either way. A person who is not in the trip gets nothing.
 export async function getBalancesForMember(tripId: string, userId: string): Promise<TripBalances> {
   const costInTripCurrency = sql`${cost.currency} = ${trip.currency} and ${cost.deletedAt} is null`;
+  const paymentInTripCurrency = sql`${payment.currency} = ${trip.currency}`;
   const [rows, totals] = await Promise.all([
     db
       .select({
@@ -463,6 +464,13 @@ export async function getBalancesForMember(tripId: string, userId: string): Prom
           Number,
         ),
         share: sql<number>`(select coalesce(sum(${costShare.amount}), 0) from ${costShare} inner join ${cost} on ${cost.id} = ${costShare.costId} where ${costShare.spotId} = ${tripMember.id} and ${costInTripCurrency})`.mapWith(
+          Number,
+        ),
+        // Money already paid back, in the trip's currency only (like costs).
+        sent: sql<number>`(select coalesce(sum(${payment.amount}), 0) from ${payment} where ${payment.fromSpot} = ${tripMember.id} and ${paymentInTripCurrency})`.mapWith(
+          Number,
+        ),
+        received: sql<number>`(select coalesce(sum(${payment.amount}), 0) from ${payment} where ${payment.toSpot} = ${tripMember.id} and ${paymentInTripCurrency})`.mapWith(
           Number,
         ),
       })
@@ -482,7 +490,13 @@ export async function getBalancesForMember(tripId: string, userId: string): Prom
   ]);
 
   const balances = balancesOf(
-    rows.map((row) => ({ spotId: row.spotId, paid: row.paid, share: row.share, sent: 0, received: 0 })),
+    rows.map((row) => ({
+      spotId: row.spotId,
+      paid: row.paid,
+      share: row.share,
+      sent: row.sent,
+      received: row.received,
+    })),
   );
   const people = rows
     .map((row, index) => ({

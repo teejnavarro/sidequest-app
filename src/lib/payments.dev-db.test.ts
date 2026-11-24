@@ -223,4 +223,213 @@ describe("payments on the dev database", () => {
       await clearAccounts(OTHER_OWNER);
     });
   });
+
+  describe("recording and reading payments", () => {
+    let tripP: string; // OWNER, MEMBER, THIRD, guests Dana and Eli
+    let codeP: string;
+    let ownerSpot: string;
+    let memberSpot: string;
+    let thirdSpot: string;
+    let dana: string;
+    let eli: string;
+    let costs: typeof import("./costs");
+    let money: typeof import("./money");
+    const pid = (name: string) => `${ID_PREFIX}p-${name}-${RUN}`;
+
+    const record = (
+      id: string,
+      userId: string,
+      fromSpot: string,
+      toSpot: string,
+      amount: number,
+      extra: { receiptPath?: string | null; method?: "gcash" | "maya" | "bank" | "cash" } = {},
+    ) =>
+      payments.recordPayment({
+        tripId: tripP,
+        paymentId: pid(id),
+        fromSpot,
+        toSpot,
+        amount,
+        method: extra.method ?? "gcash",
+        receiptPath: extra.receiptPath ?? null,
+        userId,
+      });
+
+    const netOf = async (viewer: string) =>
+      Object.fromEntries((await costs.getBalancesForMember(tripP, viewer)).people.map((p) => [p.spotId, p.net]));
+
+    async function paymentRows() {
+      return dbModule.db.select().from(schema.payment).where(orm.eq(schema.payment.tripId, tripP));
+    }
+
+    beforeAll(async () => {
+      costs = await import("./costs");
+      money = await import("./money");
+      tripP = await trips.createTrip(OWNER, { ...tripInput, name: "Payments trip" });
+      codeP = (await trips.getInviteCodeForMember(tripP, OWNER))!;
+      await trips.joinTripByInviteCode(codeP, MEMBER);
+      await trips.joinTripByInviteCode(codeP, THIRD);
+      await trips.addGuest(tripP, OWNER, "Dana");
+      await trips.addGuest(tripP, OWNER, "Eli");
+      const people = await trips.listTripMembers(tripP, OWNER);
+      const spotNamed = (name: string) => people.find((p) => p.name === name)!.spotId;
+      ownerSpot = spotNamed("Maya Test");
+      memberSpot = spotNamed("Ada Test");
+      thirdSpot = spotNamed("Cho Test");
+      dana = spotNamed("Dana");
+      eli = spotNamed("Eli");
+      // OWNER paid 90,000 centavos shared by OWNER, MEMBER and Dana: OWNER +60000, MEMBER -30000, Dana -30000.
+      const spots = [ownerSpot, memberSpot, dana];
+      const shares = money.splitEqually(90000, spots, ownerSpot).map((share) => ({ ...share, originalAmount: null }));
+      await costs.createCost(tripP, OWNER, `${ID_PREFIX}c-pay-${RUN}`, {
+        description: "Dinner",
+        amount: 90000,
+        paidBy: ownerSpot,
+        category: "food",
+        spentOn: "2027-03-12",
+        shares,
+        money: { kind: "trip" as const },
+      });
+    });
+
+    it("lets the payer and the receiver record, and moves balances by the amount", async () => {
+      expect(await netOf(OWNER)).toMatchObject({ [ownerSpot]: 60000, [memberSpot]: -30000, [dana]: -30000 });
+      expect(await record("payer", MEMBER, memberSpot, ownerSpot, 10000)).toBe("ok");
+      expect(await record("receiver", OWNER, memberSpot, ownerSpot, 5000, { method: "cash" })).toBe("ok");
+      const nets = await netOf(THIRD);
+      expect(nets[ownerSpot]).toBe(60000 - 15000);
+      expect(nets[memberSpot]).toBe(-30000 + 15000);
+      expect(Object.values(nets).reduce((sum, n) => sum + n, 0)).toBe(0);
+      const rows = await paymentRows();
+      expect(rows.map((r) => r.currency)).toEqual(["PHP", "PHP"]);
+      const line = (await costs.getBalancesForMember(tripP, OWNER)).payments.find((p) => p.from === memberSpot && p.to === ownerSpot);
+      expect(line?.amount).toBe(15000);
+    });
+
+    it("refuses a third member and a stranger, saving nothing", async () => {
+      const before = (await paymentRows()).length;
+      expect(await record("third", THIRD, memberSpot, ownerSpot, 100)).toBe("not-allowed");
+      expect(await record("stranger", STRANGER, memberSpot, ownerSpot, 100)).toBe("not-allowed");
+      expect(await record("same-spot", OWNER, ownerSpot, ownerSpot, 100)).toBe("not-allowed");
+      expect(await record("zero", OWNER, memberSpot, ownerSpot, 0)).toBe("not-allowed");
+      expect(await record("foreign", OWNER, memberSpot, `${ID_PREFIX}no-such-spot`, 100)).toBe("not-allowed");
+      expect((await paymentRows()).length).toBe(before);
+    });
+
+    it("lets one side record a payment with a guest on the other side, and refuses guest to guest", async () => {
+      expect(await record("to-guest", OWNER, ownerSpot, dana, 1000)).toBe("ok");
+      expect(await record("from-guest", OWNER, dana, ownerSpot, 2000)).toBe("ok");
+      expect(await record("guest-guest", OWNER, dana, eli, 100)).toBe("not-allowed");
+      expect(await record("guest-guest-third", THIRD, dana, eli, 100)).toBe("not-allowed");
+    });
+
+    it("stores one row when the same id is saved twice", async () => {
+      const id = "twice";
+      expect(await record(id, MEMBER, memberSpot, ownerSpot, 700)).toBe("ok");
+      expect(await record(id, MEMBER, memberSpot, ownerSpot, 700)).toBe("repeat");
+      const rows = (await paymentRows()).filter((r) => r.id === pid(id));
+      expect(rows).toHaveLength(1);
+      // Someone else cannot use that id, and a repeat does not reveal it to them.
+      expect(await record(id, THIRD, memberSpot, ownerSpot, 700)).toBe("not-allowed");
+    });
+
+    it("ignores a payment in another currency in the balances", async () => {
+      const before = await netOf(OWNER);
+      await dbModule.db.insert(schema.payment).values({
+        id: pid("usd"),
+        tripId: tripP,
+        fromSpot: memberSpot,
+        toSpot: ownerSpot,
+        amount: 99999,
+        currency: "USD",
+        method: "bank",
+        createdBy: MEMBER,
+      });
+      expect(await netOf(OWNER)).toEqual(before);
+      expect((await payments.listPaymentsForMember(tripP, OWNER)).some((p) => p.id === pid("usd"))).toBe(false);
+    });
+
+    it("shows a receipt only to the payer and the receiver", async () => {
+      expect(await record("receipt", MEMBER, memberSpot, ownerSpot, 300, { receiptPath: "receipts/r.jpg" })).toBe("ok");
+      for (const party of [MEMBER, OWNER]) {
+        const item = (await payments.listPaymentsForMember(tripP, party)).find((p) => p.id === pid("receipt"));
+        expect(item).toMatchObject({ mine: true, hasReceipt: true });
+        expect(await payments.getReceiptForParty(tripP, pid("receipt"), party)).toBe("receipts/r.jpg");
+        expect(await payments.getPaymentForParty(tripP, pid("receipt"), party)).toMatchObject({ id: pid("receipt"), hasReceipt: true });
+      }
+      // A third member sees the payment line but never the receipt.
+      const third = (await payments.listPaymentsForMember(tripP, THIRD)).find((p) => p.id === pid("receipt"));
+      expect(third).toMatchObject({ mine: false, hasReceipt: false, amount: 300 });
+      expect(JSON.stringify(await payments.listPaymentsForMember(tripP, THIRD))).not.toContain("receipts/r.jpg");
+      expect(await payments.getReceiptForParty(tripP, pid("receipt"), THIRD)).toBeNull();
+      expect(await payments.getPaymentForParty(tripP, pid("receipt"), THIRD)).toBeNull();
+      // A stranger gets nothing at all.
+      expect(await payments.listPaymentsForMember(tripP, STRANGER)).toEqual([]);
+      expect(await payments.getReceiptForParty(tripP, pid("receipt"), STRANGER)).toBeNull();
+      // Names are first names, guests included, and the viewer is marked.
+      const mine = (await payments.listPaymentsForMember(tripP, OWNER)).find((p) => p.id === pid("to-guest"))!;
+      expect(mine.from).toMatchObject({ name: "Maya", isYou: true, isGuest: false });
+      expect(mine.to).toMatchObject({ name: "Dana", isGuest: true, isYou: false });
+    });
+
+    it("hides the receipt from a party who left, and shows it again after rejoining", async () => {
+      expect(await trips.leaveTrip(tripP, MEMBER)).toBe("ok");
+      expect(await payments.getReceiptForParty(tripP, pid("receipt"), MEMBER)).toBeNull();
+      expect(await payments.getPaymentForParty(tripP, pid("receipt"), MEMBER)).toBeNull();
+      expect(await payments.listPaymentsForMember(tripP, MEMBER)).toEqual([]);
+      expect(await payments.deletePayment(tripP, pid("receipt"), MEMBER)).toBe("not-found");
+      // The receiver still sees it, with the payer marked as left.
+      const item = (await payments.listPaymentsForMember(tripP, OWNER)).find((p) => p.id === pid("receipt"))!;
+      expect(item.from.hasLeft).toBe(true);
+      await trips.joinTripByInviteCode(codeP, MEMBER);
+      expect(await payments.getReceiptForParty(tripP, pid("receipt"), MEMBER)).toBe("receipts/r.jpg");
+    });
+
+    it("builds the Pay page only for a member, with the right rights and reasons", async () => {
+      const page = await payments.getPayPageForMember(tripP, memberSpot, ownerSpot, MEMBER);
+      expect(page).toMatchObject({
+        currency: "PHP",
+        canRecord: true,
+        from: { name: "Ada", isYou: true },
+        to: { name: "Maya", isYou: false },
+      });
+      expect(page!.amount).toBe(30000 - 10000 - 5000 - 700 - 300);
+      expect(JSON.stringify(page)).not.toContain("example.test");
+
+      // A third member can look but not record; a stranger gets nothing.
+      expect((await payments.getPayPageForMember(tripP, memberSpot, ownerSpot, THIRD))!.canRecord).toBe(false);
+      expect(await payments.getPayPageForMember(tripP, memberSpot, ownerSpot, STRANGER)).toBeNull();
+      // The same spot twice and a spot from nowhere give nothing.
+      expect(await payments.getPayPageForMember(tripP, ownerSpot, ownerSpot, OWNER)).toBeNull();
+      expect(await payments.getPayPageForMember(tripP, ownerSpot, `${ID_PREFIX}none`, OWNER)).toBeNull();
+
+      // Receiver reasons: a guest, nobody saved details.
+      await clearAccounts(OWNER);
+      expect((await payments.getPayPageForMember(tripP, ownerSpot, dana, OWNER))!.receiver).toEqual({ reason: "guest" });
+      expect((await payments.getPayPageForMember(tripP, memberSpot, ownerSpot, MEMBER))!.receiver).toEqual({ reason: "none" });
+      await payments.createPaymentAccount(OWNER, wallet, "qr/p.jpg");
+      const withDetails = await payments.getPayPageForMember(tripP, memberSpot, ownerSpot, MEMBER);
+      expect(withDetails!.receiver).toMatchObject({ accounts: [{ number: "09171234567", hasQr: true }] });
+      expect(JSON.stringify(withDetails)).not.toContain("qr/p.jpg");
+
+      // A receiver who has left shows a reason, not their details.
+      expect(await trips.leaveTrip(tripP, THIRD)).toBe("ok");
+      expect((await payments.getPayPageForMember(tripP, memberSpot, thirdSpot, MEMBER))!.receiver).toEqual({ reason: "left" });
+      await trips.joinTripByInviteCode(codeP, THIRD);
+      await clearAccounts(OWNER);
+    }, 30000);
+
+    it("lets only a party delete a payment, and balances return to what they were", async () => {
+      const first = await netOf(OWNER);
+      expect(await record("delete-me", MEMBER, memberSpot, ownerSpot, 4000, { receiptPath: "receipts/d.jpg" })).toBe("ok");
+      const after = await netOf(OWNER);
+      expect(after[ownerSpot]).toBe(first[ownerSpot]! - 4000);
+      expect(await payments.deletePayment(tripP, pid("delete-me"), THIRD)).toBe("not-found");
+      expect(await payments.deletePayment(tripP, pid("delete-me"), STRANGER)).toBe("not-found");
+      expect(await netOf(OWNER)).toEqual(after);
+      expect(await payments.deletePayment(tripP, pid("delete-me"), OWNER)).toEqual({ receiptPath: "receipts/d.jpg" });
+      expect(await payments.deletePayment(tripP, pid("delete-me"), OWNER)).toBe("not-found");
+      expect(await netOf(OWNER)).toEqual(first);
+    });
+  });
 });
