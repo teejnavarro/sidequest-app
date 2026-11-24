@@ -87,10 +87,30 @@ describe("recordPaymentAction", () => {
 
   it("refuses an amount above the fresh line with the spec wording, saving nothing", async () => {
     const result = await recordPaymentAction(initial, formWith({ amount: "900.01" }));
-    expect(result.errors.amount).toBe("That's more than Ben owes Ana (₱900.00). Lower the amount.");
+    expect(result.errors.amount).toBe("That's more than you owe Ana (₱900.00). Lower the amount.");
     expect(result.values.amount).toBe("900.01");
     expect(mocks.recordPayment).not.toHaveBeenCalled();
     expect(mocks.putImage).not.toHaveBeenCalled();
+  });
+
+  it("says you when the receiver is the viewer, and names both for a third person", async () => {
+    mocks.getPayPageForMember.mockResolvedValue({
+      ...page,
+      amount: 45000,
+      from: { ...page.from, name: "Bea", isYou: false },
+      to: { ...page.to, name: "Ben", isYou: true },
+    });
+    const receiver = await recordPaymentAction(initial, formWith({ amount: "450.01" }));
+    expect(receiver.errors.amount).toBe("That's more than Bea owes you (₱450.00). Lower the amount.");
+    mocks.getPayPageForMember.mockResolvedValue({
+      ...page,
+      amount: 45000,
+      from: { ...page.from, name: "Bea", isYou: false },
+      to: { ...page.to, isYou: false },
+      canRecord: true,
+    });
+    const third = await recordPaymentAction(initial, formWith({ amount: "450.01" }));
+    expect(third.errors.amount).toBe("That's more than Bea owes Ana (₱450.00). Lower the amount.");
   });
 
   it("refuses a bad method or a blank amount", async () => {

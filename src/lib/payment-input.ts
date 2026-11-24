@@ -118,7 +118,14 @@ export type PaymentRecordResult =
 // line it settles (maxAmount, in minor units); it can be lowered for a part payment.
 export function validatePaymentRecord(
   values: { amount?: unknown; method?: unknown },
-  context: { currency: string; maxAmount: number; payerName?: string; receiverName?: string },
+  context: {
+    currency: string;
+    maxAmount: number;
+    payerName?: string;
+    receiverName?: string;
+    payerIsYou?: boolean;
+    receiverIsYou?: boolean;
+  },
 ): PaymentRecordResult {
   const errors: Partial<Record<"amount" | "method", string>> = {};
   let amount = 0;
@@ -130,10 +137,14 @@ export function validatePaymentRecord(
     const parsed = parseAmount(raw, context.currency);
     if (!parsed.ok) errors.amount = parsed.error;
     else if (parsed.minor > context.maxAmount) {
-      const who =
-        context.payerName && context.receiverName
-          ? `${context.payerName} owes ${context.receiverName}`
-          : "is owed";
+      // "you owe Ana", "Bea owes you", or both names when the viewer is neither.
+      const who = context.payerIsYou
+        ? `you owe ${context.receiverName ?? "them"}`
+        : context.receiverIsYou
+          ? `${context.payerName ?? "they"} owes you`
+          : context.payerName && context.receiverName
+            ? `${context.payerName} owes ${context.receiverName}`
+            : "is owed";
       errors.amount = `That's more than ${who} (${formatMoney(context.maxAmount, context.currency)}). Lower the amount.`;
     } else amount = parsed.minor;
   }

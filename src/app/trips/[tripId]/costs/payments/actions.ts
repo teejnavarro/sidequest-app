@@ -63,6 +63,8 @@ export async function recordPaymentAction(
     maxAmount: page.amount,
     payerName: page.from.name,
     receiverName: page.to.name,
+    payerIsYou: page.from.isYou,
+    receiverIsYou: page.to.isYou,
   });
   const errors: PayFormState["errors"] = result.ok ? {} : { ...result.errors };
 

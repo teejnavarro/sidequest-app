@@ -125,6 +125,18 @@ describe("validatePaymentRecord", () => {
     });
   });
 
+  it("says you for the viewer in the over-the-line message", () => {
+    expect(validatePaymentRecord({ amount: "900.01", method: "gcash" }, { ...php, payerIsYou: true })).toEqual({
+      ok: false,
+      errors: { amount: "That's more than you owe Ana (₱900.00). Lower the amount." },
+    });
+    const receiver = { ...php, maxAmount: 45000, payerName: "Bea", receiverName: "Ben", receiverIsYou: true };
+    expect(validatePaymentRecord({ amount: "450.01", method: "cash" }, receiver)).toEqual({
+      ok: false,
+      errors: { amount: "That's more than Bea owes you (₱450.00). Lower the amount." },
+    });
+  });
+
   it("respects 0-decimal currencies", () => {
     const vnd = { currency: "VND", maxAmount: 250000 };
     expect(validatePaymentRecord({ amount: "250,000", method: "bank" }, vnd).ok).toBe(true);
