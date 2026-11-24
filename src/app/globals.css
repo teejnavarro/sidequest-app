@@ -86,6 +86,18 @@ body {
   line-height: 1.5;
 }
 
+/* iPhone Safari gives date boxes a native minimum width that ignores w-full, so they spill
+   past their column and widen the whole form. Dropping the native look lets them fit.
+   Tapping still opens the iPhone date picker. */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 /* Headings use the display font (Tailwind utility: font-display). */
 h1,
 h2,
