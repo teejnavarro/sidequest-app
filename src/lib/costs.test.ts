@@ -273,14 +273,14 @@ describe("getBalancesForMember", () => {
   });
 
   it("works out nets and the fewest payments, and keeps a left person who still owes", async () => {
-    // spotId, id, name, image, isGuest, isYou, hasLeft, paid, share
+    // spotId, id, name, image, isGuest, isYou, hasLeft, paid, share, sent, received
     fake.queue = [
       [
-        ["s1", "u1", "Maya Cruz", null, false, true, false, "600000", "322333"],
-        ["s2", "u2", "Bea Lim", null, false, false, false, "244000", "354333"],
-        ["s3", "u3", "Jun Diaz", null, false, false, false, "362000", "321000"],
-        ["s4", "s4", "Dana", null, true, false, true, "100000", "308334"],
-        ["s5", "u5", "Gone Even", null, false, false, true, "0", "0"],
+        ["s1", "u1", "Maya Cruz", null, false, true, false, "600000", "322333", "0", "0"],
+        ["s2", "u2", "Bea Lim", null, false, false, false, "244000", "354333", "0", "0"],
+        ["s3", "u3", "Jun Diaz", null, false, false, false, "362000", "321000", "0", "0"],
+        ["s4", "s4", "Dana", null, true, false, true, "100000", "308334", "0", "0"],
+        ["s5", "u5", "Gone Even", null, false, false, true, "0", "0", "0", "0"],
       ],
       [["6", "1306000"]],
     ];

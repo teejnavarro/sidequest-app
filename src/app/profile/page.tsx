@@ -7,6 +7,7 @@ import { Face } from "@/components/face";
 import { TaskBand } from "@/components/task-band";
 import { cardClass, quietButton, screenClass, skeleton } from "@/components/ui";
 import { NameForm } from "./name-form";
+import { PaymentDetailsCard } from "./payment-details-card";
 
 async function ProfileContent() {
   const user = await getCurrentUser();
@@ -17,6 +18,7 @@ async function ProfileContent() {
         <Face userId={user.id} name={user.name} image={user.image} size={72} />
         <NameForm currentName={user.name} />
       </div>
+      <PaymentDetailsCard userId={user.id} />
       <form action={signOut}>
         <button type="submit" className={`${quietButton} w-full`}>
           <SignOut size={20} weight="bold" aria-hidden="true" />
@@ -31,6 +33,7 @@ function ProfileLoading() {
   return (
     <div aria-hidden="true" className="grid gap-4">
       <div className={`h-64 ${skeleton} rounded-card bg-chip`} />
+      <div className={`h-56 ${skeleton} rounded-card bg-chip`} />
       <div className={`h-12 ${skeleton} rounded-full bg-chip`} />
     </div>
   );

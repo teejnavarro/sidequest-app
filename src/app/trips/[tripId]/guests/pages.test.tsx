@@ -43,7 +43,7 @@ async function renderContent(page: (p: typeof props) => ReactElement) {
 }
 
 const TRIP = { id: "trip-1", name: "Saigon barkada", ownerId: "owner" };
-const GUEST = { spotId: "spot-1", name: "Lito", addedById: "u2", addedByName: "Ben Santos", costCount: 0, trashedCostCount: 0 };
+const GUEST = { spotId: "spot-1", name: "Lito", addedById: "u2", addedByName: "Ben Santos", costCount: 0, trashedCostCount: 0, paymentCount: 0 };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -95,7 +95,7 @@ describe("Edit guest", () => {
     expect(out).toContain('data-edit="trip-1/spot-1/Lito"');
     const link = out.match(/<a[^>]*href="\/trips\/trip-1\/guests\/spot-1\/remove"[^>]*>Remove guest<\/a>/)?.[0];
     expect(link).toContain("text-owe");
-    expect(out).toContain("A guest who&#x27;s part of any costs can&#x27;t be removed.");
+    expect(out).toContain("A guest who&#x27;s part of any costs or payments can&#x27;t be removed.");
   });
 
   it("replaces Remove guest with a muted line when the guest is part of costs", async () => {
@@ -108,6 +108,18 @@ describe("Edit guest", () => {
     expect(await html()).not.toContain("in the trash");
     mocks.getGuestForEditor.mockResolvedValue({ ...GUEST, costCount: 2, trashedCostCount: 1 });
     expect(await html()).toContain("Lito is part of 2 costs (1 in the trash), so they can&#x27;t be removed.");
+  });
+
+  it("says a guest in a payment can't be removed, and joins it with costs when both apply", async () => {
+    mocks.getGuestForEditor.mockResolvedValue({ ...GUEST, paymentCount: 1 });
+    let out = await html();
+    expect(out).toContain("Lito is part of a payment, so they can&#x27;t be removed.");
+    expect(out).not.toContain("Remove guest");
+    mocks.getGuestForEditor.mockResolvedValue({ ...GUEST, paymentCount: 3 });
+    expect(await html()).toContain("Lito is part of 3 payments, so they");
+    mocks.getGuestForEditor.mockResolvedValue({ ...GUEST, costCount: 2, paymentCount: 1 });
+    out = await html();
+    expect(out).toContain("Lito is part of 2 costs and a payment, so they can&#x27;t be removed.");
   });
 
   it("names the adder's first name and the trip owner for another editor", async () => {

@@ -3,7 +3,8 @@ import { and, asc, desc, eq, exists, inArray, isNotNull, isNull, ne, notExists, 
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import { user } from "@/db/auth-schema";
-import { cost, costShare, trip, tripMember } from "@/db/trip-schema";
+import { cost, costShare, payment, trip, tripMember } from "@/db/trip-schema";
+import { deleteImages } from "@/lib/blob-store";
 import { isMemberOf } from "@/lib/ideas";
 import { isInviteCode } from "@/lib/invite-code";
 import type { TripInput } from "@/lib/trip-input";
@@ -364,6 +365,7 @@ export type GuestSpot = {
   addedByName: string;
   costCount: number; // how many costs the guest paid or shares, trashed ones included
   trashedCostCount: number; // how many of those are in the trash
+  paymentCount: number; // how many recorded payments the guest is on either side of
 };
 
 // How many costs a spot paid or shares. Used inside queries on trip_member.
@@ -373,6 +375,11 @@ const costCountOf = sql<number>`(select count(*) from ${cost} where ${cost.paidB
 
 // The same, only the trashed ones.
 const trashedCostCountOf = sql<number>`(select count(*) from ${cost} where ${cost.deletedAt} is not null and (${cost.paidBy} = ${tripMember.id} or exists (select 1 from ${costShare} where ${costShare.costId} = ${cost.id} and ${costShare.spotId} = ${tripMember.id})))`.mapWith(
+  Number,
+);
+
+// How many recorded payments a spot is on either side of. A guest in a payment can't be removed.
+const paymentCountOf = sql<number>`(select count(*) from ${payment} where ${payment.fromSpot} = ${tripMember.id} or ${payment.toSpot} = ${tripMember.id})`.mapWith(
   Number,
 );
 
@@ -425,6 +432,7 @@ export async function getGuestForEditor(
       addedByName: user.name,
       costCount: costCountOf,
       trashedCostCount: trashedCostCountOf,
+      paymentCount: paymentCountOf,
     })
     .from(tripMember)
     .innerJoin(user, eq(user.id, tripMember.addedBy))
@@ -454,9 +462,10 @@ export async function renameGuest(
 }
 
 // Removes a guest, with the same conditions as getGuestForEditor inside the delete itself,
-// plus "the guest is not in any cost" (the database refuses it too). "in-costs" means the
-// person may remove the guest but the guest is part of a cost; "not-found" covers everything
-// else, so the cases look the same to a stranger.
+// plus "the guest is not in any cost or payment" (the database refuses it too). "in-costs"
+// means the person may remove the guest but the guest is part of a cost or a payment (the page
+// says which, from getGuestForEditor); "not-found" covers everything else, so the cases look
+// the same to a stranger.
 export async function removeGuest(
   tripId: string,
   spotId: string,
@@ -465,7 +474,13 @@ export async function removeGuest(
   try {
     const deleted = await db
       .delete(tripMember)
-      .where(and(guestEditableBy(tripId, spotId, userId), sql`${costCountOf} = 0`))
+      .where(
+        and(
+          guestEditableBy(tripId, spotId, userId),
+          sql`${costCountOf} = 0`,
+          sql`${paymentCountOf} = 0`,
+        ),
+      )
       .returning({ id: tripMember.id });
     if (deleted.length > 0) return "ok";
   } catch (error) {
@@ -474,7 +489,7 @@ export async function removeGuest(
     return "in-costs";
   }
   const guest = await getGuestForEditor(tripId, spotId, userId);
-  return guest && guest.costCount > 0 ? "in-costs" : "not-found";
+  return guest && (guest.costCount > 0 || guest.paymentCount > 0) ? "in-costs" : "not-found";
 }
 
 // The guests nobody has claimed yet in the trip this code opens: spot id and name. Only
@@ -691,18 +706,26 @@ export async function hasLeftSpot(tripId: string, userId: string): Promise<boole
 }
 
 // Deletes the trip for good, but only for its owner. Ownership is part of each delete's own
-// condition, so a member or a stranger deletes nothing. The trip's costs are deleted first,
-// in the same all-or-nothing batch: a cost points at spots with no cascade, and the database
-// checks that before the trip's own cascade has cleared the shares. The member rows, the
-// shares and the invite code (which lives on the trip) go with the trip. Returns true only
-// when a trip was removed, so repeating the delete is harmless.
+// condition, so a member or a stranger deletes nothing. The trip's payments and costs are
+// deleted first, in the same all-or-nothing batch: both point at spots with no cascade, and the
+// database checks that before the trip's own cascade has cleared the rest. The member rows, the
+// shares and the invite code (which lives on the trip) go with the trip. The receipt files are
+// deleted afterwards (a file left behind is harmless). Returns true only when a trip was
+// removed, so repeating the delete is harmless.
 export async function deleteTripForOwner(tripId: string, userId: string): Promise<boolean> {
   const owned = and(eq(trip.id, tripId), eq(trip.ownerId, userId));
-  const [, deleted] = await db.batch([
+  const ownedTrip = exists(db.select({ one: trip.id }).from(trip).where(owned));
+  const [receipts, , , deleted] = await db.batch([
     db
-      .delete(cost)
-      .where(and(eq(cost.tripId, tripId), exists(db.select({ one: trip.id }).from(trip).where(owned)))),
+      .select({ path: payment.receiptPath })
+      .from(payment)
+      .where(and(eq(payment.tripId, tripId), isNotNull(payment.receiptPath), ownedTrip)),
+    db.delete(payment).where(and(eq(payment.tripId, tripId), ownedTrip)),
+    db.delete(cost).where(and(eq(cost.tripId, tripId), ownedTrip)),
     db.delete(trip).where(owned).returning({ id: trip.id }),
   ]);
+  if (deleted.length > 0) {
+    await deleteImages(receipts.flatMap((row) => (row.path ? [row.path] : [])));
+  }
   return deleted.length > 0;
 }

@@ -21,18 +21,51 @@ describe("balancesOf", () => {
   it("is paid minus share, in input order", () => {
     expect(
       balancesOf([
-        { spotId: "a", paid: 500, share: 200 },
-        { spotId: "b", paid: 0, share: 300 },
+        { spotId: "a", paid: 500, share: 200, sent: 0, received: 0 },
+        { spotId: "b", paid: 0, share: 300, sent: 0, received: 0 },
       ]),
     ).toEqual([net("a", 300), net("b", -300)]);
   });
 
+  describe("with recorded payments", () => {
+    // Ana is owed 900, Ben owes 900.
+    const before = [
+      { spotId: "ana", paid: 900, share: 0, sent: 0, received: 0 },
+      { spotId: "ben", paid: 0, share: 900, sent: 0, received: 0 },
+    ];
+    const pay = (amount: number) =>
+      balancesOf([
+        { ...before[0]!, received: amount },
+        { ...before[1]!, sent: amount },
+      ]);
+
+    it("moves the sender up and the receiver down by the amount", () => {
+      expect(pay(400)).toEqual([net("ana", 500), net("ben", -500)]);
+    });
+
+    it("still adds up to zero", () => {
+      expect(pay(400).reduce((s, b) => s + b.net, 0)).toBe(0);
+    });
+
+    it("leaves only what is left to settle after a partial payment", () => {
+      expect(settleUp(pay(400))).toEqual([{ from: "ben", to: "ana", amount: 500 }]);
+    });
+
+    it("leaves nothing to settle after a full payment", () => {
+      expect(settleUp(pay(900))).toEqual([]);
+    });
+
+    it("flips the direction after an overpayment", () => {
+      expect(settleUp(pay(1000))).toEqual([{ from: "ana", to: "ben", amount: 100 }]);
+    });
+  });
+
   it("matches the hand-worked example (4 people, 6 costs)", () => {
     const totals = [
-      { spotId: "maya", paid: 600000, share: 322333 },
-      { spotId: "bea", paid: 244000, share: 354333 },
-      { spotId: "jun", paid: 362000, share: 321000 },
-      { spotId: "dana", paid: 100000, share: 308334 },
+      { spotId: "maya", paid: 600000, share: 322333, sent: 0, received: 0 },
+      { spotId: "bea", paid: 244000, share: 354333, sent: 0, received: 0 },
+      { spotId: "jun", paid: 362000, share: 321000, sent: 0, received: 0 },
+      { spotId: "dana", paid: 100000, share: 308334, sent: 0, received: 0 },
     ];
     const balances = balancesOf(totals);
     expect(balances.map((b) => b.net)).toEqual([277667, -110333, 41000, -208334]);
@@ -233,7 +266,9 @@ describe("whole trips through the cost checks", () => {
         for (const s of shares) share.set(s.spotId, share.get(s.spotId)! + s.amount);
       }
 
-      const balances = balancesOf(spotIds.map((id) => ({ spotId: id, paid: paid.get(id)!, share: share.get(id)! })));
+      const balances = balancesOf(
+        spotIds.map((id) => ({ spotId: id, paid: paid.get(id)!, share: share.get(id)!, sent: 0, received: 0 })),
+      );
       expect(balances.reduce((s, b) => s + b.net, 0)).toBe(0);
       const payments = settleUp(balances);
       expect(Object.values(apply(balances, payments)).every((v) => v === 0)).toBe(true);

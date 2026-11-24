@@ -300,10 +300,18 @@ describe("people in the list and on the invite", () => {
 });
 
 describe("deleteTripForOwner", () => {
-  it("puts ownership inside both deletes, costs first, in one all-or-nothing batch", async () => {
+  it("puts ownership inside every statement, payments then costs, in one all-or-nothing batch", async () => {
     await deleteTripForOwner("trip-1", "u1");
-    expect(fake.batches).toEqual([2]);
-    const [costs, tripDelete] = fake.queries;
+    expect(fake.batches).toEqual([4]);
+    const [receipts, payments, costs, tripDelete] = fake.queries;
+    expect(receipts.sql).toMatch(/^select "receipt_path" from "payment" where/);
+    expect(receipts.sql).toContain('"payment"."trip_id" = $1');
+    expect(receipts.sql).toContain('"trip"."owner_id" = $');
+    expect(receipts.params).toEqual(["trip-1", "trip-1", "u1"]);
+    expect(payments.sql).toMatch(/^delete from "payment" where/);
+    expect(payments.sql).toContain('"payment"."trip_id" = $1');
+    expect(payments.sql).toContain('"trip"."owner_id" = $');
+    expect(payments.params).toEqual(["trip-1", "trip-1", "u1"]);
     expect(costs.sql).toMatch(/^delete from "cost" where/);
     expect(costs.sql).toContain('"cost"."trip_id" = $1');
     expect(costs.sql).toContain('"trip"."owner_id" = $');
@@ -377,7 +385,7 @@ describe("addGuest", () => {
 
 describe("changing a guest", () => {
   it("getGuestForEditor checks guest, trip, member and adder-or-owner in the query", async () => {
-    fake.rows = [["spot-1", "Lia", "u2", "Ben", "2", "1"]];
+    fake.rows = [["spot-1", "Lia", "u2", "Ben", "2", "1", "0"]];
     await expect(getGuestForEditor("trip-1", "spot-1", "u2")).resolves.toEqual({
       spotId: "spot-1",
       name: "Lia",
@@ -385,6 +393,7 @@ describe("changing a guest", () => {
       addedByName: "Ben",
       costCount: 2,
       trashedCostCount: 1,
+      paymentCount: 0,
     });
     const { sql, params } = fake.queries[0];
     expect(sql).toContain('"trip_member"."user_id" is null');

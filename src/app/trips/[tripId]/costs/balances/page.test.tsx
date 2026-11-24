@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getTripForMember: vi.fn(),
   getBalancesForMember: vi.fn(),
+  listPaymentsForMember: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
   }),
@@ -16,6 +17,7 @@ vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("@/lib/costs", () => ({ getBalancesForMember: mocks.getBalancesForMember }));
+vi.mock("@/lib/payments", () => ({ listPaymentsForMember: mocks.listPaymentsForMember }));
 
 type ContentProps = { params: Promise<{ tripId: string }> };
 
@@ -61,8 +63,31 @@ const example = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
-  mocks.getTripForMember.mockResolvedValue({ id: "trip-1", currency: "PHP" });
+  mocks.getTripForMember.mockResolvedValue({ id: "trip-1", currency: "PHP", timeZone: "Asia/Manila" });
   mocks.getBalancesForMember.mockResolvedValue(example);
+  mocks.listPaymentsForMember.mockResolvedValue([]);
+});
+
+const spot = (spotId: string, name: string, extra = {}) => ({
+  spotId,
+  name,
+  isGuest: false,
+  hasLeft: false,
+  isYou: false,
+  ...extra,
+});
+
+const paid = (id: string, from: ReturnType<typeof spot>, to: ReturnType<typeof spot>, extra = {}) => ({
+  id,
+  from,
+  to,
+  amount: 30000,
+  currency: "PHP",
+  method: "gcash",
+  createdAt: new Date("2026-11-24T06:05:00Z"),
+  mine: false,
+  hasReceipt: false,
+  ...extra,
 });
 
 describe("the Balances page", () => {
@@ -88,13 +113,55 @@ describe("the Balances page", () => {
   it("lists the viewer's payments first, in plain words", async () => {
     const html = await render();
     expect(html).toContain("Settle up");
-    expect(html).toContain("The fewest payments to make everyone even.");
+    expect(html).toContain("The fewest payments to make everyone even. Tap one to see how to pay.");
     expect(html).toContain("Dana pays you");
     expect(html).toContain("Bea pays you");
     expect(html).toContain("Bea pays Jun");
     expect(html).toContain("₱2,083.34");
-    expect(html).toContain("Paid someone back? Marking it here comes in a later update.");
+    expect(html).not.toContain("comes in a later update");
     expect(html.indexOf("Bea pays you")).toBeLessThan(html.indexOf("Bea pays Jun"));
+  });
+
+  it("makes every settle-up line a link to its Pay page", async () => {
+    const html = await render();
+    expect(html).toContain('href="/trips/trip-1/costs/pay/bea/maya"');
+    expect(html).toContain('href="/trips/trip-1/costs/pay/bea/jun"');
+    expect(html).toContain('href="/trips/trip-1/costs/pay/dana/maya"');
+  });
+
+  it("shows no Payments card when nothing was paid back", async () => {
+    expect(await render()).not.toContain("aria-label=\"Payments\"");
+  });
+
+  it("lists recorded payments newest first, in the trip time zone, with receipts only when the viewer may see them", async () => {
+    mocks.listPaymentsForMember.mockResolvedValue([
+      paid("p1", spot("maya", "Maya", { isYou: true }), spot("bea", "Bea"), { mine: true, hasReceipt: true }),
+      paid("p2", spot("bea", "Bea"), spot("maya", "Maya", { isYou: true }), { mine: true, method: "cash", amount: 45000 }),
+      paid("p3", spot("bea", "Bea"), spot("jun", "Jun"), { method: "bank", amount: 20000 }),
+    ]);
+    const html = await render();
+    const card = html.slice(html.indexOf('aria-label="Payments"'));
+    expect(card).toContain("You paid Bea");
+    expect(card).toContain("Bea paid you");
+    expect(card).toContain("Bea paid Jun");
+    expect(card).toContain("GCash · Tue, Nov 24");
+    expect(card).toContain("Cash · Tue, Nov 24");
+    expect(card).toContain("Bank · Tue, Nov 24");
+    expect(card).toContain("₱300.00");
+    expect(card.match(/Receipt/g)).toHaveLength(1);
+    expect(card.indexOf("You paid Bea")).toBeLessThan(card.indexOf("Bea paid Jun"));
+    // Only the viewer's own payments are links.
+    expect(card).toContain('href="/trips/trip-1/costs/payments/p1"');
+    expect(card).toContain('href="/trips/trip-1/costs/payments/p2"');
+    expect(card).not.toContain("/costs/payments/p3");
+  });
+
+  it("marks a payer who left, and still draws a face for them", async () => {
+    mocks.listPaymentsForMember.mockResolvedValue([
+      paid("p9", spot("gone", "Lou", { hasLeft: true }), spot("maya", "Maya", { isYou: true }), { mine: true }),
+    ]);
+    const html = await render();
+    expect(html).toContain('Lou<span class="text-muted"> (left the trip)</span> paid you');
   });
 
   it("puts the viewer's own payments before the others, and says 'You pay' when the viewer pays", async () => {
@@ -175,7 +242,7 @@ describe("the Balances page", () => {
     expect(html).toContain("Everyone&#x27;s even. Nothing to pay.");
     expect(html).toContain("are settled");
     expect(html).toContain("is settled");
-    expect(html).not.toContain("Paid someone back?");
+    expect(html).not.toContain("comes in a later update");
   });
 
   it("says there are no costs yet, with a link back to Costs and no amber button", async () => {
