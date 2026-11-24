@@ -16,7 +16,17 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const deleteImages = vi.fn<(paths: string[]) => Promise<void>>(async () => {});
-vi.mock("./blob-store", () => ({ deleteImages }));
+// The image routes read the file through readImage; here any path gives three JPEG bytes, so
+// the routes' answers depend only on the real privacy queries.
+const readImage = vi.fn<(path: string) => Promise<{ stream: ReadableStream<Uint8Array> }>>(async () => ({
+  stream: new Response(new Uint8Array([0xff, 0xd8, 0xff])).body!,
+}));
+vi.mock("./blob-store", () => ({ deleteImages, readImage }));
+// The signed-in person for the image routes.
+let signedIn = "";
+vi.mock("./current-user", () => ({
+  getCurrentUser: async () => ({ id: signedIn, name: "Test", image: null }),
+}));
 
 const ID_PREFIX = "qa-dev-pay-";
 const RUN = crypto.randomUUID();
@@ -430,6 +440,179 @@ describe("payments on the dev database", () => {
       expect(await payments.deletePayment(tripP, pid("delete-me"), OWNER)).toEqual({ receiptPath: "receipts/d.jpg" });
       expect(await payments.deletePayment(tripP, pid("delete-me"), OWNER)).toBe("not-found");
       expect(await netOf(OWNER)).toEqual(first);
+    });
+
+    // ---- QA: visibility edge cases ----
+
+    const spotOf = async (tripId: string, name: string) =>
+      (await trips.listTripMembers(tripId, OWNER)).find((p) => p.name === name)!.spotId;
+
+    it("shuts a removed party out of the payment, receipt, Pay page and recording, until they rejoin", async () => {
+      expect(await record("removed", MEMBER, memberSpot, ownerSpot, 200, { receiptPath: "receipts/removed.jpg" })).toBe("ok");
+      expect(await trips.removeMember(tripP, memberSpot, OWNER)).toBe(true);
+
+      expect(await payments.getReceiptForParty(tripP, pid("removed"), MEMBER)).toBeNull();
+      expect(await payments.getPaymentForParty(tripP, pid("removed"), MEMBER)).toBeNull();
+      expect(await payments.listPaymentsForMember(tripP, MEMBER)).toEqual([]);
+      expect(await payments.getPayPageForMember(tripP, memberSpot, ownerSpot, MEMBER)).toBeNull();
+      expect(await record("removed-new", MEMBER, memberSpot, ownerSpot, 100)).toBe("not-allowed");
+      expect(await payments.deletePayment(tripP, pid("removed"), MEMBER)).toBe("not-found");
+      // The receiver keeps it.
+      expect(await payments.getReceiptForParty(tripP, pid("removed"), OWNER)).toBe("receipts/removed.jpg");
+
+      await trips.joinTripByInviteCode(codeP, MEMBER);
+      expect(await payments.getReceiptForParty(tripP, pid("removed"), MEMBER)).toBe("receipts/removed.jpg");
+      expect(await payments.getPayPageForMember(tripP, memberSpot, ownerSpot, MEMBER)).not.toBeNull();
+    }, 30000);
+
+    it("gives a third member who left no Pay page and no payment list", async () => {
+      expect(await payments.getPayPageForMember(tripP, memberSpot, ownerSpot, THIRD)).not.toBeNull();
+      expect(await trips.leaveTrip(tripP, THIRD)).toBe("ok");
+      expect(await payments.getPayPageForMember(tripP, memberSpot, ownerSpot, THIRD)).toBeNull();
+      expect(await payments.listPaymentsForMember(tripP, THIRD)).toEqual([]);
+      await trips.joinTripByInviteCode(codeP, THIRD);
+    });
+
+    it("never lets a payment be reached through another trip's id", async () => {
+      // MEMBER is a party to the payment and also a member of trip A, but the payment is in trip P.
+      expect(await payments.getReceiptForParty(tripA, pid("removed"), MEMBER)).toBeNull();
+      expect(await payments.getPaymentForParty(tripA, pid("removed"), MEMBER)).toBeNull();
+      expect(await payments.deletePayment(tripA, pid("removed"), MEMBER)).toBe("not-found");
+      expect((await payments.listPaymentsForMember(tripA, MEMBER)).some((p) => p.id === pid("removed"))).toBe(false);
+      // Trip P's spots under trip A's id: no Pay page and nothing saved.
+      expect(await payments.getPayPageForMember(tripA, memberSpot, ownerSpot, MEMBER)).toBeNull();
+      expect(
+        await payments.recordPayment({
+          tripId: tripA,
+          paymentId: pid("cross-trip"),
+          fromSpot: memberSpot,
+          toSpot: ownerSpot,
+          amount: 100,
+          method: "cash",
+          receiptPath: null,
+          userId: MEMBER,
+        }),
+      ).toBe("not-allowed");
+      expect((await paymentRows()).some((r) => r.id === pid("cross-trip"))).toBe(false);
+      // The payment is untouched.
+      expect(await payments.getReceiptForParty(tripP, pid("removed"), MEMBER)).toBe("receipts/removed.jpg");
+    });
+
+    it("hides a person's details when the owner of the details leaves every shared trip", async () => {
+      await clearAccounts(MEMBER);
+      await payments.createPaymentAccount(MEMBER, bank, "qr/member.jpg");
+      const [account] = await payments.listMyPaymentAccounts(MEMBER);
+      // THIRD shares trips A and P with MEMBER.
+      expect(await payments.listPaymentAccountsForViewer(MEMBER, THIRD)).toEqual([account]);
+      expect(await trips.leaveTrip(tripA, MEMBER)).toBe("ok");
+      expect(await payments.listPaymentAccountsForViewer(MEMBER, THIRD)).toEqual([account]); // trip P
+      expect(await trips.leaveTrip(tripP, MEMBER)).toBe("ok");
+      expect(await payments.listPaymentAccountsForViewer(MEMBER, THIRD)).toEqual([]);
+      expect(await payments.getQrForViewer(account!.id, THIRD)).toBeNull();
+      // OWNER still shares trip B with MEMBER; MEMBER still sees their own.
+      expect(await payments.listPaymentAccountsForViewer(MEMBER, OWNER)).toEqual([account]);
+      expect(await payments.getQrForViewer(account!.id, MEMBER)).toBe("qr/member.jpg");
+      await trips.joinTripByInviteCode(codeA, MEMBER);
+      await trips.joinTripByInviteCode(codeP, MEMBER);
+      expect(await payments.listPaymentAccountsForViewer(MEMBER, THIRD)).toEqual([account]);
+      await clearAccounts(MEMBER);
+    }, 30000);
+
+    describe("image routes against the real privacy rules", () => {
+      let qrRoute: typeof import("@/app/profile/payment-details/[accountId]/qr/route");
+      let receiptRoute: typeof import("@/app/trips/[tripId]/costs/payments/[paymentId]/receipt/route");
+      let accountId: string;
+
+      const getQr = async (as: string, id = accountId) => {
+        signedIn = as;
+        return qrRoute.GET(new Request("http://localhost/qr"), { params: Promise.resolve({ accountId: id }) });
+      };
+      const getReceipt = async (as: string, tripId = tripP, paymentId = pid("route")) => {
+        signedIn = as;
+        return receiptRoute.GET(new Request("http://localhost/receipt"), {
+          params: Promise.resolve({ tripId, paymentId }),
+        });
+      };
+      const expectImage = (response: Response) => {
+        expect(response.status).toBe(200);
+        expect(response.headers.get("Content-Type")).toBe("image/jpeg");
+        expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+      };
+      const expectRefused = async (response: Response) => {
+        expect(response.status).toBe(404);
+        expect(await response.text()).toBe("Not found");
+        expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+      };
+
+      // Leaves, or is removed from, every trip they share with OWNER; returns a rejoin.
+      async function shutOut(userId: string, name: string, how: "leave" | "remove") {
+        const shared = [tripA, tripP];
+        for (const tripId of shared) {
+          if (how === "leave") expect(await trips.leaveTrip(tripId, userId)).toBe("ok");
+          else expect(await trips.removeMember(tripId, await spotOf(tripId, name), OWNER)).toBe(true);
+        }
+        return async () => {
+          await trips.joinTripByInviteCode(codeA, userId);
+          await trips.joinTripByInviteCode(codeP, userId);
+        };
+      }
+
+      beforeAll(async () => {
+        qrRoute = await import("@/app/profile/payment-details/[accountId]/qr/route");
+        receiptRoute = await import("@/app/trips/[tripId]/costs/payments/[paymentId]/receipt/route");
+        await clearAccounts(OWNER);
+        await payments.createPaymentAccount(OWNER, wallet, "qr/route.jpg");
+        accountId = (await payments.listMyPaymentAccounts(OWNER))[0]!.id;
+        expect(await record("route", MEMBER, memberSpot, ownerSpot, 100, { receiptPath: "receipts/route.jpg" })).toBe("ok");
+      });
+
+      afterAll(async () => {
+        await clearAccounts(OWNER);
+      });
+
+      it("QR route: the owner and a member of a shared trip get the image, a stranger gets 404", async () => {
+        readImage.mockClear();
+        expectImage(await getQr(OWNER));
+        expectImage(await getQr(THIRD));
+        expect(readImage).toHaveBeenCalledWith("qr/route.jpg");
+        readImage.mockClear();
+        await expectRefused(await getQr(STRANGER));
+        await expectRefused(await getQr(OTHER_OWNER));
+        await expectRefused(await getQr(MEMBER, `${ID_PREFIX}missing`));
+        expect(readImage).not.toHaveBeenCalled();
+      });
+
+      it("QR route: 404 right after leaving or being removed, the image again after rejoining", async () => {
+        for (const how of ["leave", "remove"] as const) {
+          const rejoin = await shutOut(THIRD, "Cho Test", how);
+          await expectRefused(await getQr(THIRD));
+          await rejoin();
+          expectImage(await getQr(THIRD));
+        }
+      }, 60000);
+
+      it("receipt route: payer and receiver get the image, a third member and a stranger get 404", async () => {
+        readImage.mockClear();
+        expectImage(await getReceipt(MEMBER));
+        expectImage(await getReceipt(OWNER));
+        expect(readImage).toHaveBeenCalledWith("receipts/route.jpg");
+        readImage.mockClear();
+        await expectRefused(await getReceipt(THIRD));
+        await expectRefused(await getReceipt(STRANGER));
+        // The payer, through a trip id they are in but the payment is not.
+        await expectRefused(await getReceipt(MEMBER, tripA));
+        expect(readImage).not.toHaveBeenCalled();
+      });
+
+      it("receipt route: 404 for the payer right after leaving or being removed, the image again after rejoining", async () => {
+        for (const how of ["leave", "remove"] as const) {
+          const rejoin = await shutOut(MEMBER, "Ada Test", how);
+          await expectRefused(await getReceipt(MEMBER));
+          expectImage(await getReceipt(OWNER));
+          await rejoin();
+          expectImage(await getReceipt(MEMBER));
+        }
+      }, 60000);
     });
   });
 
