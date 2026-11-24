@@ -432,4 +432,92 @@ describe("payments on the dev database", () => {
       expect(await netOf(OWNER)).toEqual(first);
     });
   });
+
+  describe("guests and trip deletion", () => {
+    it("blocks removing a guest who is in a payment, and allows one who is in neither", async () => {
+      const tripG = await trips.createTrip(OWNER, { ...tripInput, name: "Guests trip" });
+      await trips.addGuest(tripG, OWNER, "Gus");
+      await trips.addGuest(tripG, OWNER, "Gwen");
+      const people = await trips.listTripMembers(tripG, OWNER);
+      const spotNamed = (name: string) => people.find((p) => p.name === name)!.spotId;
+      const owner = spotNamed("Maya Test");
+      const gus = spotNamed("Gus");
+      const gwen = spotNamed("Gwen");
+
+      expect(
+        await payments.recordPayment({
+          tripId: tripG,
+          paymentId: `${ID_PREFIX}p-gus-${RUN}`,
+          fromSpot: gus,
+          toSpot: owner,
+          amount: 500,
+          method: "cash",
+          receiptPath: null,
+          userId: OWNER,
+        }),
+      ).toBe("ok");
+
+      expect(await trips.getGuestForEditor(tripG, gus, OWNER)).toMatchObject({ costCount: 0, paymentCount: 1 });
+      expect(await trips.getGuestForEditor(tripG, gwen, OWNER)).toMatchObject({ costCount: 0, paymentCount: 0 });
+      expect(await trips.removeGuest(tripG, gus, OWNER)).toBe("in-costs");
+      expect(await trips.getGuestForEditor(tripG, gus, OWNER)).not.toBeNull();
+      expect(await trips.removeGuest(tripG, gwen, OWNER)).toBe("ok");
+      expect(await trips.getGuestForEditor(tripG, gwen, OWNER)).toBeNull();
+
+      // Once the payment is deleted the guest can go.
+      expect(await payments.deletePayment(tripG, `${ID_PREFIX}p-gus-${RUN}`, OWNER)).toEqual({ receiptPath: null });
+      expect(await trips.removeGuest(tripG, gus, OWNER)).toBe("ok");
+    }, 30000);
+
+    it("deletes a trip that has payments, with and without receipts, and the receipt files after", async () => {
+      const costs = await import("./costs");
+      const money = await import("./money");
+      const tripD = await trips.createTrip(OWNER, { ...tripInput, name: "Delete trip" });
+      const code = (await trips.getInviteCodeForMember(tripD, OWNER))!;
+      await trips.joinTripByInviteCode(code, MEMBER);
+      const people = await trips.listTripMembers(tripD, OWNER);
+      const owner = people.find((p) => p.name === "Maya Test")!.spotId;
+      const member = people.find((p) => p.name === "Ada Test")!.spotId;
+      const shares = money.splitEqually(10000, [owner, member], owner).map((share) => ({ ...share, originalAmount: null }));
+      await costs.createCost(tripD, OWNER, `${ID_PREFIX}c-del-${RUN}`, {
+        description: "Taxi",
+        amount: 10000,
+        paidBy: owner,
+        category: null,
+        spentOn: "2027-03-12",
+        shares,
+        money: { kind: "trip" as const },
+      });
+      const pay = (id: string, receiptPath: string | null) =>
+        payments.recordPayment({
+          tripId: tripD,
+          paymentId: `${ID_PREFIX}p-${id}-${RUN}`,
+          fromSpot: member,
+          toSpot: owner,
+          amount: 1000,
+          method: "gcash",
+          receiptPath,
+          userId: MEMBER,
+        });
+      expect(await pay("del-a", "receipts/del-a.jpg")).toBe("ok");
+      expect(await pay("del-b", null)).toBe("ok");
+
+      // A member is not the owner: nothing is deleted, no file is touched.
+      deleteImages.mockClear();
+      expect(await trips.deleteTripForOwner(tripD, MEMBER)).toBe(false);
+      expect(await trips.deleteTripForOwner(tripD, STRANGER)).toBe(false);
+      expect(deleteImages).not.toHaveBeenCalled();
+      expect(await dbModule.db.select().from(schema.payment).where(orm.eq(schema.payment.tripId, tripD))).toHaveLength(2);
+
+      expect(await trips.deleteTripForOwner(tripD, OWNER)).toBe(true);
+      expect(await dbModule.db.select().from(schema.payment).where(orm.eq(schema.payment.tripId, tripD))).toEqual([]);
+      expect(await dbModule.db.select().from(schema.cost).where(orm.eq(schema.cost.tripId, tripD))).toEqual([]);
+      expect(await dbModule.db.select().from(schema.trip).where(orm.eq(schema.trip.id, tripD))).toEqual([]);
+      expect(deleteImages).toHaveBeenCalledTimes(1);
+      expect(deleteImages).toHaveBeenCalledWith(["receipts/del-a.jpg"]);
+      // Repeating it is harmless and deletes no files.
+      expect(await trips.deleteTripForOwner(tripD, OWNER)).toBe(false);
+      expect(deleteImages).toHaveBeenCalledTimes(1);
+    }, 30000);
+  });
 });
