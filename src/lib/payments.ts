@@ -463,7 +463,7 @@ export async function listPaymentsForMember(
   }));
 }
 
-export type PaymentDetails = PaymentListItem & { recordedBy: string; hasReceipt: boolean };
+export type PaymentDetails = PaymentListItem & { recordedBy: string; recordedByYou: boolean };
 
 // One payment in full, only for the payer or the receiver (a person still in the trip).
 export async function getPaymentForParty(
@@ -481,6 +481,7 @@ export async function getPaymentForParty(
       createdAt: payment.createdAt,
       receipt: sql<boolean>`${payment.receiptPath} is not null`,
       recordedBy: recorder.name,
+      recordedByYou: sql<boolean>`${payment.createdBy} = ${userId}`,
       fromSpot: personColumns(userId, fromSpotAlias, fromUser),
       toSpot: personColumns(userId, toSpotAlias, toUser),
     })
@@ -505,6 +506,7 @@ export async function getPaymentForParty(
     mine: true,
     hasReceipt: row.receipt,
     recordedBy: firstNameOf(row.recordedBy),
+    recordedByYou: row.recordedByYou,
   };
 }
 

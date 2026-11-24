@@ -355,7 +355,7 @@ describe("payments on the dev database", () => {
         const item = (await payments.listPaymentsForMember(tripP, party)).find((p) => p.id === pid("receipt"));
         expect(item).toMatchObject({ mine: true, hasReceipt: true });
         expect(await payments.getReceiptForParty(tripP, pid("receipt"), party)).toBe("receipts/r.jpg");
-        expect(await payments.getPaymentForParty(tripP, pid("receipt"), party)).toMatchObject({ id: pid("receipt"), hasReceipt: true });
+        expect(await payments.getPaymentForParty(tripP, pid("receipt"), party)).toMatchObject({ id: pid("receipt"), hasReceipt: true, recordedBy: "Ada", recordedByYou: party === MEMBER });
       }
       // A third member sees the payment line but never the receipt.
       const third = (await payments.listPaymentsForMember(tripP, THIRD)).find((p) => p.id === pid("receipt"));

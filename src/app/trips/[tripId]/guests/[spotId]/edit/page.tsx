@@ -4,12 +4,25 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { firstNameOf } from "@/lib/display-name";
-import { getGuestForEditor, getTripForMember } from "@/lib/trips";
+import { getGuestForEditor, getTripForMember, type GuestSpot } from "@/lib/trips";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
 import { cardClass, helpClass, linkClass, screenClass, skeleton } from "@/components/ui";
 import { EditGuestForm } from "./edit-guest-form";
 
 type Params = Promise<{ tripId: string; spotId: string }>;
+
+// "3 costs (1 in the trash)", "a payment", or both: what keeps this guest from being removed.
+function blockers(guest: GuestSpot): string {
+  const parts: string[] = [];
+  if (guest.costCount > 0) {
+    const trash = guest.trashedCostCount > 0 ? ` (${guest.trashedCostCount} in the trash)` : "";
+    parts.push(`${guest.costCount} ${guest.costCount === 1 ? "cost" : "costs"}${trash}`);
+  }
+  if (guest.paymentCount > 0) {
+    parts.push(guest.paymentCount === 1 ? "a payment" : `${guest.paymentCount} payments`);
+  }
+  return parts.join(" and ");
+}
 
 // This page sits outside the trip layout, so it checks for itself. Only the person who added
 // the guest, or the trip owner, gets here: anyone else (and a spot that is no longer a guest,
@@ -36,11 +49,9 @@ async function EditGuestContent({ params }: { params: Params }) {
           </p>
           <EditGuestForm tripId={trip.id} spotId={guest.spotId} name={guest.name} />
         </div>
-        {guest.costCount > 0 ? (
+        {guest.costCount > 0 || guest.paymentCount > 0 ? (
           <p className={`${helpClass} wrap-anywhere`}>
-            {guest.name} is part of {guest.costCount} {guest.costCount === 1 ? "cost" : "costs"}
-            {guest.trashedCostCount > 0 ? ` (${guest.trashedCostCount} in the trash)` : ""}, so they can&apos;t be
-            removed.
+            {guest.name} is part of {blockers(guest)}, so they can&apos;t be removed.
           </p>
         ) : (
           <>
@@ -50,7 +61,7 @@ async function EditGuestContent({ params }: { params: Params }) {
             >
               Remove guest
             </Link>
-            <p className={helpClass}>A guest who&apos;s part of any costs can&apos;t be removed.</p>
+            <p className={helpClass}>A guest who&apos;s part of any costs or payments can&apos;t be removed.</p>
           </>
         )}
       </main>
