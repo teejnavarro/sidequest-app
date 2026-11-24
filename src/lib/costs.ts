@@ -481,7 +481,9 @@ export async function getBalancesForMember(tripId: string, userId: string): Prom
       .where(and(eq(cost.tripId, tripId), costInTripCurrency, isMemberOf(tripId, userId))),
   ]);
 
-  const balances = balancesOf(rows.map((row) => ({ spotId: row.spotId, paid: row.paid, share: row.share })));
+  const balances = balancesOf(
+    rows.map((row) => ({ spotId: row.spotId, paid: row.paid, share: row.share, sent: 0, received: 0 })),
+  );
   const people = rows
     .map((row, index) => ({
       spotId: row.spotId,

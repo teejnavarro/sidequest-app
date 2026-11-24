@@ -1,16 +1,22 @@
 // Who owes whom. Balances are never stored: each visit adds up what every spot paid and its
 // share of every cost, and these pure functions turn that into balances and the fewest
-// payments. Whole minor units only, no floating point, no database or framework imports.
+// payments. Money already paid back counts too: what a spot sent lowers what it owes, what it
+// received lowers what it is owed. Whole minor units only, no floating point, no database or
+// framework imports.
 
-export type SpotTotals = { spotId: string; paid: number; share: number }; // minor units
-export type Balance = { spotId: string; net: number }; // paid - share; > 0 owed, < 0 owes
+// sent / received: recorded payments from / to this spot
+export type SpotTotals = { spotId: string; paid: number; share: number; sent: number; received: number }; // minor units
+export type Balance = { spotId: string; net: number }; // paid - share + sent - received; > 0 owed, < 0 owes
 export type Payment = { from: string; to: string; amount: number }; // spot ids, amount > 0
 
 // Above this many people with a non-zero balance the exact search (2^n) is skipped.
 const EXACT_LIMIT = 12;
 
 export function balancesOf(totals: SpotTotals[]): Balance[] {
-  return totals.map(({ spotId, paid, share }) => ({ spotId, net: paid - share }));
+  return totals.map(({ spotId, paid, share, sent, received }) => ({
+    spotId,
+    net: paid - share + sent - received,
+  }));
 }
 
 // The person who owes most pays the person owed most, the smaller of the two amounts, until
