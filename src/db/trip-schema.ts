@@ -290,3 +290,78 @@ export const costShare = pgTable(
     ),
   ],
 );
+
+// A person's own receiving details (GCash, Maya or a bank account), shown only to people who
+// share a trip with them (see src/lib/payments.ts). The number is stored as digits only.
+// No cascade from user: the account deletion story deletes these rows and their QR files.
+export const paymentAccount = pgTable(
+  "payment_account",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()::text`),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+    // One of gcash, maya, bank.
+    kind: text("kind").notNull(),
+    // Set only for a bank account.
+    bankName: text("bank_name"),
+    accountName: text("account_name").notNull(),
+    accountNumber: text("account_number").notNull(),
+    // The pathname of the QR image in the private Blob store, e.g. "qr/<uuid>.jpg".
+    qrPath: text("qr_path"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("payment_account_userId_idx").on(table.userId),
+    check("payment_account_kind_check", sql`${table.kind} in ('gcash', 'maya', 'bank')`),
+    check(
+      "payment_account_bank_name_check",
+      sql`(${table.kind} = 'bank') = (${table.bankName} is not null)`,
+    ),
+  ],
+);
+
+// One recorded payment between two spots of a trip. The amount is whole minor units of
+// `currency` (the trip's currency when saved). The id is made by the form, so a double tap
+// saves once. Payments go with their trip; spots are NO ACTION, so a spot in a payment can't
+// be deleted.
+export const payment = pgTable(
+  "payment",
+  {
+    id: text("id").primaryKey(),
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trip.id, { onDelete: "cascade" }),
+    fromSpot: text("from_spot")
+      .notNull()
+      .references(() => tripMember.id),
+    toSpot: text("to_spot")
+      .notNull()
+      .references(() => tripMember.id),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    currency: text("currency").notNull(),
+    // One of gcash, maya, bank, cash.
+    method: text("method").notNull(),
+    // The pathname of the receipt image in the private Blob store.
+    receiptPath: text("receipt_path"),
+    // No cascade from user, like cost.created_by.
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("payment_tripId_idx").on(table.tripId),
+    index("payment_fromSpot_idx").on(table.fromSpot),
+    index("payment_toSpot_idx").on(table.toSpot),
+    check("payment_spots_differ", sql`${table.fromSpot} <> ${table.toSpot}`),
+    check("payment_amount_positive", sql`${table.amount} > 0`),
+    check("payment_method_check", sql`${table.method} in ('gcash', 'maya', 'bank', 'cash')`),
+  ],
+);
