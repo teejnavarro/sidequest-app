@@ -181,3 +181,12 @@ describe("BANK_SUGGESTIONS", () => {
     expect(BANK_SUGGESTIONS).toHaveLength(16);
   });
 });
+
+describe("accountLabel", () => {
+  it("names the wallet or the bank", async () => {
+    const { accountLabel } = await import("./payment-input");
+    expect(accountLabel({ kind: "gcash", bankName: null })).toBe("GCash");
+    expect(accountLabel({ kind: "maya", bankName: null })).toBe("Maya");
+    expect(accountLabel({ kind: "bank", bankName: "BPI" })).toBe("BPI");
+  });
+});

@@ -30,3 +30,6 @@ export type PayFormState = {
 export const emptyPayValues: PayFormValues = { amount: "", method: "" };
 
 export type PaymentDeleteState = { error?: string };
+
+// Most accounts one person can save (the server enforces it too).
+export const MAX_PAYMENT_ACCOUNTS = 10;

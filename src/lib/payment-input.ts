@@ -179,3 +179,9 @@ export function paymentSentence(args: {
         : `via ${METHOD_LABELS[args.method]}`;
   return `${payer} paid ${receiver} ${formatMoney(args.amount, args.currency)} ${how}.`;
 }
+
+// What an account is called on screen: GCash, Maya, or the bank's own name.
+export function accountLabel(account: { kind: "gcash" | "maya" | "bank"; bankName: string | null }): string {
+  if (account.kind === "bank") return account.bankName ?? "Bank";
+  return METHOD_LABELS[account.kind];
+}
