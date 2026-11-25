@@ -27,6 +27,7 @@ const RUN = crypto.randomUUID();
 const ME = `${ID_PREFIX}me-${RUN}`; // the account that gets deleted
 const ADA = `${ID_PREFIX}ada-${RUN}`;
 const CHO = `${ID_PREFIX}cho-${RUN}`;
+const DAN = `${ID_PREFIX}dan-${RUN}`; // joined one of ME's trips and left it
 
 const tripInput = {
   name: "Manila long weekend",
@@ -41,6 +42,8 @@ const QR = `qr/${RUN}-me.jpg`;
 const RECEIPT_ME_SHARED = `receipts/${RUN}-me-shared.jpg`;
 const RECEIPT_ADA = `receipts/${RUN}-ada.jpg`;
 const RECEIPT_SOLO = `receipts/${RUN}-solo.jpg`;
+const RECEIPT_DAN_LEFT = `receipts/${RUN}-dan-left.jpg`;
+const QR_ADA = `qr/${RUN}-ada.jpg`;
 
 function devDatabaseAddress(): string {
   let address: string | undefined;
@@ -60,11 +63,15 @@ describe("account deletion on the dev database", () => {
   let trips: typeof import("./trips");
   let costs: typeof import("./costs");
   let account: typeof import("./account");
+  let payments: typeof import("./payments");
   let schema: typeof import("@/db/trip-schema") & typeof import("@/db/auth-schema");
   let orm: typeof import("drizzle-orm");
   let shared: string; // owned by ME, with ADA and CHO
   let others: string; // owned by ADA, ME is a member and owes money
   let solo: string; // owned by ME, only a guest besides
+  let shared2: string; // owned by ME, with CHO: a second trip to hand over
+  let leftBehind: string; // owned by ME; DAN was in it and left, so it counts as solo
+  let adaAccountId: string;
   const spot: Record<string, string> = {};
 
   async function cleanUp() {
@@ -174,6 +181,29 @@ describe("account deletion on the dev database", () => {
     };
   }
 
+  // Everything the other people own, to prove the deletion never reaches past ME.
+  async function theirs() {
+    const { db } = dbModule;
+    const { inArray } = orm;
+    const people = [ADA, CHO, DAN];
+    return {
+      users: await db.select().from(schema.user).where(inArray(schema.user.id, people)).orderBy(schema.user.id),
+      sessions: await db.select().from(schema.session).where(inArray(schema.session.userId, people)),
+      accounts: await db.select().from(schema.account).where(inArray(schema.account.userId, people)),
+      payAccounts: await db
+        .select()
+        .from(schema.paymentAccount)
+        .where(inArray(schema.paymentAccount.userId, people)),
+      // DAN's spot in the trip that gets deleted is left out: it goes with that trip.
+      spots: await db
+        .select()
+        .from(schema.tripMember)
+        .where(orm.and(inArray(schema.tripMember.userId, people), orm.ne(schema.tripMember.tripId, leftBehind)))
+        .orderBy(schema.tripMember.id),
+    };
+  }
+  let othersBefore: Awaited<ReturnType<typeof theirs>>;
+
   const tripExists = async (id: string) =>
     (await dbModule.db.select().from(schema.trip).where(orm.eq(schema.trip.id, id))).length === 1;
 
@@ -184,6 +214,7 @@ describe("account deletion on the dev database", () => {
     trips = await import("./trips");
     costs = await import("./costs");
     account = await import("./account");
+    payments = await import("./payments");
     schema = {
       ...(await import("@/db/trip-schema")),
       ...(await import("@/db/auth-schema")),
@@ -193,13 +224,33 @@ describe("account deletion on the dev database", () => {
 
     await cleanUp(); // anything left by an earlier crashed run
     await db.insert(schema.user).values(
-      [ME, ADA, CHO].map((id, index) => ({
+      [ME, ADA, CHO, DAN].map((id, index) => ({
         id,
-        name: ["Maya Test", "Ada Test", "Cho Test"][index]!,
+        name: ["Maya Test", "Ada Test", "Cho Test", "Dan Test"][index]!,
         email: `${id}@example.test`,
-        image: id === ME ? "https://example.test/me.jpg" : null,
+        image: id === ME || id === ADA ? `https://example.test/${index}.jpg` : null,
       })),
     );
+    // ADA has her own sign-in rows and payment details; none of it may change.
+    await db.insert(schema.session).values({
+      id: `${ID_PREFIX}s-ada-${RUN}`,
+      expiresAt: new Date(Date.now() + 3600_000),
+      token: `${ID_PREFIX}t-ada-${RUN}`,
+      updatedAt: new Date(),
+      userId: ADA,
+    });
+    await db.insert(schema.account).values({
+      id: `${ID_PREFIX}a-ada-${RUN}`,
+      accountId: `${ID_PREFIX}g-ada-${RUN}`,
+      providerId: "google",
+      userId: ADA,
+      updatedAt: new Date(),
+    });
+    const [adaAccount] = await db
+      .insert(schema.paymentAccount)
+      .values({ userId: ADA, kind: "gcash", accountName: "Ada Test", accountNumber: "09190000000", qrPath: QR_ADA })
+      .returning({ id: schema.paymentAccount.id });
+    adaAccountId = adaAccount!.id;
     await db.insert(schema.session).values({
       id: `${ID_PREFIX}s-${RUN}`,
       expiresAt: new Date(Date.now() + 3600_000),
@@ -226,6 +277,11 @@ describe("account deletion on the dev database", () => {
     await trips.joinTripByInviteCode((await trips.getInviteCodeForMember(shared, ME))!, CHO);
     await trips.joinTripByInviteCode((await trips.getInviteCodeForMember(others, ADA))!, ME);
     await trips.addGuest(solo, ME, "Gus");
+    await trips.addGuest(shared, ME, "Gina"); // guests count in "You + n"
+    shared2 = await trips.createTrip(ME, { ...tripInput, name: "Third group trip" });
+    await trips.joinTripByInviteCode((await trips.getInviteCodeForMember(shared2, ME))!, CHO);
+    leftBehind = await trips.createTrip(ME, { ...tripInput, name: "Trip Dan left" });
+    await trips.joinTripByInviteCode((await trips.getInviteCodeForMember(leftBehind, ME))!, DAN);
 
     spot.meShared = await spotOf(shared, ME);
     spot.adaShared = await spotOf(shared, ADA);
@@ -238,6 +294,9 @@ describe("account deletion on the dev database", () => {
       .from(schema.tripMember)
       .where(orm.and(orm.eq(schema.tripMember.tripId, solo), orm.isNotNull(schema.tripMember.guestName)));
     spot.gusSolo = guest!.id;
+    spot.meShared2 = await spotOf(shared2, ME);
+    spot.meLeft = await spotOf(leftBehind, ME);
+    spot.danLeft = await spotOf(leftBehind, DAN);
 
     // Shared trip: ME is owed money, one payment each way, each with its own receipt.
     await addCost("sh", shared, 900, spot.meShared!, [spot.meShared!, spot.adaShared!, spot.choShared!]);
@@ -251,6 +310,10 @@ describe("account deletion on the dev database", () => {
     await addCost("so", solo, 400, spot.meSolo!, [spot.meSolo!, spot.gusSolo!]);
     await addCost("so2", solo, 100, spot.gusSolo!, [spot.meSolo!, spot.gusSolo!], true);
     await addPayment("so", solo, spot.gusSolo!, spot.meSolo!, ME, 50, RECEIPT_SOLO);
+    // Trip Dan left: Dan paid a cost, ME paid him back and Dan added the receipt, then he left.
+    await addCost("dl", leftBehind, 600, spot.danLeft!, [spot.meLeft!, spot.danLeft!]);
+    await addPayment("dl", leftBehind, spot.meLeft!, spot.danLeft!, DAN, 300, RECEIPT_DAN_LEFT);
+    expect(await trips.leaveTrip(leftBehind, DAN)).toBe("ok");
 
     const [idea] = await db
       .insert(schema.idea)
@@ -278,9 +341,17 @@ describe("account deletion on the dev database", () => {
 
   it("lists what to hand over, the solo trips with cost counts, and what the person owes", async () => {
     const check = await account.getAccountDeletionCheck(ME);
-    expect(check.handOver).toEqual([{ tripId: shared, name: "Manila long weekend", peopleCount: 3 }]);
-    // The trashed cost counts, like it does on Delete trip.
-    expect(check.soloTrips).toEqual([{ tripId: solo, name: "My own trip", costCount: 2 }]);
+    // Newest first. peopleCount counts the guest too: ME, ADA, CHO and Gina make 4.
+    expect(check.handOver).toEqual([
+      { tripId: shared2, name: "Third group trip", peopleCount: 2 },
+      { tripId: shared, name: "Manila long weekend", peopleCount: 4 },
+    ]);
+    // The trashed cost counts, like it does on Delete trip. A trip whose other person left
+    // counts as solo (owner kept this rule at the PC check, 2026-11-25).
+    expect(check.soloTrips).toEqual([
+      { tripId: leftBehind, name: "Trip Dan left", costCount: 1 },
+      { tripId: solo, name: "My own trip", costCount: 2 },
+    ]);
     // Second trip: 500 share, 200 paid back. The shared trip is not owed (ME is ahead), and the
     // solo trip is going away.
     expect(check.owing).toEqual([{ tripId: others, name: "Second group trip", amount: 300, currency: "PHP" }]);
@@ -298,10 +369,27 @@ describe("account deletion on the dev database", () => {
     expect(deleted).toEqual([]);
   });
 
-  it("deletes after handing the shared trip over, and other members' balances do not move", async () => {
+  it("still refuses with one of two shared trips handed over", async () => {
+    // Before deletion ME may see ADA's QR, because they share a trip.
+    expect(await payments.getQrForViewer(adaAccountId, ME)).toBe(QR_ADA);
+    const before = await mine();
     expect(await trips.transferOwnership(shared, spot.adaShared!, ME)).toBe(true);
-    expect((await account.getAccountDeletionCheck(ME)).handOver).toEqual([]);
+    expect((await account.getAccountDeletionCheck(ME)).handOver).toEqual([
+      { tripId: shared2, name: "Third group trip", peopleCount: 2 },
+    ]);
+    expect(await account.deleteAccount(ME)).toBe("owns-shared-trips");
+    expect(await mine()).toEqual(before);
+    expect(await tripExists(solo)).toBe(true);
+    expect(await tripExists(leftBehind)).toBe(true);
+    expect(deleted).toEqual([]);
+  });
 
+  it("deletes after handing the shared trip over, and other members' balances do not move", async () => {
+    expect(await trips.transferOwnership(shared2, await spotOf(shared2, CHO), ME)).toBe(true);
+    expect((await account.getAccountDeletionCheck(ME)).handOver).toEqual([]);
+    othersBefore = await theirs();
+
+    const shared2Cho = await moneyAs(shared2, CHO);
     const sharedAda = await moneyAs(shared, ADA);
     const sharedCho = await moneyAs(shared, CHO);
     const othersAda = await moneyAs(others, ADA);
@@ -312,6 +400,13 @@ describe("account deletion on the dev database", () => {
     expect(await moneyAs(shared, ADA)).toEqual(sharedAda);
     expect(await moneyAs(shared, CHO)).toEqual(sharedCho);
     expect(await moneyAs(others, ADA)).toEqual(othersAda);
+    // No costs in this trip: a left person with nothing owed drops off Balances (SQ-006 rule),
+    // so only ME's zero row goes and everything else stays.
+    expect(shared2Cho.nets).toContainEqual([spot.meShared2, 0]);
+    expect(await moneyAs(shared2, CHO)).toEqual({
+      ...shared2Cho,
+      nets: shared2Cho.nets.filter(([spotId]) => spotId !== spot.meShared2),
+    });
     const after = await costs.getBalancesForMember(shared, ADA);
     const gone = after.people.find((p) => p.spotId === spot.meShared)!;
     expect(gone).toMatchObject({ name: "Former member", hasLeft: true });
@@ -332,7 +427,8 @@ describe("account deletion on the dev database", () => {
 
   it("deletes the QR and the receipts the person uploaded, and keeps the other person's", async () => {
     expect(deleted).toHaveLength(1);
-    expect([...deleted[0]!].sort()).toEqual([QR, RECEIPT_ME_SHARED, RECEIPT_SOLO].sort());
+    // Dan's receipt goes too: it lived in a trip that is deleted with the account.
+    expect([...deleted[0]!].sort()).toEqual([QR, RECEIPT_ME_SHARED, RECEIPT_SOLO, RECEIPT_DAN_LEFT].sort());
     const { db } = dbModule;
     const rows = await db
       .select({ id: schema.payment.id, path: schema.payment.receiptPath })
@@ -351,6 +447,40 @@ describe("account deletion on the dev database", () => {
     }
     expect(await tripExists(shared)).toBe(true);
     expect(await tripExists(others)).toBe(true);
+  });
+
+  it("deletes a trip whose other person left, with that person's cost and payment", async () => {
+    const { db } = dbModule;
+    expect(await tripExists(leftBehind)).toBe(false);
+    for (const table of [schema.cost, schema.payment, schema.tripMember] as const) {
+      expect(await db.select().from(table).where(orm.eq(table.tripId, leftBehind))).toEqual([]);
+    }
+  });
+
+  it("leaves the other people's account, sign-in, payment details and spots alone", async () => {
+    const now = await theirs();
+    expect(now).toEqual(othersBefore);
+    expect(now.users).toHaveLength(3);
+    expect(now.sessions).toHaveLength(1);
+    expect(now.accounts).toHaveLength(1);
+    expect(now.payAccounts).toEqual([expect.objectContaining({ userId: ADA, qrPath: QR_ADA })]);
+    expect(now.users.find((row) => row.id === ADA)).toMatchObject({
+      name: "Ada Test",
+      email: `${ADA}@example.test`,
+      image: "https://example.test/1.jpg",
+    });
+  });
+
+  it("gives the deleted account no way back into its old trips", async () => {
+    expect(await trips.getTripForMember(shared, ME)).toBeNull();
+    expect(await trips.getTripForMember(others, ME)).toBeNull();
+    expect((await costs.getBalancesForMember(shared, ME)).people).toEqual([]);
+    expect(await payments.listPaymentsForMember(shared, ME)).toEqual([]);
+    expect(await payments.getPayPageForMember(shared, spot.meShared!, spot.adaShared!, ME)).toBeNull();
+    expect(await payments.getQrForViewer(adaAccountId, ME)).toBeNull();
+    // ADA still sees the spot, as a former member with no details to show.
+    const page = await payments.getPayPageForMember(shared, spot.adaShared!, spot.meShared!, ADA);
+    expect(page).toMatchObject({ to: { name: "Former member", hasLeft: true }, receiver: { reason: "left" } });
   });
 
   it("marks every spot as left and keeps ideas, votes and schedule rows", async () => {
