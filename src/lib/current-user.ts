@@ -7,6 +7,9 @@ export type CurrentUser = { id: string; name: string; image: string | null };
 
 // Who is signed in, or null. Never returns email, tokens or the raw session.
 export async function getOptionalUser(): Promise<CurrentUser | null> {
+  "use cache: private";
+  // Next.js prepares the next page ahead of a tap and only waits for cached
+  // reads. This keeps the lookup in browser memory only; sign-out clears it.
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return null;
   const { id, name, image } = session.user;
