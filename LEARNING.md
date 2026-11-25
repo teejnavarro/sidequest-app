@@ -771,3 +771,53 @@ crash is harmless, because nobody can open it without the app's check.
 - Look at the trip as someone else: the person should read "Former member (left the trip)" with a
   plain person icon, and the balances should not have moved.
 - Open /privacy while signed out.
+
+## Chapter 17: Why a page can start loading before you tap it
+
+### The problem
+
+After the delete-account work, the server logs showed red lines on almost every signed-in page:
+"INTERNAL_SERVER_ERROR". The pages themselves worked fine. Something was failing quietly in the
+background, and each failure was a wasted trip to the database.
+
+### Prefetching: a waiter who sets the table early
+
+Sidequest feels quick because of prefetching. When a link shows on your screen, Next.js starts
+preparing the page behind it before you tap, like a waiter who lays the table while you are still
+reading the menu. The prepared part is kept ready, so the tap feels instant.
+
+There is one rule. The early preparation only waits for things that are allowed to be remembered
+("cached"). It does not wait for anything that must be fetched fresh. Asking "who is signed in?" was
+fetched fresh every time, because we never told Next.js it could be remembered. So the early
+preparation walked away while that question was still on its way to the database. The question got cut
+off, Better Auth logged it as an error, and then your real tap asked again and it worked. That is why
+the pages were fine but the logs were red.
+
+### Why only on Vercel
+
+On the PC, the database answered fast enough that the early preparation was still standing there
+waiting, so nothing was cut off and the local server logged 0 errors. On Vercel the timing is tighter,
+so the cut-off happened on almost every page. The same code behaved differently depending on how fast
+the answer came back. That is a good reason to always check a fix in the place where the problem was
+seen, not only on your own computer.
+
+### A private cache: a note in your own pocket
+
+The fix is one line, `"use cache: private"`, on the function that looks up who is signed in. It tells
+Next.js the answer may be remembered for a few minutes, but only inside your own browser, never on the
+server where someone else could get it. Think of a note you keep in your own pocket, not a note stuck
+on the shop wall. Because it is remembered, the early preparation now waits for it instead of walking
+away, the errors stop, and the tap gets faster because "who is signed in" is already known.
+
+### Why signing out still works
+
+Signing out and deleting an account are actions that change your cookies, and Next.js throws away the
+remembered pages in your browser whenever that happens. Signing in is a full trip to Google and back, so
+it starts fresh too. Every action that changes data still checks who you are again, on the server, so
+the note in your pocket is never what protects your trips.
+
+### Your action items
+
+- Sign in on staging, tap around the home page, My trips, a trip and Profile.
+- Sign out, then open My trips: you should land on the sign-in page.
+- Sign back in and check your trips are still there.
