@@ -1,4 +1,6 @@
 import Image from "next/image";
+import { User } from "@phosphor-icons/react/dist/ssr";
+import { FORMER_MEMBER_NAME } from "@/lib/display-name";
 import { faceColorClass, initialsOf } from "./face-color";
 
 type FaceProps = {
@@ -13,7 +15,8 @@ type FaceProps = {
   neutral?: boolean;
 };
 
-// The Google photo when there is one, otherwise initials on the person's color.
+// The Google photo when there is one, otherwise initials on the person's color. A deleted
+// account (no photo) gets a quiet circle with a person icon, so it never looks like a friend.
 export function Face({ userId, name, image, size = 32, decorative = false, neutral = false }: FaceProps) {
   const box = { width: size, height: size };
   if (image) {
@@ -28,13 +31,14 @@ export function Face({ userId, name, image, size = 32, decorative = false, neutr
       />
     );
   }
+  const former = name === FORMER_MEMBER_NAME;
   return (
     <span
       {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": name })}
       style={{ ...box, fontSize: Math.round(size * 0.36) }}
-      className={`inline-grid shrink-0 place-items-center rounded-full font-bold ${neutral ? "bg-chip text-ink" : `text-on-face ${faceColorClass(userId)}`}`}
+      className={`inline-grid shrink-0 place-items-center rounded-full font-bold ${former ? "bg-chip text-muted" : neutral ? "bg-chip text-ink" : `text-on-face ${faceColorClass(userId)}`}`}
     >
-      {initialsOf(name)}
+      {former ? <User size={Math.round(size * 0.55)} weight="bold" aria-hidden="true" /> : initialsOf(name)}
     </span>
   );
 }

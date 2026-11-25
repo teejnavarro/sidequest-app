@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateDisplayName } from "./display-name";
+import { FORMER_MEMBER_NAME, firstNameOf, validateDisplayName } from "./display-name";
 
 describe("validateDisplayName", () => {
   it("trims surrounding spaces", () => {
@@ -51,5 +51,25 @@ describe("validateDisplayName", () => {
     for (const bad of [null, undefined, 42, {}, ["Maya"]]) {
       expect(validateDisplayName(bad)).toEqual({ ok: false, error: "Please enter a name." });
     }
+  });
+});
+
+describe("former member name", () => {
+  it("is refused in any case or spacing", () => {
+    const refused = {
+      ok: false,
+      error: "That name is saved for deleted accounts. Pick another.",
+    };
+    expect(validateDisplayName("Former member")).toEqual(refused);
+    expect(validateDisplayName("former  MEMBER")).toEqual(refused);
+  });
+
+  it("keeps the whole label for firstNameOf", () => {
+    expect(firstNameOf(FORMER_MEMBER_NAME)).toBe("Former member");
+  });
+
+  it("still handles an ordinary name", () => {
+    expect(validateDisplayName("Former Maya")).toEqual({ ok: true, name: "Former Maya" });
+    expect(firstNameOf("Maya Cruz")).toBe("Maya");
   });
 });

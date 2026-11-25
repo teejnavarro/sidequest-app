@@ -727,3 +727,47 @@ for who is allowed to save: it is decided in the database, not by what the page 
   second account in the same trip.
 - Record a part payment and check that settle-up shows only what is left.
 - Delete the payment and see that the balances go back.
+
+## Chapter 16: Deleting an account without breaking the money
+
+### The problem
+
+Someone wants to leave Sidequest for good. Their name, photo, payment details and receipts should go.
+But their costs and payments are part of other people's sums. If Ben paid for the group dinner and then
+vanishes completely, Ana's balance would suddenly be wrong.
+
+### Blank it out, don't tear it out
+
+Think of a hotel guest checking out. The room number stays in the bill history, but the guest's name,
+ID and key card are gone. Our database works the same way. Fourteen places point at a person's
+account row (trips they own, ideas, votes, costs, payments). Removing the row would mean rewiring all
+fourteen. So we keep the row and empty it: the name becomes "Former member", the email becomes a
+made-up address nobody can use, the photo goes, and the sign-in link and every open session are
+deleted. Costs and payments point at the person's spot in each trip, not at the person, and the spot is
+simply marked as left (the same thing that happens when someone leaves a trip). So every balance
+adds up exactly as before. Signing in again later with the same Google account starts a new, empty
+account, because nothing is left to match.
+
+### One batch, and the rule inside every step
+
+All the changes run as one all-or-nothing batch, so a dropped signal can never leave half an account.
+There is one rule: you can't delete while you still own a trip with other people in it, because a trip
+with no real owner would be stuck. We don't check that once at the top and hope. Every single
+statement in the batch carries the rule inside its own condition. If someone hands a trip back to you
+at the very same moment, every statement quietly does nothing, instead of leaving a mess. It is like a
+row of doors that each check the lock themselves, rather than one guard at the front who may have
+looked away.
+
+### Order matters inside the batch
+
+The batch first notes down which picture files belong to you, and only then deletes the rows that hold
+those file names. Trips only you are in are deleted too (their costs and payments first, since those
+point at spots). The picture files themselves are deleted after the batch. A file left behind by a
+crash is harmless, because nobody can open it without the app's check.
+
+### Your action items
+
+- Try it with a second Google test account: join a trip, add a cost, then delete that account.
+- Look at the trip as someone else: the person should read "Former member (left the trip)" with a
+  plain person icon, and the balances should not have moved.
+- Open /privacy while signed out.

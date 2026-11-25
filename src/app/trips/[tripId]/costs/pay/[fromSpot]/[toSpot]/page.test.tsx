@@ -159,6 +159,14 @@ describe("the Pay page", () => {
     expect(await render()).toContain("Dana is a guest, so there are no saved details.");
     mocks.getPayPageForMember.mockResolvedValue({ ...payerView, to: person("ana", "Ana", { hasLeft: true }), receiver: { reason: "left" } });
     expect(await render()).toContain("Ana left the trip, so their details are hidden.");
+    mocks.getPayPageForMember.mockResolvedValue({
+      ...payerView,
+      to: person("ana", "Former member", { hasLeft: true }),
+      receiver: { reason: "left" },
+    });
+    const html = await render();
+    expect(html).toContain("This person deleted their account, so there are no details to show.");
+    expect(html).not.toContain("left the trip, so their details are hidden");
   });
 
   it("says so when the line is gone, and shows no details or form", async () => {

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { GoogleLogo } from "@phosphor-icons/react/dist/ssr";
 import { getOptionalUser } from "@/lib/current-user";
 import { signInWithGoogle } from "@/app/actions";
-import { primaryButton, skeleton } from "@/components/ui";
+import { linkClass, primaryButton, skeleton } from "@/components/ui";
 
 const DEMO_FACES = [
   { initials: "BA", color: "bg-face-1" },
@@ -12,8 +12,11 @@ const DEMO_FACES = [
   { initials: "RI", color: "bg-face-4" },
 ];
 
-async function SignInArea() {
-  const user = await getOptionalUser();
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+// Reads the session and the address, so it stays inside Suspense.
+async function SignInArea({ searchParams }: { searchParams: SearchParams }) {
+  const [user, { deleted }] = await Promise.all([getOptionalUser(), searchParams]);
 
   if (user) {
     return (
@@ -24,16 +27,19 @@ async function SignInArea() {
   }
 
   return (
-    <form action={signInWithGoogle}>
-      <button type="submit" className={`${primaryButton} w-full`}>
-        <GoogleLogo size={20} weight="bold" aria-hidden="true" />
-        Continue with Google
-      </button>
-    </form>
+    <>
+      {deleted === "1" && <p className="text-[13px] text-muted">Your account is deleted.</p>}
+      <form action={signInWithGoogle}>
+        <button type="submit" className={`${primaryButton} w-full`}>
+          <GoogleLogo size={20} weight="bold" aria-hidden="true" />
+          Continue with Google
+        </button>
+      </form>
+    </>
   );
 }
 
-export default function Home() {
+export default function Home({ searchParams }: { searchParams: SearchParams }) {
   return (
     <main className="mx-auto grid min-h-[70dvh] w-full max-w-[480px] flex-1 content-center gap-5 px-4 py-8 md:max-w-[640px]">
       <div className="flex" aria-hidden="true">
@@ -58,8 +64,11 @@ export default function Home() {
           />
         }
       >
-        <SignInArea />
+        <SignInArea searchParams={searchParams} />
       </Suspense>
+      <Link href="/privacy" className={`${linkClass} justify-self-start text-[13px] underline`}>
+        Privacy note
+      </Link>
     </main>
   );
 }

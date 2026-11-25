@@ -6,6 +6,7 @@ import { Bank, DeviceMobile } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getPayPageForMember, type PayPage, type PaymentAccountView } from "@/lib/payments";
+import { FORMER_MEMBER_NAME } from "@/lib/display-name";
 import { amountText, formatMoney } from "@/lib/money";
 import { accountLabel, formatAccountNumber } from "@/lib/payment-input";
 import { CopyButton } from "@/components/copy-button";
@@ -73,6 +74,7 @@ function receiverReason(page: PayPage): string {
   const name = page.to.name;
   if ("accounts" in page.receiver) return "";
   if (page.receiver.reason === "guest") return `${name} is a guest, so there are no saved details.`;
+  if (name === FORMER_MEMBER_NAME) return "This person deleted their account, so there are no details to show.";
   if (page.receiver.reason === "left") return `${name} left the trip, so their details are hidden.`;
   return `${name} hasn't added payment details yet. Ask them in the group chat.`;
 }
