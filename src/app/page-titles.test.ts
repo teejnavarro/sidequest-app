@@ -7,6 +7,8 @@ const pages: [string, string][] = [
   ["src/app/trips/page.tsx", "My trips | Sidequest"],
   ["src/app/trips/new/page.tsx", "New trip | Sidequest"],
   ["src/app/profile/page.tsx", "Profile | Sidequest"],
+  ["src/app/profile/delete/page.tsx", "Delete my account | Sidequest"],
+  ["src/app/privacy/page.tsx", "Privacy note | Sidequest"],
   ["src/app/trips/[tripId]/(tabs)/schedule/page.tsx", "Schedule | Sidequest"],
   ["src/app/trips/[tripId]/(tabs)/ideas/page.tsx", "Ideas | Sidequest"],
   ["src/app/trips/[tripId]/(tabs)/bookings/page.tsx", "Bookings | Sidequest"],
