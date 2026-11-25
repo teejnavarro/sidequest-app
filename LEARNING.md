@@ -776,7 +776,7 @@ crash is harmless, because nobody can open it without the app's check.
 
 ### The problem
 
-After the delete-account work, the server logs showed red lines on almost every signed-in page:
+Since SQ-003 (2026-11-02), the server logs showed red lines on almost every signed-in page:
 "INTERNAL_SERVER_ERROR". The pages themselves worked fine. Something was failing quietly in the
 background, and each failure was a wasted trip to the database.
 
@@ -795,10 +795,10 @@ the pages were fine but the logs were red.
 
 ### Why only on Vercel
 
-On the PC, the database answered fast enough that the early preparation was still standing there
-waiting, so nothing was cut off and the local server logged 0 errors. On Vercel the timing is tighter,
-so the cut-off happened on almost every page. The same code behaved differently depending on how fast
-the answer came back. That is a good reason to always check a fix in the place where the problem was
+The local server logged 0 errors on the PC, while Vercel logged them on almost every page. Our best
+explanation is timing, not a confirmed fact: on the PC the database may answer fast enough that the
+early preparation is still waiting, and on Vercel the timing is tighter, so the question gets cut off.
+We never measured that difference directly. Either way, it is a good reason to always check a fix in the place where the problem was
 seen, not only on your own computer.
 
 ### A private cache: a note in your own pocket
