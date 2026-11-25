@@ -1,11 +1,12 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { SignOut } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
+import { ShieldCheck, SignOut } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { signOut } from "@/app/actions";
 import { Face } from "@/components/face";
 import { TaskBand } from "@/components/task-band";
-import { cardClass, quietButton, screenClass, skeleton } from "@/components/ui";
+import { cardClass, focusRing, quietButton, screenClass, skeleton } from "@/components/ui";
 import { NameForm } from "./name-form";
 import { PaymentDetailsCard } from "./payment-details-card";
 
@@ -25,6 +26,21 @@ async function ProfileContent() {
           Sign out
         </button>
       </form>
+      <div className="grid">
+        <Link
+          href="/privacy"
+          className={`inline-flex min-h-11 items-center justify-center gap-1.5 text-sm font-bold text-blue-text underline underline-offset-2 ${focusRing}`}
+        >
+          <ShieldCheck size={18} weight="bold" aria-hidden="true" />
+          Privacy note
+        </Link>
+        <Link
+          href="/profile/delete"
+          className={`inline-flex min-h-11 items-center justify-center text-sm font-bold text-owe underline underline-offset-2 ${focusRing}`}
+        >
+          Delete my account
+        </Link>
+      </div>
     </>
   );
 }
