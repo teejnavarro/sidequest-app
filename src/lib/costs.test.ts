@@ -5,8 +5,10 @@ import {
   deleteCost,
   getBalancesForMember,
   getCostForMember,
+  getCostPhotoForMember,
   listCostsForMember,
   restoreCost,
+  setCostPhotoForMember,
   updateCost,
 } from "./costs";
 import type { CostInput } from "./cost-input";
@@ -171,10 +173,10 @@ describe("createCost", () => {
     );
   });
 
-  it("counts the same save again as ok, and says not-found for anyone else", async () => {
+  it("counts the same save again as a repeat, and says not-found for anyone else", async () => {
     // The batch has four statements; the fifth query is the look-up afterwards.
     fake.queue = [[], [], [], [], [["c1"]]];
-    await expect(createCost("trip-1", "u1", "c1", input)).resolves.toBe("ok");
+    await expect(createCost("trip-1", "u1", "c1", input)).resolves.toBe("repeat");
     expect(fake.queries[fake.queries.length - 1].sql).toContain('"cost"."created_by" = $');
     fake.queue = [[], [], [], [], []];
     await expect(createCost("trip-1", "stranger", "c1", input)).resolves.toBe("not-found");
@@ -185,8 +187,8 @@ describe("updateCost", () => {
   const expected = new Date("2027-03-12T10:00:00.123Z");
 
   it("changes the cost only when it was not saved since, then replaces its shares, in one batch", async () => {
-    fake.queue = [[["c1"]]];
-    await expect(updateCost("trip-1", "c1", "u1", input, expected)).resolves.toBe("ok");
+    fake.queue = [[["c1", null]]];
+    await expect(updateCost("trip-1", "c1", "u1", input, expected)).resolves.toEqual({ ok: true, oldPhoto: null });
     expect(fake.batches).toEqual([5]);
     const [update, remove, ...inserts] = fake.queries;
     expect(update.sql).toMatch(/^update "cost" set/);
@@ -298,5 +300,86 @@ describe("getBalancesForMember", () => {
     ]);
     expect(result.total).toBe(1306000);
     expect(result.costCount).toBe(6);
+  });
+});
+
+describe("receipt photos", () => {
+  it("reads the path in one live, in-trip, current-member statement", async () => {
+    await expect(getCostPhotoForMember("trip-1", "c1", "stranger")).resolves.toBeNull();
+    fake.rows = [["cost-photos/a.jpg"]];
+    await expect(getCostPhotoForMember("trip-1", "c1", "u1")).resolves.toBe("cost-photos/a.jpg");
+    fake.rows = [[null]];
+    await expect(getCostPhotoForMember("trip-1", "c1", "u1")).resolves.toBeNull();
+    const { sql, params } = fake.queries[fake.queries.length - 1];
+    expect(sql).toContain('"cost"."deleted_at" is null');
+    expect(sql).toContain('"cost"."trip_id" = $');
+    expect(sql).toContain('"viewer"."user_id" = $');
+    expect(sql).toContain('"viewer"."left_at" is null');
+    expect(params).toEqual(expect.arrayContaining(["trip-1", "c1", "u1"]));
+  });
+
+  it("sets or removes the photo without touching who edited or when", async () => {
+    fake.rows = [["cost-photos/old.jpg"]];
+    await expect(setCostPhotoForMember("trip-1", "c1", "u1", "cost-photos/new.jpg")).resolves.toEqual({
+      ok: true,
+      old: "cost-photos/old.jpg",
+    });
+    const [{ sql, params }] = fake.queries;
+    expect(sql).toMatch(/^update "cost" set /);
+    expect(sql).toContain('"photo_path" = $');
+    expect(sql).toContain('"photo_at" = now()');
+    expect(sql).toContain('"updated_at" = "cost"."updated_at"');
+    expect(sql).not.toContain('"updated_by"');
+    expect(sql).toContain('"cost"."deleted_at" is null');
+    expect(sql).toContain('"viewer"."user_id" = $');
+    expect(params).toEqual(expect.arrayContaining(["cost-photos/new.jpg", "u1"]));
+
+    fake.rows = [[null]];
+    await expect(setCostPhotoForMember("trip-1", "c1", "u1", null)).resolves.toEqual({ ok: true, old: null });
+    expect(fake.queries[1].sql).toContain('"photo_at" = $');
+    fake.rows = [];
+    await expect(setCostPhotoForMember("trip-1", "c1", "stranger", "cost-photos/x.jpg")).resolves.toEqual({ ok: false });
+  });
+
+  it("writes a new cost's photo with who and when, or leaves the columns empty", async () => {
+    fake.queue = [[["c1"]]];
+    await createCost("trip-1", "u1", "c1", input, { set: "cost-photos/n.jpg" });
+    expect(fake.queries[0].sql).toContain("now()::timestamp");
+    expect(fake.queries[0].params).toEqual(expect.arrayContaining(["cost-photos/n.jpg"]));
+    fake.queries.length = 0;
+    fake.queue = [[["c1"]]];
+    await createCost("trip-1", "u1", "c1", input);
+    expect(fake.queries[0].params).not.toContain("cost-photos/n.jpg");
+  });
+
+  it("changes the photo in the edit statement only when asked, and returns the replaced path", async () => {
+    const expected = new Date("2027-03-12T10:00:00.123Z");
+    fake.queue = [[["c1", "cost-photos/old.jpg"]]];
+    await expect(updateCost("trip-1", "c1", "u1", input, expected, { set: "cost-photos/n.jpg" })).resolves.toEqual({
+      ok: true,
+      oldPhoto: "cost-photos/old.jpg",
+    });
+    expect(fake.queries[0].sql).toContain('"photo_path" = $');
+    expect(fake.queries[0].sql).toContain('"photo_by" = $');
+    expect(fake.queries[0].params).toEqual(expect.arrayContaining(["cost-photos/n.jpg"]));
+
+    fake.queries.length = 0;
+    fake.queue = [[["c1", null]]];
+    await updateCost("trip-1", "c1", "u1", input, expected);
+    expect(fake.queries[0].sql).not.toContain('"photo_path" = $');
+
+    fake.queries.length = 0;
+    fake.queue = [[["c1", "cost-photos/old.jpg"]]];
+    await updateCost("trip-1", "c1", "u1", input, expected, "remove");
+    expect(fake.queries[0].sql).toContain('"photo_path" = $');
+    expect(fake.queries[0].sql).toContain('"photo_at" = $');
+  });
+
+  it("tells Edit only whether a cost has a photo, never the path", async () => {
+    fake.queue = [[["c1", "Dinner", 100000, "PHP", null, null, null, "food", "2027-03-12", "spot-a", new Date(0), true]], []];
+    const found = await getCostForMember("trip-1", "c1", "u1");
+    expect(found?.hasPhoto).toBe(true);
+    expect(fake.queries[0].sql).toContain('"photo_path" is not null');
+    expect(JSON.stringify(found)).not.toContain("cost-photos");
   });
 });

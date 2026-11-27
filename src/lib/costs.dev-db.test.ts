@@ -209,8 +209,8 @@ describe("shared costs on the dev database", () => {
       costs.createCost(tripA, OWNER, id, input({ description: "Taxi" })),
       costs.createCost(tripA, OWNER, id, input({ description: "Taxi" })),
     ]);
-    expect(results).toEqual(["ok", "ok"]);
-    await expect(costs.createCost(tripA, OWNER, id, input({ description: "Taxi" }))).resolves.toBe("ok");
+    expect([...results].sort()).toEqual(["ok", "repeat"]);
+    await expect(costs.createCost(tripA, OWNER, id, input({ description: "Taxi" }))).resolves.toBe("repeat");
     expect((await costRows(tripA)).filter((r) => r.id === id)).toHaveLength(1);
     const saved = await shareRows(id);
     expect(saved).toHaveLength(3);
@@ -277,7 +277,7 @@ describe("shared costs on the dev database", () => {
       shares: shareOf([ownerSpot, adderSpot], 350000, ownerSpot),
       category: null,
     });
-    await expect(costs.updateCost(tripA, id, ADDER, next, opened.updatedAt)).resolves.toBe("ok");
+    await expect(costs.updateCost(tripA, id, ADDER, next, opened.updatedAt)).resolves.toMatchObject({ ok: true });
     const [row] = (await costRows(tripA)).filter((r) => r.id === id);
     expect(row).toMatchObject({ description: "Dinner and drinks", amount: 350000, category: null, createdBy: OWNER, updatedBy: ADDER });
     const saved = await shareRows(id);
@@ -305,7 +305,7 @@ describe("shared costs on the dev database", () => {
     expect(saved.reduce((sum, s) => sum + s.amount, 0)).toBe(400000);
     // Opening it again gives a copy that saves.
     const fresh = (await costs.getCostForMember(tripA, id, OWNER))!;
-    await expect(costs.updateCost(tripA, id, OWNER, input({ description: "Second look" }), fresh.updatedAt)).resolves.toBe("ok");
+    await expect(costs.updateCost(tripA, id, OWNER, input({ description: "Second look" }), fresh.updatedAt)).resolves.toMatchObject({ ok: true });
     // The same copy twice: the second save is stale.
     await expect(costs.updateCost(tripA, id, OWNER, input({ description: "Again" }), fresh.updatedAt)).resolves.toBe("changed");
   });
@@ -393,8 +393,8 @@ describe("shared costs on the dev database", () => {
       costs.updateCost(tripA, id, OWNER, input({ description: fromOwner.description, amount: fromOwner.amount, shares: shareOf(fromOwner.spots, fromOwner.amount, ownerSpot) }), opened.updatedAt),
       costs.updateCost(tripA, id, ADDER, input({ description: fromAdder.description, amount: fromAdder.amount, paidBy: adderSpot, shares: shareOf(fromAdder.spots, fromAdder.amount, adderSpot) }), opened.updatedAt),
     ]);
-    expect([...results].sort()).toEqual(["changed", "ok"]);
-    const winner = results[0] === "ok" ? fromOwner : fromAdder;
+    expect(results.map((r) => (typeof r === "string" ? r : "ok")).sort()).toEqual(["changed", "ok"]);
+    const winner = typeof results[0] !== "string" ? fromOwner : fromAdder;
     const [row] = (await costRows(tripA)).filter((r) => r.id === id);
     expect(row).toMatchObject({ description: winner.description, amount: winner.amount });
     // The loser's shares never mix in: the shares are exactly the winner's and add up.
@@ -888,7 +888,7 @@ describe("shared costs on the dev database", () => {
 
     // Someone edits it: the history shows them. Then a person in it leaves.
     const opened = (await costs.getCostForMember(t, id, ADDER))!;
-    await expect(costs.updateCost(t, id, ADDER, input({ shares: shareOf([maya, ada, cho, dana], 100000, ada), paidBy: ada, description: "Dinner out" }), opened.updatedAt)).resolves.toBe("ok");
+    await expect(costs.updateCost(t, id, ADDER, input({ shares: shareOf([maya, ada, cho, dana], 100000, ada), paidBy: ada, description: "Dinner out" }), opened.updatedAt)).resolves.toMatchObject({ ok: true });
     expect((await costs.getCostBreakdownForMember(t, id, ADDER))!.editedBy).toEqual({ name: "Ada", isYou: true });
     expect((await costs.getCostBreakdownForMember(t, id, OWNER))!.editedBy).toEqual({ name: "Ada", isYou: false });
     await expect(trips.leaveTrip(t, JOINER)).resolves.toBe("ok");

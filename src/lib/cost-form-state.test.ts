@@ -34,6 +34,7 @@ const saved: CostDetails = {
     { spotId: "c", amount: 33333, originalAmount: null },
   ],
   updatedAt: new Date("2027-03-12T10:00:00.000Z"),
+  hasPhoto: false,
 };
 
 describe("buildCostReview for a new cost", () => {
@@ -266,6 +267,7 @@ describe("costs in another currency", () => {
       paidBy: value.paidBy,
       shares: value.shares,
       updatedAt: new Date(0),
+      hasPhoto: false,
     };
   }
 
