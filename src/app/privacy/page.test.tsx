@@ -53,7 +53,10 @@ describe("PrivacyPage", () => {
     }
     expect(html).toContain("Your email: nobody.");
     expect(html).toContain('href="https://github.com/teejnavarro/sidequest-app"');
-    expect(html).toContain("Updated 25 November 2026.");
+    expect(html).toContain(
+      "A receipt photo on a cost: everyone in the trip right now. It stays with the trip if the person who added it deletes their account.",
+    );
+    expect(html).toContain("Updated 27 November 2026.");
     // The fallback is the signed-out band, so the header is never empty.
     expect(html).toContain('href="/"');
   });
