@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getCurrentUser, getOptionalUser } from "./current-user";
+import {
+  getCurrentUser,
+  getCurrentUserForPage,
+  getOptionalUser,
+  getOptionalUserForPage,
+} from "./current-user";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
@@ -59,6 +64,41 @@ describe("getCurrentUser", () => {
   it("returns the user when signed in", async () => {
     mocks.getSession.mockResolvedValue(session);
     await expect(getCurrentUser()).resolves.toMatchObject({ id: "u1", name: "Maya Cruz" });
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+});
+
+describe("getOptionalUserForPage", () => {
+  it("returns null when signed out", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    await expect(getOptionalUserForPage()).resolves.toBeNull();
+  });
+
+  it("returns only id, name and image, never email or tokens", async () => {
+    mocks.getSession.mockResolvedValue(session);
+    await expect(getOptionalUserForPage()).resolves.toEqual({
+      id: "u1",
+      name: "Maya Cruz",
+      image: "https://lh3.googleusercontent.com/a/made-up",
+    });
+  });
+
+  it("turns a missing photo into null", async () => {
+    mocks.getSession.mockResolvedValue({ ...session, user: { ...session.user, image: undefined } });
+    await expect(getOptionalUserForPage()).resolves.toMatchObject({ image: null });
+  });
+});
+
+describe("getCurrentUserForPage", () => {
+  it("sends signed-out visitors home", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    await expect(getCurrentUserForPage()).rejects.toThrow("redirect:/");
+    expect(mocks.redirect).toHaveBeenCalledWith("/");
+  });
+
+  it("returns the user when signed in", async () => {
+    mocks.getSession.mockResolvedValue(session);
+    await expect(getCurrentUserForPage()).resolves.toMatchObject({ id: "u1", name: "Maya Cruz" });
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 });
