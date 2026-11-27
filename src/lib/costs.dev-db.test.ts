@@ -15,6 +15,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 //   don't touch each other's rows.
 
 vi.mock("server-only", () => ({}));
+// No real Blob calls: photo paths are plain text here, and deleting files is only recorded.
+const blob = vi.hoisted(() => ({ deleted: [] as string[][] }));
+vi.mock("@/lib/blob-store", () => ({
+  deleteImages: async (paths: string[]) => {
+    blob.deleted.push(paths);
+  },
+}));
 
 const ID_PREFIX = "qa-dev-costs-";
 const RUN = crypto.randomUUID();
@@ -293,7 +300,7 @@ describe("shared costs on the dev database", () => {
     // Someone saves first...
     await expect(
       costs.updateCost(tripA, id, ADDER, input({ description: "Changed first", amount: 400000, shares: shareOf([ownerSpot, adderSpot], 400000, ownerSpot) }), opened.updatedAt),
-    ).resolves.toBe("ok");
+    ).resolves.toMatchObject({ ok: true });
     // ...so the copy opened earlier is stale.
     await expect(
       costs.updateCost(tripA, id, OWNER, input({ description: "Late save", amount: 1000, shares: shareOf([ownerSpot], 1000, ownerSpot) }), opened.updatedAt),
@@ -420,7 +427,7 @@ describe("shared costs on the dev database", () => {
     const opened = (await costs.getCostForMember(tripA, sharerCost, OWNER))!;
     await expect(
       costs.updateCost(tripA, sharerCost, OWNER, input({ amount: 1000, shares: shareOf([ownerSpot], 1000, ownerSpot) }), opened.updatedAt),
-    ).resolves.toBe("ok");
+    ).resolves.toMatchObject({ ok: true });
     await expect(trips.getGuestForEditor(tripA, sharer, ADDER)).resolves.toMatchObject({ costCount: 0 });
     await expect(trips.removeGuest(tripA, sharer, ADDER)).resolves.toBe("ok");
     await expect(trips.removeGuest(tripA, payer, ADDER)).resolves.toBe("in-costs");
@@ -688,7 +695,7 @@ describe("shared costs on the dev database", () => {
         }),
         opened!.updatedAt,
       ),
-    ).resolves.toBe("ok");
+    ).resolves.toMatchObject({ ok: true });
     const back = await costs.getCostForMember(tripA, rateId, OWNER);
     expect(back!.original).toBeNull();
     expect(back!.shares.every((x) => x.originalAmount === null)).toBe(true);
@@ -946,6 +953,124 @@ describe("shared costs on the dev database", () => {
     expect(dexLines.costs.map((line) => line.effect)).toEqual([-6250, 285150]);
     expect(dexLines.payments.map((line) => line.effect)).toEqual([10000, -50000]); // newest first
   }, 60_000);
+
+  it("keeps a cost's receipt photo private to current members and never counts it as an edit", async () => {
+    const t = await trips.createTrip(OWNER, { ...tripInput, name: "Photo trip" });
+    const joinCode = (await trips.getInviteCodeForMember(t, OWNER))!;
+    await trips.joinTripByInviteCode(joinCode, ADDER);
+    await trips.joinTripByInviteCode(joinCode, JOINER);
+    const people = await trips.listTripMembers(t, OWNER);
+    const spot = (name: string) => people.find((p) => p.name === name)!.spotId;
+    const [maya, ada, cho] = [spot("Maya Test"), spot("Ada Test"), spot("Cho Test")];
+    const make = (name: string, tripId = t, by = OWNER, among = [maya, ada, cho], paidBy = maya, photo?: { set: string }) =>
+      costs.createCost(
+        tripId,
+        by,
+        costId(name),
+        {
+          description: name,
+          amount: 90000,
+          paidBy,
+          category: null,
+          spentOn: "2027-03-12",
+          shares: shareOf(among, 90000, paidBy),
+          money: { kind: "trip" as const },
+        },
+        photo,
+      );
+    const id = costId("ph-main");
+    await make("ph-main");
+    const rowOf = async (cid: string) => (await costRows(t)).find((r) => r.id === cid)!;
+    const before = await rowOf(id);
+    expect(before).toMatchObject({ photoPath: null, photoBy: null, photoAt: null });
+    expect((await costs.getCostBreakdownForMember(t, id, OWNER))!.photo).toBeNull();
+    expect((await costs.getCostForMember(t, id, OWNER))!.hasPhoto).toBe(false);
+
+    // Add: any current member; the edit time and editor stay exactly as they were.
+    await expect(costs.getCostPhotoForMember(t, id, ADDER)).resolves.toBeNull();
+    await expect(costs.setCostPhotoForMember(t, id, ADDER, "cost-photos/one.jpg")).resolves.toEqual({ ok: true, old: null });
+    const added = await rowOf(id);
+    expect(added).toMatchObject({ photoPath: "cost-photos/one.jpg", photoBy: ADDER });
+    expect(added.photoAt).toBeInstanceOf(Date);
+    expect(added.updatedAt).toEqual(before.updatedAt);
+    expect(added.updatedBy).toBe(before.updatedBy);
+    await expect(costs.getCostPhotoForMember(t, id, OWNER)).resolves.toBe("cost-photos/one.jpg");
+    const seen = (await costs.getCostBreakdownForMember(t, id, OWNER))!;
+    expect(seen.photo).toMatchObject({ by: "Ada" });
+    expect(seen.editedBy).toBeNull();
+    expect((await costs.getCostBreakdownForMember(t, id, ADDER))!.photo!.by).toBe("you");
+    expect(JSON.stringify(seen)).not.toContain("cost-photos");
+    const open = (await costs.getCostForMember(t, id, OWNER))!;
+    expect(open.hasPhoto).toBe(true);
+    expect(JSON.stringify(open)).not.toContain("cost-photos");
+
+    // Replace hands back the old path; remove empties all three columns.
+    await expect(costs.setCostPhotoForMember(t, id, OWNER, "cost-photos/two.jpg")).resolves.toEqual({
+      ok: true,
+      old: "cost-photos/one.jpg",
+    });
+    expect((await rowOf(id)).updatedAt).toEqual(before.updatedAt);
+
+    // Refused: a stranger, another trip's id, an unknown cost; and nothing changes.
+    await expect(costs.setCostPhotoForMember(t, id, STRANGER, "cost-photos/x.jpg")).resolves.toEqual({ ok: false });
+    await expect(costs.setCostPhotoForMember(tripB, id, OWNER_TWO, "cost-photos/x.jpg")).resolves.toEqual({ ok: false });
+    await expect(costs.setCostPhotoForMember(t, `${ID_PREFIX}no-such-cost`, OWNER, "cost-photos/x.jpg")).resolves.toEqual({ ok: false });
+    await expect(costs.getCostPhotoForMember(t, id, STRANGER)).resolves.toBeNull();
+    await expect(costs.getCostPhotoForMember(tripB, id, OWNER_TWO)).resolves.toBeNull();
+    await expect(costs.getCostPhotoForMember(tripB, id, OWNER)).resolves.toBeNull();
+    await expect(costs.getCostPhotoForMember(t, `${ID_PREFIX}no-such-cost`, OWNER)).resolves.toBeNull();
+    expect((await rowOf(id)).photoPath).toBe("cost-photos/two.jpg");
+
+    // A trashed cost refuses everyone; restoring brings the same photo back.
+    await costs.deleteCost(t, id, OWNER);
+    await expect(costs.getCostPhotoForMember(t, id, OWNER)).resolves.toBeNull();
+    await expect(costs.setCostPhotoForMember(t, id, OWNER, null)).resolves.toEqual({ ok: false });
+    await costs.restoreCost(t, id, OWNER);
+    await expect(costs.getCostPhotoForMember(t, id, OWNER)).resolves.toBe("cost-photos/two.jpg");
+    expect((await rowOf(id)).updatedAt).toEqual(before.updatedAt);
+
+    // Someone who left sees and changes nothing.
+    await expect(trips.leaveTrip(t, JOINER)).resolves.toBe("ok");
+    await expect(costs.getCostPhotoForMember(t, id, JOINER)).resolves.toBeNull();
+    await expect(costs.setCostPhotoForMember(t, id, JOINER, null)).resolves.toEqual({ ok: false });
+
+    await expect(costs.setCostPhotoForMember(t, id, OWNER, null)).resolves.toEqual({ ok: true, old: "cost-photos/two.jpg" });
+    expect(await rowOf(id)).toMatchObject({ photoPath: null, photoBy: null, photoAt: null });
+
+    // Saving a new cost with a photo, and the same save again (nothing used the second photo).
+    const withPhoto = costId("ph-new");
+    await expect(make("ph-new", t, OWNER, [maya, ada], maya, { set: "cost-photos/new.jpg" })).resolves.toBe("ok");
+    await expect(make("ph-new", t, OWNER, [maya, ada], maya, { set: "cost-photos/again.jpg" })).resolves.toBe("repeat");
+    expect(await rowOf(withPhoto)).toMatchObject({ photoPath: "cost-photos/new.jpg", photoBy: OWNER });
+
+    // An edit changes the photo in the same statement and hands back the replaced path;
+    // "keep" leaves it, and "remove" clears it.
+    const edit = (photo: "keep" | "remove" | { set: string }) =>
+      costs.getCostForMember(t, withPhoto, OWNER).then((c) =>
+        costs.updateCost(
+          t,
+          withPhoto,
+          OWNER,
+          { description: "ph-new", amount: 90000, paidBy: maya, category: null, spentOn: "2027-03-12", shares: shareOf([maya, ada], 90000, maya), money: { kind: "trip" as const } },
+          c!.updatedAt,
+          photo,
+        ),
+      );
+    await expect(edit("keep")).resolves.toEqual({ ok: true, oldPhoto: "cost-photos/new.jpg" });
+    expect((await rowOf(withPhoto)).photoPath).toBe("cost-photos/new.jpg");
+    await expect(edit({ set: "cost-photos/swap.jpg" })).resolves.toEqual({ ok: true, oldPhoto: "cost-photos/new.jpg" });
+    expect(await rowOf(withPhoto)).toMatchObject({ photoPath: "cost-photos/swap.jpg", photoBy: OWNER });
+    await expect(edit("remove")).resolves.toEqual({ ok: true, oldPhoto: "cost-photos/swap.jpg" });
+    expect(await rowOf(withPhoto)).toMatchObject({ photoPath: null, photoBy: null, photoAt: null });
+
+    // Deleting the trip hands every photo path to the cleanup.
+    await costs.setCostPhotoForMember(t, id, OWNER, "cost-photos/final-a.jpg");
+    await costs.setCostPhotoForMember(t, withPhoto, OWNER, "cost-photos/final-b.jpg");
+    blob.deleted.length = 0;
+    await expect(trips.deleteTripForOwner(t, OWNER)).resolves.toBe(true);
+    expect(blob.deleted.flat().sort()).toEqual(["cost-photos/final-a.jpg", "cost-photos/final-b.jpg"]);
+    expect(await costRows(t)).toEqual([]);
+  }, 90_000);
 
   it("removes a trip's costs and shares when the trip is deleted", async () => {
     const id = costId("with-trip");

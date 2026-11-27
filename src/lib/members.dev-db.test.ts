@@ -461,11 +461,11 @@ describe("members who left, on the dev database", () => {
       // Keeping the person who left is fine, even as the payer.
       await expect(
         costs.updateCost(t.id, costId("kept"), OWNER, base(t.leaver, [t.owner, t.leaver]), (await open()).updatedAt),
-      ).resolves.toBe("ok");
+      ).resolves.toMatchObject({ ok: true });
       // Taking them out works too, and then they can't be put back.
       await expect(
         costs.updateCost(t.id, costId("kept"), OWNER, base(t.owner, [t.owner, t.bea]), (await open()).updatedAt),
-      ).resolves.toBe("ok");
+      ).resolves.toMatchObject({ ok: true });
       await expect(
         costs.updateCost(t.id, costId("kept"), OWNER, base(t.owner, [t.owner, t.leaver]), (await open()).updatedAt),
       ).resolves.toBe("changed"); // refused spots look like a changed cost, as for foreign spots

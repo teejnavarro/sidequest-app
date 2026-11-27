@@ -76,7 +76,6 @@ const creator = alias(user, "creator");
 const editor = alias(user, "editor");
 const deleter = alias(user, "deleter");
 const photoUser = alias(user, "photo_user");
-const oldCost = alias(cost, "old_cost");
 
 // A cost that is not in the trash. Every read and edit uses it; only the trash list, restore,
 // the currency lock, guest/member cost counts and deleting a trip look at trashed costs.
@@ -372,7 +371,7 @@ export async function setCostPhotoForMember(
       updatedAt: sql`${cost.updatedAt}`,
     })
     .where(and(eq(cost.id, costId), eq(cost.tripId, tripId), live, isMemberOf(tripId, userId)))
-    .returning({ old: sql<string | null>`(select ${oldCost.photoPath} from ${oldCost} where ${oldCost.id} = ${costId})` });
+    .returning({ old: sql<string | null>`(select old_cost.photo_path from cost old_cost where old_cost.id = ${costId})` });
   return rows.length > 0 ? { ok: true, old: rows[0]!.old ?? null } : { ok: false };
 }
 
@@ -513,7 +512,7 @@ export async function updateCost(
     )
     .returning({
       id: cost.id,
-      oldPhoto: sql<string | null>`(select ${oldCost.photoPath} from ${oldCost} where ${oldCost.id} = ${costId})`,
+      oldPhoto: sql<string | null>`(select old_cost.photo_path from cost old_cost where old_cost.id = ${costId})`,
     });
 
   const removeShares = db
