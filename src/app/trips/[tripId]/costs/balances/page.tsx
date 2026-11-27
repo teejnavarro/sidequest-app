@@ -4,12 +4,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
-import { getBalancesForMember, type BalancePerson } from "@/lib/costs";
+import { getBalancesForMember, listCostsForMember, type BalancePerson } from "@/lib/costs";
 import { listPaymentsForMember, type PaymentListItem, type PaymentPerson } from "@/lib/payments";
 import { paymentDayLabel } from "@/lib/payment-dates";
 import type { Payment } from "@/lib/balances";
+import { balanceLinesOf, type CostLine, type PaymentLine } from "@/lib/balance-lines";
 import { formatMoney } from "@/lib/money";
 import { Bank, CaretRight, DeviceMobile, Image as ImageIcon, Money } from "@phosphor-icons/react/dist/ssr";
+import { BalanceLine } from "@/components/balance-line";
+import { CostCategoryIcon } from "@/components/cost-category";
 import { Face } from "@/components/face";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
 import { cardClass, guestTag, helpClass, linkClass, screenClass, skeleton } from "@/components/ui";
@@ -131,6 +134,56 @@ function PaidRow({
   );
 }
 
+const shortDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+// One cost the viewer paid or shares, and what it adds to their balance. Opens the cost's page.
+function CostLineRow({ line, currency, tripId }: { line: CostLine; currency: string; tripId: string }) {
+  return (
+    <li className="border-t border-line first:border-t-0">
+      <Link
+        href={`/trips/${tripId}/costs/${line.costId}`}
+        className="flex min-h-12 min-w-0 items-center gap-3 py-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-text"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-blue-soft text-blue-text">
+          <CostCategoryIcon category={line.category} size={18} />
+        </span>
+        <span className="grid min-w-0 flex-1">
+          <span className="text-[15px] font-bold wrap-anywhere">{line.description}</span>
+          <span className="text-sm text-muted wrap-anywhere">
+            {line.payer.isYou ? "You" : line.payer.name}
+            {line.payer.hasLeft ? " (left the trip)" : ""} paid {formatMoney(line.amount, currency)} ·{" "}
+            {shortDay.format(new Date(`${line.spentOn}T00:00:00Z`))}
+          </span>
+        </span>
+        <span className="grid justify-items-end whitespace-nowrap">
+          <span className="text-xs text-muted">{line.effect < 0 ? "you owe" : "owed to you"}</span>
+          <span className="font-bold tabular-nums">{formatMoney(Math.abs(line.effect), currency)}</span>
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+// One payment the viewer sent or got. Plain: the Payments card below links to it.
+function PaymentLineRow({ line, currency, timeZone }: { line: PaymentLine; currency: string; timeZone: string }) {
+  return (
+    <li className="flex min-h-12 min-w-0 items-center gap-3 border-t border-line py-1.5 first:border-t-0">
+      <span className="grid min-w-0 flex-1">
+        <span className="text-[15px] font-bold wrap-anywhere">
+          {line.from.isYou ? "You" : line.from.name} paid {line.to.isYou ? "you" : line.to.name}
+        </span>
+        <span className="text-sm text-muted">
+          {methodWords[line.method]} · {paymentDayLabel(line.createdAt, timeZone)}
+        </span>
+      </span>
+      <span className="grid justify-items-end whitespace-nowrap">
+        <span className="text-xs text-muted">{line.effect > 0 ? "paid back" : "got back"}</span>
+        <span className="font-bold tabular-nums">{formatMoney(Math.abs(line.effect), currency)}</span>
+      </span>
+    </li>
+  );
+}
+
 // What the second line under a name says. Only the viewer's own line is colored.
 function statusOf(person: BalancePerson): { words: string; className: string } {
   if (person.isYou) {
@@ -172,10 +225,13 @@ async function BalancesContent({ params }: { params: Promise<{ tripId: string }>
   const user = await getCurrentUser();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
-  const [balances, paid] = await Promise.all([
+  const [balances, paid, costList] = await Promise.all([
     getBalancesForMember(tripId, user.id),
     listPaymentsForMember(tripId, user.id),
+    listCostsForMember(tripId, user.id),
   ]);
+  // The same rows the balances come from, so the total is the viewer's balance exactly.
+  const lines = balanceLinesOf({ currency: trip.currency, costs: costList.costs, payments: paid });
 
   const byId = new Map(balances.people.map((person) => [person.spotId, person]));
   const mine = (p: Payment) => byId.get(p.from)?.isYou || byId.get(p.to)?.isYou;
@@ -198,7 +254,7 @@ async function BalancesContent({ params }: { params: Promise<{ tripId: string }>
             <section className={`${cardClass} gap-3 px-5 py-4`} aria-label="Settle up">
               <div>
                 <h2 className="text-[19px]">Settle up</h2>
-                <p className={helpClass}>The fewest payments to make everyone even. Tap one to see how to pay.</p>
+                <p className={helpClass}>The fewest payments to make everyone even, so you might pay someone who didn&apos;t pay for your cost. Tap one to see how to pay.</p>
               </div>
               {payments.length === 0 ? (
                 <p>Everyone&apos;s even. Nothing to pay.</p>
@@ -216,6 +272,30 @@ async function BalancesContent({ params }: { params: Promise<{ tripId: string }>
                 </ul>
               )}
             </section>
+            {lines.costs.length + lines.payments.length > 0 ? (
+              <section className={`${cardClass} gap-3 px-5 py-4`} aria-label="How your balance adds up">
+                <h2 className="text-[19px]">How your balance adds up</h2>
+                <ul>
+                  {lines.costs.map((line) => (
+                    <CostLineRow key={line.costId} line={line} currency={trip.currency} tripId={trip.id} />
+                  ))}
+                </ul>
+                {lines.payments.length > 0 ? (
+                  <>
+                    <h3 className="text-sm font-bold text-muted">Payments</h3>
+                    <ul>
+                      {lines.payments.map((line) => (
+                        <PaymentLineRow key={line.paymentId} line={line} currency={trip.currency} timeZone={trip.timeZone} />
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+                <div className="flex items-center justify-between gap-3 border-t-2 border-ink pt-3">
+                  <span className="font-bold">Your balance</span>
+                  <BalanceLine net={lines.total} currency={trip.currency} />
+                </div>
+              </section>
+            ) : null}
             {paid.length > 0 ? (
               <section className={`${cardClass} gap-3 px-5 py-4`} aria-label="Payments">
                 <h2 className="text-[19px]">Payments</h2>
