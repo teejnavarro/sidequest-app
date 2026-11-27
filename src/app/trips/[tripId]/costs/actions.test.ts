@@ -34,6 +34,7 @@ vi.mock("@/lib/costs", () => ({
 
 const initial: CostFormState = { errors: {}, values: emptyCostValues, review: null, notice: null, updatedAt: "" };
 const LIST = "redirect:/trips/trip-1/costs";
+const BREAKDOWN = `${LIST}/7d0c2c0e-6f1a-4d1e-9a58-3f6c9b1a2d44`;
 const COST_ID = "7d0c2c0e-6f1a-4d1e-9a58-3f6c9b1a2d44";
 const OPENED = "2027-03-12T10:00:00.123Z";
 
@@ -330,7 +331,7 @@ describe("reviewOrSaveCostAction, edit", () => {
   });
 
   it("saves with the time the person opened it, as the signed-in person", async () => {
-    await expect(reviewOrSaveCostAction(initial, form({ step: "save", amount: "3500" }))).rejects.toThrow(LIST);
+    await expect(reviewOrSaveCostAction(initial, form({ step: "save", amount: "3500" }))).rejects.toThrow(BREAKDOWN);
     expect(mocks.updateCost).toHaveBeenCalledWith(
       "trip-1",
       COST_ID,
@@ -339,6 +340,13 @@ describe("reviewOrSaveCostAction, edit", () => {
       new Date(OPENED),
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1/costs");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/trips/trip-1/costs/${COST_ID}`);
+  });
+
+  it("returns to the cost's page after saving an edit, not the list", async () => {
+    await expect(reviewOrSaveCostAction(initial, form({ step: "save" }))).rejects.toThrow(BREAKDOWN);
+    expect(mocks.redirect).toHaveBeenCalledWith(`/trips/trip-1/costs/${COST_ID}`);
+    expect(mocks.redirect).not.toHaveBeenCalledWith("/trips/trip-1/costs");
   });
 
   it("shows 'Someone just changed this cost' with the fresh values when the save is stale", async () => {

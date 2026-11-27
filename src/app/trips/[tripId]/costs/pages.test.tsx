@@ -199,6 +199,8 @@ describe("Edit cost page", () => {
     });
     expect(html).toContain('href="/trips/trip-1/costs/cost-1/delete"');
     expect(html).toContain("Delete cost");
+    expect(html).toContain('href="/trips/trip-1/costs/cost-1"'); // the back link returns to the cost's page
+    expect(html).toContain(">Cost</span>");
   });
 
   it("lists guests in both pickers and shows a zero-decimal cost without decimals", async () => {

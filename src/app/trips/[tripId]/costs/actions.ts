@@ -73,14 +73,15 @@ function changedState(current: CostDetails): CostFormState {
 }
 
 // "Review" shows what will be saved; "Save" saves it. Both check the cost from scratch.
-// Returns the state to show again, "done" once saved, or "gone" for a trip or cost the
-// person can't reach (they end up at the Costs tab either way).
+// Returns the state to show again, "done" once a new cost is saved, "edited" once an edit is
+// saved (it ends at that cost's page), or "gone" for a trip or cost the person can't reach
+// (they end up at the Costs tab).
 async function reviewOrSave(
   userId: string,
   formData: FormData,
   tripId: string,
   costId: string,
-): Promise<CostFormState | "done" | "gone"> {
+): Promise<CostFormState | "done" | "edited" | "gone"> {
   const values = readValues(formData);
   const token = readText(formData, "updatedAt");
   const editing = readText(formData, "mode") === "edit";
@@ -119,7 +120,7 @@ async function reviewOrSave(
       const current = await getCostForMember(tripId, costId, userId);
       return current ? changedState(current) : "gone";
     }
-    return "done";
+    return "edited";
   }
 
   const current = await getCostForMember(tripId, costId, userId);
@@ -143,7 +144,7 @@ export async function reviewOrSaveCostAction(
   const costId = readText(formData, "costId");
   if (!COST_ID.test(costId)) redirect(listAddress(tripId));
 
-  let outcome: CostFormState | "done" | "gone";
+  let outcome: CostFormState | "done" | "edited" | "gone";
   try {
     outcome = await reviewOrSave(user.id, formData, tripId, costId);
   } catch {
@@ -156,6 +157,12 @@ export async function reviewOrSaveCostAction(
     };
   }
 
+  if (outcome === "edited") {
+    const address = `${listAddress(tripId)}/${costId}`;
+    revalidatePath(listAddress(tripId));
+    revalidatePath(address);
+    redirect(address); // an edit returns to the cost's page
+  }
   if (outcome === "done" || outcome === "gone") {
     if (outcome === "done") revalidatePath(listAddress(tripId));
     redirect(listAddress(tripId)); // redirect works by throwing: keep it outside try/catch

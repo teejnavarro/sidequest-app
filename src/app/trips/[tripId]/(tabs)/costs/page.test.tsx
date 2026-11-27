@@ -237,13 +237,14 @@ describe("the Costs tab", () => {
     expect(html).toContain("Added by Maya · edited by Ben");
   });
 
-  it("links each row to its Edit page and lets a long description wrap", async () => {
+  it("links each row to its breakdown page and lets a long description wrap", async () => {
     mocks.listCostsForMember.mockResolvedValue({
       costs: [cost("Supercalifragilisticexpialidocious ".repeat(5), "2027-05-09")],
       total: 100000,
     });
     const html = await render();
-    expect(html).toContain('href="/trips/trip-1/costs/cost-1/edit"');
+    expect(html).toContain('href="/trips/trip-1/costs/cost-1"');
+    expect(html).not.toContain("/costs/cost-1/edit");
     expect(html).toMatch(/wrap-anywhere">Supercalifragilistic/);
   });
 });
