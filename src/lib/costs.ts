@@ -196,6 +196,132 @@ export async function getCostForMember(
   return { ...rest, original: original && { ...original, rate }, shares };
 }
 
+// One person (or guest) on a cost breakdown. `id` is the user id for a person and the spot id
+// for a guest, which only colors their face. The name is a first name ("Former member" for a
+// deleted account).
+export type CostPerson = {
+  spotId: string;
+  id: string;
+  name: string;
+  image: string | null;
+  isGuest: boolean;
+  isYou: boolean;
+  hasLeft: boolean;
+};
+
+export type CostBreakdown = {
+  id: string;
+  description: string;
+  amount: number;
+  currency: string;
+  category: string | null;
+  spentOn: string;
+  original: { amount: number; currency: string; rate: string | null } | null;
+  paidBy: string; // a spot id
+  payer: CostPerson;
+  shares: (CostPerson & { amount: number; originalAmount: number | null })[]; // in the trip's list order
+  addedBy: { name: string; isYou: boolean };
+  createdAt: Date;
+  editedBy: { name: string; isYou: boolean } | null; // null when the cost was never edited
+  updatedAt: Date;
+};
+
+// One cost for its breakdown page: who paid, each person's share, and who added and last edited
+// it. Read-only. Null when it does not exist, is in the trash, belongs to another trip, or the
+// person is not in this trip. Every one of those looks the same.
+export async function getCostBreakdownForMember(
+  tripId: string,
+  costId: string,
+  userId: string,
+): Promise<CostBreakdown | null> {
+  const found = and(eq(cost.id, costId), eq(cost.tripId, tripId), live, isMemberOf(tripId, userId));
+  const rows = await db
+    .select({
+      id: cost.id,
+      description: cost.description,
+      amount: cost.amount,
+      currency: cost.currency,
+      originalAmount: cost.originalAmount,
+      originalCurrency: cost.originalCurrency,
+      rate: cost.rate,
+      category: cost.category,
+      spentOn: cost.spentOn,
+      paidBy: cost.paidBy,
+      payerUserId: payerSpot.userId,
+      payerName: sql<string>`coalesce(${payerUser.name}, ${payerSpot.guestName})`,
+      payerImage: payerUser.image,
+      payerHasLeft: sql<boolean>`${payerSpot.leftAt} is not null`,
+      createdById: creator.id,
+      createdByName: creator.name,
+      createdAt: cost.createdAt,
+      updatedById: editor.id,
+      updatedByName: editor.name,
+      updatedAt: cost.updatedAt,
+    })
+    .from(cost)
+    .innerJoin(payerSpot, eq(payerSpot.id, cost.paidBy))
+    .leftJoin(payerUser, eq(payerUser.id, payerSpot.userId))
+    .innerJoin(creator, eq(creator.id, cost.createdBy))
+    .innerJoin(editor, eq(editor.id, cost.updatedBy))
+    .where(found)
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  const shareRows = await db
+    .select({
+      spotId: costShare.spotId,
+      userId: tripMember.userId,
+      name: sql<string>`coalesce(${user.name}, ${tripMember.guestName})`,
+      image: user.image,
+      hasLeft: sql<boolean>`${tripMember.leftAt} is not null`,
+      amount: costShare.amount,
+      originalAmount: costShare.originalAmount,
+    })
+    .from(costShare)
+    .innerJoin(cost, eq(cost.id, costShare.costId))
+    .innerJoin(tripMember, eq(tripMember.id, costShare.spotId))
+    .leftJoin(user, eq(user.id, tripMember.userId))
+    .where(and(eq(costShare.costId, costId), found))
+    .orderBy(asc(tripMember.joinedAt), asc(tripMember.id));
+
+  const personOf = (spot: { spotId: string; userId: string | null; name: string; image: string | null; hasLeft: boolean }) => ({
+    spotId: spot.spotId,
+    id: spot.userId ?? spot.spotId,
+    name: firstNameOf(spot.name),
+    image: spot.image,
+    isGuest: spot.userId === null,
+    isYou: spot.userId === userId,
+    hasLeft: spot.hasLeft,
+  });
+  const { originalAmount, originalCurrency, rate } = row;
+  const original = originalOf({ amount: originalAmount, currency: originalCurrency });
+  return {
+    id: row.id,
+    description: row.description,
+    amount: row.amount,
+    currency: row.currency,
+    category: row.category,
+    spentOn: row.spentOn,
+    original: original && { ...original, rate },
+    paidBy: row.paidBy,
+    payer: personOf({
+      spotId: row.paidBy,
+      userId: row.payerUserId,
+      name: row.payerName,
+      image: row.payerImage,
+      hasLeft: row.payerHasLeft,
+    }),
+    shares: shareRows.map((share) => ({ ...personOf(share), amount: share.amount, originalAmount: share.originalAmount })),
+    addedBy: { name: firstNameOf(row.createdByName), isYou: row.createdById === userId },
+    createdAt: row.createdAt,
+    editedBy:
+      row.updatedAt.getTime() === row.createdAt.getTime()
+        ? null
+        : { name: firstNameOf(row.updatedByName), isYou: row.updatedById === userId },
+    updatedAt: row.updatedAt,
+  };
+}
+
 // Adds a cost and its shares, only if the person is in the trip and every spot in it belongs
 // to the trip. The id is made by the form, so a double tap saves once: an id that is already
 // there (made by this person in this trip) changes nothing and counts as "ok". The currency
