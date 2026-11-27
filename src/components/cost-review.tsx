@@ -12,6 +12,7 @@ const FIELD_LABELS = {
   paidBy: "Who paid?",
   spentOn: "Date",
   category: "Category",
+  photo: "Receipt photo",
 } as const;
 
 const who = (person: { name: string; isYou: boolean }) => (person.isYou ? "You" : person.name);
@@ -84,6 +85,7 @@ export function CostReviewView({ review }: { review: CostReview }) {
             {even ? ` = ${money(review.shares[0].amount)} each` : ""}
           </p>
           {fromOriginal ? <p className="text-[13px] text-muted tabular-nums wrap-anywhere">{fromOriginal}</p> : null}
+          {review.withPhoto ? <p className="text-[13px] text-muted">With a receipt photo.</p> : null}
           <dl className="grid gap-1 text-[15px]">
             <div className="flex gap-2">
               <dt className="text-muted">What</dt>

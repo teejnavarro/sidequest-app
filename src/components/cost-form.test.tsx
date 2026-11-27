@@ -345,3 +345,56 @@ describe("CostForm, people who left", () => {
     expect(form()).not.toContain(">Left<");
   });
 });
+
+// SQ-035: the receipt photo picker stays mounted through the review step and is tied to
+// whichever form is showing by id, so the picked file is still posted with Save. A static
+// render can't pick a file, so this checks the structure that makes it work.
+describe("CostForm, receipt photo", () => {
+  const inputsOf = (html: string) => html.match(/<input[^>]*name="(?:photo|photoAction)"[^>]*>/g) ?? [];
+  const review = {
+    kind: "new", currency: "PHP", description: "Dinner", amount: 100000, original: null, category: null,
+    spentOn: "2027-05-09", payer: { spotId: "a", name: "Maya", isYou: true },
+    shares: [{ spotId: "a", name: "Maya", isYou: true, amount: 100000, originalAmount: null, own: null }],
+    uneven: false, withPhoto: true, rest: 100000, extraTakers: [], changes: [], shareChanges: [],
+  };
+
+  it("offers an optional receipt photo with its help line, once, tied to the form by id", () => {
+    const html = form();
+    expect(html).toContain("Receipt photo (optional)");
+    expect(html).toContain("Add a receipt photo");
+    expect(html).toContain("Everyone in this trip can see it.");
+    expect(inputsOf(html)).toHaveLength(2);
+    for (const input of inputsOf(html)) expect(input).toContain('form="cost-form"');
+    expect(html).toContain('name="photoAction"');
+    expect(html).toContain('value="keep"');
+    expect(html.match(/<form /g)).toHaveLength(1);
+    expect(html).toContain('<form id="cost-form"');
+    expect(html).toMatch(/<button type="submit" form="cost-form"[^>]*>Review<\/button>/);
+  });
+
+  it("keeps the picker mounted but hidden while the review shows, with the same form id", () => {
+    fake.serverState = { errors: {}, values: { ...emptyCostValues, paidBy: "a", sharedBy: ["a"] }, review, notice: null, updatedAt: "" };
+    try {
+      const html = form();
+      expect(html).toContain("Check this cost");
+      expect(html).toContain('<form id="cost-form"');
+      expect(inputsOf(html)).toHaveLength(2);
+      for (const input of inputsOf(html)) expect(input).toContain('form="cost-form"');
+      expect(html).toMatch(/<div class="hidden"><span[^>]*>Receipt photo \(optional\)/);
+      expect(html).toContain("With a receipt photo.");
+      expect(html).not.toContain(">Review</button>");
+    } finally {
+      fake.serverState = null;
+    }
+  });
+
+  it("shows the saved photo as a preview on an edit, from the checked route and never a storage path", () => {
+    const html = form({ mode: "edit", photoSrc: "/trips/trip-1/costs/cost-1/photo" });
+    expect(html).toContain('src="/trips/trip-1/costs/cost-1/photo"');
+    expect(html).toContain('alt="Receipt photo"');
+    expect(html).toContain(">Change<");
+    expect(html).toContain(">Remove<");
+    expect(html).not.toContain("cost-photos/");
+    expect(form()).not.toContain(">Remove<");
+  });
+});

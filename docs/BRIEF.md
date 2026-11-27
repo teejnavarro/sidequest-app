@@ -3,6 +3,7 @@
 Approved by the owner on 2026-10-31, and the amended version (stages, payment details, gap
 fixes) approved the same day. Amended again on 2026-11-14 (earlier dates, build in bundles)
 and on 2026-11-17 (uneven splits: what each person had, the rest shared equally).
+Amended again on 2026-11-27 (an optional receipt photo on a cost).
 This brief is the contract; changes need the owner's approval.
 
 ```
@@ -52,7 +53,8 @@ STAGE 1 — Planning (built between 18 December 2026 and mid-January 2027)
   Account & privacy
                  - "Delete my account": removes the user's profile, payment
                    details and screenshots; their past costs stay in trips as
-                   "former member" so balances don't break
+                   "former member" so balances don't break, and so do receipt
+                   photos they added to a cost
                  - A short plain-language privacy note: what's stored, who sees
                    it, how to delete it
   Ideas
@@ -111,6 +113,9 @@ STAGE 1 — Planning (built between 18 December 2026 and mid-January 2027)
                    ₱3,000, split 4 ways = ₱750 each. Save?"); editing shows
                    before → after; deleting asks "Are you sure?"
                  - Deleted costs go to a trash and can be restored
+                 - Optional receipt photo on a cost (one per cost), added or
+                   changed on the cost's page or its form; seen by everyone
+                   currently in the trip, and by no one outside it
                  - Export the trip's costs to a spreadsheet file (CSV)
   Payment details & settle-up
                  - Each user saves receiving details on their profile: GCash/Maya
@@ -166,8 +171,8 @@ Out of scope:    - Native iPhone/Android apps or app store publishing
                  - Editing while offline (viewing only)
                  - A combined balance across all trips (possible later)
                  - Splitting by percent or by shares, live exchange rates, maps, travel times,
-                   opening-hours checks, overlap warnings, packing lists, receipt
-                   photos for costs, comments on items, pasalubong list
+                   opening-hours checks, overlap warnings, packing lists,
+                   comments on items, pasalubong list
                    (possible later)
                  - Teams/Outlook-style time-grid calendar view (possible later,
                    for laptop users)
@@ -219,6 +224,8 @@ Success criteria:
                  - A non-member cannot see anyone's payment details, and a
                    payment screenshot is visible only to its payer and receiver
                    (tested)
+                 - A cost's receipt photo is visible to every trip member and to
+                   no one outside the trip, including someone who left (tested)
                  - Deleting an account removes its payment details and leaves
                    trip balances intact
                  - The CSV export opens in Excel/Google Sheets with totals that
@@ -292,8 +299,8 @@ Assumptions:     - Splitting ₱1,000 among 3 leaves one extra centavo; one pers
                  - One treasurer per trip's common fund; any member can be it
                  - One destination (one main currency and time zone) per trip in
                    Phase 1; connected trips are a Phase 2 idea
-                 - Payment screenshots are shrunk on upload to stay within free
-                   storage limits
+                 - Payment screenshots and cost receipt photos are shrunk on
+                   upload to stay within free storage limits
                  - The Architect picks the tech stack; the main choices get
                    explained to you before building starts
 

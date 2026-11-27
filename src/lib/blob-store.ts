@@ -1,12 +1,12 @@
 import "server-only";
 import { del, get, put } from "@vercel/blob";
 
-// The only place that talks to Vercel Blob. QR codes and receipts live in a PRIVATE store:
+// The only place that talks to Vercel Blob. QR codes, receipts and cost photos live in a PRIVATE store:
 // nothing here gives out a link, so every image is read through a route that first checks
 // who is asking (see src/lib/payments.ts). Pages and actions never import @vercel/blob.
 // The token comes from BLOB_READ_WRITE_TOKEN (local) or Vercel's own sign-in (deployed).
 
-export type ImageFolder = "qr" | "receipts";
+export type ImageFolder = "qr" | "receipts" | "cost-photos";
 
 // Saves a JPEG under a new random name and returns that name (the pathname), like "qr/<uuid>.jpg".
 export async function putImage(folder: ImageFolder, bytes: Uint8Array): Promise<string> {

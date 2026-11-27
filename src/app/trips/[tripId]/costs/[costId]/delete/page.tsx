@@ -34,7 +34,7 @@ async function DeleteCostContent({ params }: { params: Params }) {
             It moves to the trash for everyone and stops counting in balances. Anyone in the trip can put it back.
           </p>
           <div className="grid gap-3">
-            <Link href={`/trips/${trip.id}/costs/${cost.id}/edit`} className={`${primaryButton} w-full`}>
+            <Link href={`/trips/${trip.id}/costs/${cost.id}`} className={`${primaryButton} w-full`}>
               Keep cost
             </Link>
             <DeleteCostForm tripId={trip.id} costId={cost.id} />

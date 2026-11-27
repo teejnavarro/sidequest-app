@@ -21,6 +21,7 @@ import { CURRENCIES } from "@/lib/trip-options";
 import { CostReviewView } from "@/components/cost-review";
 import { Face } from "@/components/face";
 import { Field, describedBy } from "@/components/form-fields";
+import { ImagePicker } from "@/components/image-picker";
 import {
   errorClass,
   focusRing,
@@ -42,7 +43,14 @@ type CostFormProps = {
   values: CostFormValues;
   // When an edit was opened (an ISO string); empty for a new cost.
   updatedAt: string;
+  // The address of the saved receipt photo (the checked route), for the picker's preview on an
+  // edit; null when there is none. Never a storage path.
+  photoSrc?: string | null;
 };
+
+// Both the form and the review form carry this id. The photo picker stays mounted outside them
+// (so a picked file survives the swap to the review) and its inputs point here.
+const FORM_ID = "cost-form";
 
 const placeholder = "placeholder:text-muted";
 
@@ -194,9 +202,10 @@ export function CostForm(props: CostFormProps) {
     </>
   );
 
-  if (state.review && hiddenFor !== state) {
-    return (
-      <form action={formAction} className="grid gap-5">
+  const reviewing = state.review !== null && hiddenFor !== state;
+  const reviewForm =
+    state.review && hiddenFor !== state ? (
+      <form id={FORM_ID} action={formAction} className="grid gap-5">
         {hidden}
         <input type="hidden" name="step" value="save" />
         <input type="hidden" name="description" value={values.description} />
@@ -229,8 +238,7 @@ export function CostForm(props: CostFormProps) {
           </button>
         </div>
       </form>
-    );
-  }
+    ) : null;
 
   const foreign = currency !== props.currency;
   const decimals = minorDigits(currency) > 0;
@@ -239,9 +247,9 @@ export function CostForm(props: CostFormProps) {
   const chargedLabel = props.currency === "PHP" ? "Pesos" : props.currency;
   const currencies = [props.currency, ...CURRENCIES.map((option) => option.value).filter((code) => code !== props.currency)];
 
-  return (
-    // A new key gives the boxes fresh values when the server sends back a newer copy.
-    <form key={`${state.updatedAt}|${state.notice ?? ""}`} action={formAction} className="grid gap-6" noValidate>
+  // A new key gives the boxes fresh values when the server sends back a newer copy.
+  const editForm = (
+    <form id={FORM_ID} key={`${state.updatedAt}|${state.notice ?? ""}`} action={formAction} className="grid" noValidate>
       {hidden}
       <input type="hidden" name="step" value="review" />
 
@@ -510,13 +518,36 @@ export function CostForm(props: CostFormProps) {
         </Field>
       </div>
 
-      <p role="alert" className={`${errorClass} empty:hidden`}>
-        {errors.form}
-      </p>
-
-      <button type="submit" disabled={pending} className={`${primaryButton} w-full`}>
-        {pending ? "Checking…" : "Review"}
-      </button>
     </form>
+  );
+
+  return (
+    <div className="grid gap-6">
+      {reviewForm ?? editForm}
+      {/* Mounted for good, hidden while the review shows, so the picked file is still there on Save. */}
+      <div className={reviewing ? "hidden" : "grid min-w-0 gap-1.5"}>
+        <span className={labelClass}>Receipt photo (optional)</span>
+        <ImagePicker
+          name="photo"
+          actionName="photoAction"
+          form={FORM_ID}
+          savedSrc={props.photoSrc ?? null}
+          icon="camera"
+          addLabel="Add a receipt photo"
+          help="Everyone in this trip can see it."
+          previewAlt="Receipt photo"
+        />
+      </div>
+      {reviewing ? null : (
+        <>
+          <p role="alert" className={`${errorClass} empty:hidden`}>
+            {errors.form}
+          </p>
+          <button type="submit" form={FORM_ID} disabled={pending} className={`${primaryButton} w-full`}>
+            {pending ? "Checking…" : "Review"}
+          </button>
+        </>
+      )}
+    </div>
   );
 }

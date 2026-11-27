@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getTripForMember: vi.fn(),
   getBalancesForMember: vi.fn(),
+  listCostsForMember: vi.fn(),
   listPaymentsForMember: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
@@ -16,7 +17,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
-vi.mock("@/lib/costs", () => ({ getBalancesForMember: mocks.getBalancesForMember }));
+vi.mock("@/lib/costs", () => ({
+  getBalancesForMember: mocks.getBalancesForMember,
+  listCostsForMember: mocks.listCostsForMember,
+}));
 vi.mock("@/lib/payments", () => ({ listPaymentsForMember: mocks.listPaymentsForMember }));
 
 type ContentProps = { params: Promise<{ tripId: string }> };
@@ -66,6 +70,7 @@ beforeEach(() => {
   mocks.getTripForMember.mockResolvedValue({ id: "trip-1", currency: "PHP", timeZone: "Asia/Manila" });
   mocks.getBalancesForMember.mockResolvedValue(example);
   mocks.listPaymentsForMember.mockResolvedValue([]);
+  mocks.listCostsForMember.mockResolvedValue({ costs: [], total: 0, trashCount: 0 });
 });
 
 const spot = (spotId: string, name: string, extra = {}) => ({
@@ -113,7 +118,9 @@ describe("the Balances page", () => {
   it("lists the viewer's payments first, in plain words", async () => {
     const html = await render();
     expect(html).toContain("Settle up");
-    expect(html).toContain("The fewest payments to make everyone even. Tap one to see how to pay.");
+    expect(html).toContain(
+      "The fewest payments to make everyone even, so you might pay someone who didn&#x27;t pay for your cost. Tap one to see how to pay.",
+    );
     expect(html).toContain("Dana pays you");
     expect(html).toContain("Bea pays you");
     expect(html).toContain("Bea pays Jun");
@@ -256,5 +263,98 @@ describe("the Balances page", () => {
 
   it("never prints an email", async () => {
     expect(await render()).not.toContain("@");
+  });
+});
+
+// The tester case with made-up names: Lunch 3,802.00 paid by Dan and Photoshoot 250.00 paid
+// by Cara, each split four ways between Ana, Ben, Cara and Dan.
+describe("How your balance adds up", () => {
+  const who = (name: string, viewer: string) => ({ spotId: name, name, isGuest: false, isYou: name === viewer, hasLeft: false });
+  const costsSeenBy = (viewer: string) => ({
+    costs: [
+      { id: "shoot", description: "Photoshoot", amount: 25000, currency: "PHP", category: "activities", spentOn: "2026-11-08", payer: who("Cara", viewer), myShare: 6250 },
+      { id: "lunch", description: "Lunch", amount: 380200, currency: "PHP", category: "food", spentOn: "2026-11-07", payer: who("Dan", viewer), myShare: 95050 },
+    ],
+    total: 405200,
+    trashCount: 0,
+  });
+  const card = (html: string) => {
+    const at = html.indexOf('aria-label="How your balance adds up"');
+    return at < 0 ? "" : html.slice(at, html.indexOf("</section>", at));
+  };
+  const text = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").replaceAll("&#x27;", "'");
+
+  it("shows Ana what each cost adds and the total, under Settle up and above Everyone's balance", async () => {
+    mocks.listCostsForMember.mockResolvedValue(costsSeenBy("Ana"));
+    const html = await render();
+    const words = text(card(html));
+    expect(words).toContain("How your balance adds up");
+    expect(words).toContain("Lunch Dan paid ₱3,802.00 · Nov 7 you owe ₱950.50");
+    expect(words).toContain("Photoshoot Cara paid ₱250.00 · Nov 8 you owe ₱62.50");
+    expect(words).toContain("Your balance You owe ₱1,013.00");
+    expect(html.indexOf('aria-label="Settle up"')).toBeLessThan(html.indexOf('aria-label="How your balance adds up"'));
+    expect(html.indexOf('aria-label="How your balance adds up"')).toBeLessThan(html.indexOf('aria-label="Everyone'));
+  });
+
+  it("shows Cara what she is owed for the cost she paid", async () => {
+    mocks.listCostsForMember.mockResolvedValue(costsSeenBy("Cara"));
+    const words = text(card(await render()));
+    expect(words).toContain("You paid ₱250.00 · Nov 8 owed to you ₱187.50");
+    expect(words).toContain("Lunch Dan paid ₱3,802.00 · Nov 7 you owe ₱950.50");
+    expect(words).toContain("You owe ₱763.00");
+  });
+
+  it("links each cost line to its breakdown page", async () => {
+    mocks.listCostsForMember.mockResolvedValue(costsSeenBy("Ana"));
+    const html = card(await render());
+    expect(html).toContain('href="/trips/trip-1/costs/lunch"');
+    expect(html).toContain('href="/trips/trip-1/costs/shoot"');
+  });
+
+  it("lists payments sent and got back, and counts them in the total", async () => {
+    mocks.listCostsForMember.mockResolvedValue(costsSeenBy("Ana"));
+    mocks.listPaymentsForMember.mockResolvedValue([
+      paid("p1", who("Ana", "Ana"), who("Dan", "Ana"), { amount: 50000, mine: true }),
+      paid("p2", who("Ben", "Ana"), who("Ana", "Ana"), { amount: 20000, mine: true, method: "cash" }),
+      paid("p3", who("Ben", "Ana"), who("Dan", "Ana")),
+    ]);
+    const words = text(card(await render()));
+    expect(words).toContain("Payments");
+    expect(words).toContain("You paid Dan GCash · Tue, Nov 24 paid back ₱500.00");
+    expect(words).toContain("Ben paid you Cash · Tue, Nov 24 got back ₱200.00");
+    expect(words).not.toContain("Ben paid Dan");
+    expect(words).toContain("You owe ₱713.00"); // 1,013.00 - 500.00 + 200.00
+  });
+
+  it("leaves the card out when the viewer has no lines", async () => {
+    expect(await render()).not.toContain("How your balance adds up");
+  });
+
+  it("marks a cost's payer who left the trip, and no one else", async () => {
+    const seen = costsSeenBy("Ana");
+    seen.costs[1] = { ...seen.costs[1], payer: { ...who("Dan", "Ana"), hasLeft: true } };
+    mocks.listCostsForMember.mockResolvedValue(seen);
+    const words = text(card(await render()));
+    expect(words).toContain("Lunch Dan (left the trip) paid ₱3,802.00 · Nov 7 you owe ₱950.50");
+    expect(words).toContain("Photoshoot Cara paid ₱250.00");
+    expect(words.match(/left the trip/g)).toHaveLength(1);
+  });
+
+  it("leaves out a cost in another currency, from the lines and the total", async () => {
+    const seen = costsSeenBy("Ana");
+    seen.costs.push({ id: "pho", description: "Pho stall", amount: 2000000, currency: "VND", category: "food", spentOn: "2026-11-09", payer: who("Dan", "Ana"), myShare: 500000 });
+    mocks.listCostsForMember.mockResolvedValue(seen);
+    const html = card(await render());
+    const words = text(html);
+    expect(words).toContain("Lunch Dan paid ₱3,802.00");
+    expect(words).not.toContain("Pho stall");
+    expect(html).not.toContain('href="/trips/trip-1/costs/pho"');
+    expect(words).toContain("Your balance You owe ₱1,013.00");
+  });
+
+  it("shows All settled when the lines add up to nothing", async () => {
+    mocks.listCostsForMember.mockResolvedValue(costsSeenBy("Ana"));
+    mocks.listPaymentsForMember.mockResolvedValue([paid("p1", who("Ana", "Ana"), who("Dan", "Ana"), { amount: 101300, mine: true })]);
+    expect(text(card(await render()))).toContain("Your balance All settled");
   });
 });

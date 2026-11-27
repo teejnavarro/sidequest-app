@@ -17,12 +17,12 @@ export const metadata: Metadata = { title: "Costs | Sidequest" };
 const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 // One row: what, how much, who paid, the viewer's share, and who added or edited it. The
-// whole row opens the Edit page.
+// whole row opens the cost's breakdown page.
 function CostRow({ cost, tripId }: { cost: CostListItem; tripId: string }) {
   return (
     <li className="border-t border-line first:border-t-0">
       <Link
-        href={`/trips/${tripId}/costs/${cost.id}/edit`}
+        href={`/trips/${tripId}/costs/${cost.id}`}
         className={`grid min-h-11 grid-cols-[2.5rem_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-0.5 py-3 ${focusRing}`}
       >
         <span className="row-span-3 grid size-10 place-items-center rounded-full bg-blue-soft text-blue-text">

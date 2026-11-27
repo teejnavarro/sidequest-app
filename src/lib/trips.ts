@@ -709,23 +709,27 @@ export async function hasLeftSpot(tripId: string, userId: string): Promise<boole
 // condition, so a member or a stranger deletes nothing. The trip's payments and costs are
 // deleted first, in the same all-or-nothing batch: both point at spots with no cascade, and the
 // database checks that before the trip's own cascade has cleared the rest. The member rows, the
-// shares and the invite code (which lives on the trip) go with the trip. The receipt files are
-// deleted afterwards (a file left behind is harmless). Returns true only when a trip was
+// shares and the invite code (which lives on the trip) go with the trip. The receipt files and
+// the costs' photo files are deleted afterwards (a file left behind is harmless). Returns true only when a trip was
 // removed, so repeating the delete is harmless.
 export async function deleteTripForOwner(tripId: string, userId: string): Promise<boolean> {
   const owned = and(eq(trip.id, tripId), eq(trip.ownerId, userId));
   const ownedTrip = exists(db.select({ one: trip.id }).from(trip).where(owned));
-  const [receipts, , , deleted] = await db.batch([
+  const [receipts, photos, , , deleted] = await db.batch([
     db
       .select({ path: payment.receiptPath })
       .from(payment)
       .where(and(eq(payment.tripId, tripId), isNotNull(payment.receiptPath), ownedTrip)),
+    db
+      .select({ path: cost.photoPath })
+      .from(cost)
+      .where(and(eq(cost.tripId, tripId), isNotNull(cost.photoPath), ownedTrip)),
     db.delete(payment).where(and(eq(payment.tripId, tripId), ownedTrip)),
     db.delete(cost).where(and(eq(cost.tripId, tripId), ownedTrip)),
     db.delete(trip).where(owned).returning({ id: trip.id }),
   ]);
   if (deleted.length > 0) {
-    await deleteImages(receipts.flatMap((row) => (row.path ? [row.path] : [])));
+    await deleteImages([...receipts, ...photos].flatMap((row) => (row.path ? [row.path] : [])));
   }
   return deleted.length > 0;
 }

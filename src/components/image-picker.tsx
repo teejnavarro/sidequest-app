@@ -1,17 +1,18 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Image as ImageIcon, QrCode } from "@phosphor-icons/react/dist/ssr";
+import { Camera, Image as ImageIcon, QrCode } from "@phosphor-icons/react/dist/ssr";
 import { ImageReadError, shrinkImage } from "@/lib/image-shrink";
 import { errorClass, focusRing, helpClass, smallQuietButton } from "@/components/ui";
 
-const icons = { qr: QrCode, image: ImageIcon };
+const icons = { qr: QrCode, image: ImageIcon, camera: Camera };
 const READ_FAILED = "Couldn't read that image. Try a screenshot instead.";
 
 // Picks one picture, shrinks it on the phone and puts the small JPEG back into the file box, so
 // the form posts the small file. With a saved picture it shows a preview with Change and Remove;
 // `actionName` then posts keep, replace or remove so the server knows which one it was.
-// `onPreview` tells the form what is showing (for a review step).
+// `onPreview` tells the form what is showing (for a review step). `form` ties both inputs to a
+// form elsewhere on the page (by its id), so the picker can stay mounted while forms swap.
 export function ImagePicker({
   name,
   actionName,
@@ -21,6 +22,7 @@ export function ImagePicker({
   help,
   previewAlt,
   onPreview,
+  form,
 }: {
   name: string;
   actionName?: string;
@@ -30,6 +32,7 @@ export function ImagePicker({
   help?: string;
   previewAlt: string;
   onPreview?: (src: string | null) => void;
+  form?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -80,6 +83,7 @@ export function ImagePicker({
         ref={input}
         type="file"
         name={name}
+        form={form}
         accept="image/*"
         onChange={onPick}
         tabIndex={-1}
@@ -87,7 +91,7 @@ export function ImagePicker({
         className="hidden"
       />
       {actionName ? (
-        <input type="hidden" name={actionName} value={picked ? "replace" : removed ? "remove" : "keep"} />
+        <input type="hidden" name={actionName} form={form} value={picked ? "replace" : removed ? "remove" : "keep"} />
       ) : null}
 
       {showing ? (

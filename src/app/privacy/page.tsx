@@ -48,6 +48,10 @@ export default function PrivacyPage() {
             <li>Only people in a trip see that trip.</li>
             <li>Your payment details: only people in a trip with you right now.</li>
             <li>A receipt: only the person who paid and the person paid.</li>
+            <li>
+              A receipt photo on a cost: everyone in the trip right now. It stays with the trip if the person who
+              added it deletes their account.
+            </li>
             <li>Your email: nobody. It&apos;s only used to sign you in.</li>
           </ul>
         </Section>
@@ -74,7 +78,7 @@ export default function PrivacyPage() {
           </a>
           .
         </p>
-        <p className="text-[13px] text-muted">Updated 25 November 2026.</p>
+        <p className="text-[13px] text-muted">Updated 27 November 2026.</p>
       </main>
     </>
   );
