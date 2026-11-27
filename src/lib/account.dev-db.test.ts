@@ -43,6 +43,10 @@ const RECEIPT_ME_SHARED = `receipts/${RUN}-me-shared.jpg`;
 const RECEIPT_ADA = `receipts/${RUN}-ada.jpg`;
 const RECEIPT_SOLO = `receipts/${RUN}-solo.jpg`;
 const RECEIPT_DAN_LEFT = `receipts/${RUN}-dan-left.jpg`;
+// Cost photos: the shared trip's stays, the ones in trips deleted with the account go.
+const PHOTO_SHARED = `cost-photos/${RUN}-shared.jpg`;
+const PHOTO_SOLO = `cost-photos/${RUN}-solo.jpg`;
+const PHOTO_DAN_LEFT = `cost-photos/${RUN}-dan-left.jpg`;
 const QR_ADA = `qr/${RUN}-ada.jpg`;
 
 function devDatabaseAddress(): string {
@@ -314,6 +318,12 @@ describe("account deletion on the dev database", () => {
     await addCost("dl", leftBehind, 600, spot.danLeft!, [spot.meLeft!, spot.danLeft!]);
     await addPayment("dl", leftBehind, spot.meLeft!, spot.danLeft!, DAN, 300, RECEIPT_DAN_LEFT);
     expect(await trips.leaveTrip(leftBehind, DAN)).toBe("ok");
+    for (const [id, path] of [["sh", PHOTO_SHARED], ["so", PHOTO_SOLO], ["dl", PHOTO_DAN_LEFT]] as const) {
+      await db
+        .update(schema.cost)
+        .set({ photoPath: path, photoBy: ME, photoAt: new Date() })
+        .where(orm.eq(schema.cost.id, `${ID_PREFIX}c-${id}-${RUN}`));
+    }
 
     const [idea] = await db
       .insert(schema.idea)
@@ -428,7 +438,15 @@ describe("account deletion on the dev database", () => {
   it("deletes the QR and the receipts the person uploaded, and keeps the other person's", async () => {
     expect(deleted).toHaveLength(1);
     // Dan's receipt goes too: it lived in a trip that is deleted with the account.
-    expect([...deleted[0]!].sort()).toEqual([QR, RECEIPT_ME_SHARED, RECEIPT_SOLO, RECEIPT_DAN_LEFT].sort());
+    expect([...deleted[0]!].sort()).toEqual(
+      [QR, RECEIPT_ME_SHARED, RECEIPT_SOLO, RECEIPT_DAN_LEFT, PHOTO_SOLO, PHOTO_DAN_LEFT].sort(),
+    );
+    // A photo on a cost in a shared trip stays with the trip.
+    const [kept] = await dbModule.db
+      .select({ path: schema.cost.photoPath })
+      .from(schema.cost)
+      .where(orm.eq(schema.cost.id, `${ID_PREFIX}c-sh-${RUN}`));
+    expect(kept?.path).toBe(PHOTO_SHARED);
     const { db } = dbModule;
     const rows = await db
       .select({ id: schema.payment.id, path: schema.payment.receiptPath })

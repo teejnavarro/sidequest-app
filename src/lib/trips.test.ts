@@ -302,12 +302,16 @@ describe("people in the list and on the invite", () => {
 describe("deleteTripForOwner", () => {
   it("puts ownership inside every statement, payments then costs, in one all-or-nothing batch", async () => {
     await deleteTripForOwner("trip-1", "u1");
-    expect(fake.batches).toEqual([4]);
-    const [receipts, payments, costs, tripDelete] = fake.queries;
+    expect(fake.batches).toEqual([5]);
+    const [receipts, photos, payments, costs, tripDelete] = fake.queries;
     expect(receipts.sql).toMatch(/^select "receipt_path" from "payment" where/);
     expect(receipts.sql).toContain('"payment"."trip_id" = $1');
     expect(receipts.sql).toContain('"trip"."owner_id" = $');
     expect(receipts.params).toEqual(["trip-1", "trip-1", "u1"]);
+    expect(photos.sql).toMatch(/^select "photo_path" from "cost" where/);
+    expect(photos.sql).toContain('"cost"."trip_id" = $1');
+    expect(photos.sql).toContain('"trip"."owner_id" = $');
+    expect(photos.params).toEqual(["trip-1", "trip-1", "u1"]);
     expect(payments.sql).toMatch(/^delete from "payment" where/);
     expect(payments.sql).toContain('"payment"."trip_id" = $1');
     expect(payments.sql).toContain('"trip"."owner_id" = $');
