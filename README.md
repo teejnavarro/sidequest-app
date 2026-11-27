@@ -115,3 +115,4 @@ Production address: https://sidequest-app-rho.vercel.app/ (updates on every merg
 - 2026-11-27 - SQ-035 planned on `feature/cost-breakdown` (`/architect`). Owner choices: the foreign-currency line uses the same rate words as Review, "Keep cost" returns to the new Cost page, and balance lines that add nothing are hidden. No database change.
 - 2026-11-27 - Brief amendment approved: optional receipt photo on a cost (one per cost), seen by everyone in the trip, kept when its uploader deletes their account. Added to SQ-035, which now needs one migration.
 - 2026-11-27 - SQ-035 re-planned for the receipt photo: three new columns on costs (migration 0012), the same private image storage as payment receipts, and a photo change doesn't count as "Last edited" (owner's call).
+- 2026-11-27 - SQ-035 merged as PR #21 and live-checked 2026-11-27 (cost breakdown page, "How your balance adds up", receipt photo on a cost; migration 0012 applied to production before merge).
