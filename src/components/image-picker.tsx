@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Image as ImageIcon, QrCode } from "@phosphor-icons/react/dist/ssr";
+import { Camera, Image as ImageIcon, QrCode } from "@phosphor-icons/react/dist/ssr";
 import { ImageReadError, shrinkImage } from "@/lib/image-shrink";
 import { errorClass, focusRing, helpClass, smallQuietButton } from "@/components/ui";
 
-const icons = { qr: QrCode, image: ImageIcon };
+const icons = { qr: QrCode, image: ImageIcon, camera: Camera };
 const READ_FAILED = "Couldn't read that image. Try a screenshot instead.";
 
 // Picks one picture, shrinks it on the phone and puts the small JPEG back into the file box, so
