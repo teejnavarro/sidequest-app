@@ -898,7 +898,7 @@ seen, not only on your own computer.
 
 ### A private cache: a note in your own pocket
 
-The fix is one line, `"use cache: private"`, on the function that looks up who is signed in. It tells
+The first fix was one line, `"use cache: private"`, on the function that looks up who is signed in. It tells
 Next.js the answer may be remembered for a few minutes, but only inside your own browser, never on the
 server where someone else could get it. Think of a note you keep in your own pocket, not a note stuck
 on the shop wall. Because it is remembered, the early preparation now waits for it instead of walking
@@ -910,6 +910,19 @@ Signing out and deleting an account are actions that change your cookies, and Ne
 remembered pages in your browser whenever that happens. Signing in is a full trip to Google and back, so
 it starts fresh too. Every action that changes data still checks who you are again, on the server, so
 the note in your pocket is never what protects your trips.
+
+### QA found a catch: a photo cannot be renewed
+
+QA tested what the private cache did to the sign-in cookie. Better Auth quietly renews that cookie while
+you are active, like a gym renewing your card each visit. Inside a private cache, the cookie is only a
+photo of what was there, so it can be read but not changed. The renewal inside actions and file links
+(the spreadsheet export, receipts, photos) failed without any error, and after seven days even an
+active person would have been signed out.
+
+So the check is now split in two. Actions and file links read the cookie fresh, so renewal works. Pages
+and layouts use the `...ForPage` versions, which keep the note in your pocket. A guard test
+(`current-user-usage.test.ts`) fails if a page uses the fresh one or an action uses the page one, so the
+split cannot drift back.
 
 ### Your action items
 
