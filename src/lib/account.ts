@@ -12,7 +12,8 @@ import { FORMER_MEMBER_NAME } from "@/lib/display-name";
 // The privacy layer for deleting an account. "Delete" blanks the account out instead of
 // removing the user row: fourteen foreign keys point at it, and costs, ideas and votes must
 // keep a name to show. The person's own data (photo, email, payment details, receipts they
-// uploaded, sign-in links) is wiped; trips only they are in go with them.
+// uploaded, sign-in links) is wiped; trips only they are in go with them. Receipt photos on
+// costs in shared trips stay with the trip (the brief's rule); those in solo trips go with it.
 
 // Another signed-in person who is still in the trip. Guests never count.
 function otherActivePerson(tripIdColumn: AnyColumn, userId: string) {
@@ -109,7 +110,7 @@ export async function getAccountDeletionCheck(userId: string): Promise<DeletionC
 export async function deleteAccount(userId: string): Promise<"ok" | "owns-shared-trips"> {
   const guard = canDelete(userId);
   const inSoloTrip = inArray(payment.tripId, ownedTripIds(userId, false));
-  const [qr, own, solo, , , , , , , blanked] = await db.batch([
+  const [qr, own, solo, soloPhotos, , , , , , , blanked] = await db.batch([
     db
       .select({ path: paymentAccount.qrPath })
       .from(paymentAccount)
@@ -122,6 +123,10 @@ export async function deleteAccount(userId: string): Promise<"ok" | "owns-shared
       .select({ path: payment.receiptPath })
       .from(payment)
       .where(and(inSoloTrip, isNotNull(payment.receiptPath), guard)),
+    db
+      .select({ path: cost.photoPath })
+      .from(cost)
+      .where(and(inArray(cost.tripId, ownedTripIds(userId, false)), isNotNull(cost.photoPath), guard)),
     // Solo trips: payments and costs point at spots without cascade, so they go first.
     db.delete(payment).where(and(inSoloTrip, guard)),
     db
@@ -151,7 +156,7 @@ export async function deleteAccount(userId: string): Promise<"ok" | "owns-shared
     db.delete(account).where(and(eq(account.userId, userId), guard)),
   ]);
   if (blanked.length === 0) return "owns-shared-trips";
-  const paths = [...qr, ...own, ...solo].flatMap((row) => (row.path ? [row.path] : []));
+  const paths = [...qr, ...own, ...solo, ...soloPhotos].flatMap((row) => (row.path ? [row.path] : []));
   await deleteImages([...new Set(paths)]);
   return "ok";
 }

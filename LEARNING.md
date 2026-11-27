@@ -772,7 +772,102 @@ crash is harmless, because nobody can open it without the app's check.
   plain person icon, and the balances should not have moved.
 - Open /privacy while signed out.
 
-## Chapter 17: Why a page can start loading before you tap it
+---
+
+## Chapter 17: Showing the working: where a balance comes from
+
+Two testers opened Balances and saw one line: "Ana pays Dan 1,013.00." Fair question: for what? They
+could not see which costs added up to that number, and one of them wondered if a friend had been paid
+back her share of a smaller cost. A total with no working is like a bill that only says "Total: 1,013".
+Nobody argues with a receipt. They argue with a number that appears from nowhere.
+
+### Two small windows, no new sums
+
+Think of a restaurant bill. The total is the answer, and the itemised list under it is the working. We
+already had the total (the balance). What was missing was the list. So the app got two new views, and
+neither one does any new maths.
+
+1. **A page for one cost.** Tap a cost and you see who paid, what each person owes, who added it and
+   who last changed it. Edit and Delete are one tap away. Before this, tapping a cost dropped you
+   straight into the Edit form, which is like opening a receipt by tearing it up.
+2. **"How your balance adds up".** On Balances, one line for every cost and payment that makes up
+   your balance, then the total.
+
+### Why the list can never disagree with the balance
+
+The list is built from the same rows the balance is built from. The balance is "what you paid, minus
+your share, plus payments you sent, minus payments you got". The list takes each cost (what you paid
+minus your share for that cost) and each payment, and adds them up. It is the same sum written out in
+pieces, so the pieces can only add up to the whole. If we had written a second, separate calculation,
+the two would drift apart one day and people would stop trusting both. Our tests check this on real
+database rows for every person in a trip, with a payment included.
+
+### The tester case
+
+Lunch was 3,802.00 and Photoshoot was 250.00, each split four ways. We use made-up names in the tests
+(Ana, Ben, Cara and Dan) because the code is public. Dan paid for Lunch and Cara paid for Photoshoot.
+Each person's share is 950.50 for Lunch and 62.50 for Photoshoot.
+
+- Ana owes 950.50 and 62.50. Her balance is owing 1,013.00.
+- Cara owes 950.50 for Lunch but is owed 187.50 for Photoshoot (250.00 minus her own 62.50). She ends
+  up owing 763.00.
+- Dan is owed 2,851.50 for Lunch and owes 62.50 for Photoshoot. He is owed 2,789.00.
+
+So Ana pays Dan 1,013.00, Ben pays Dan 1,013.00 and Cara pays Dan 763.00. Cara never pays for her own
+Photoshoot, and she never gets paid for it directly either. Her 187.50 is simply netted against what she
+owes for Lunch. That is why the Settle up card now says you might pay someone who did not pay for your
+cost: it settles with the fewest payments, not cost by cost.
+
+### Even or uneven, decided in one place
+
+The cost page tags a cost "Not an even split" when the shares are not what an equal split would give.
+The Edit form already had that rule, to decide whether to open the "add what each person had" panel.
+Rather than copy it, we moved it into one small function, `isEvenSplit`, and both places call it. One rule,
+one place, so they can't disagree.
+
+### A receipt photo on a cost
+
+Later the same week the owner asked for one more thing: attach a photo of the receipt to a cost. A
+photo is a file, and files are a privacy question. Here is how it works.
+
+- **One private shelf.** Photos go in the same private storage as payment receipts. No link to a photo is
+  ever given out. To see a photo, your browser asks a small door in our app, and the door checks
+  that you are in the trip right now. Someone who left, someone who was never in the trip, a deleted cost
+  and a missing file all get the same plain "not found". It is like a coat check: the ticket alone gets you
+  nothing, the attendant looks at who you are every time.
+- **Checked on every view.** Because the check happens each time, taking someone out of a trip shuts
+  them out of the photos at once. We don't have to hunt down old links.
+- **A photo is not an edit.** Adding or replacing a photo does not change "last edited" or the time the
+  cost was last saved. If it did, someone adding a photo could make another person's open Edit form say
+  "someone just changed this cost".
+- **No upload until you save.** At the review step the app only checks the file. It uploads when you
+  press Save. Otherwise every abandoned review would leave a file on the shelf that no cost points to.
+  When a save is refused or repeated, the new file is deleted again. When a photo is replaced or
+  removed, the old file is deleted.
+- **The browser never sees the storage name.** The page only ever knows "this cost has a photo". The
+  path stays on the server and is never taken from a form either.
+- **When things are deleted.** Deleting a trip deletes its photos. Deleting an account keeps photos on
+  costs in trips with other people, because those costs belong to the group. The privacy note says so.
+
+### The phone-sized trap
+
+The picker for the photo had to survive the swap from the form to the review. Our form is replaced
+by the review screen, and a file box inside the replaced form would lose the picked picture, like
+handing someone a form, then swapping it for a clean copy while their photo is still in your hand. So the
+picker lives outside both screens and points at "the form" by its name. Both screens use the same name,
+so Save still carries the file.
+
+### Your action items
+
+- Open a cost and look at who paid and each share. Do the shares add up to the total?
+- Compare the last line of "How your balance adds up" with your row in Everyone's balance. They
+  should be the same number with the same words.
+- Add a receipt photo from the cost page, then replace it from Edit. Open the photo address while
+  signed out or as someone who left the trip: it should say "not found".
+
+---
+
+## Chapter 18: Why a page can start loading before you tap it
 
 ### The problem
 

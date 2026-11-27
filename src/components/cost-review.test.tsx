@@ -22,6 +22,7 @@ const base: CostReview = {
     { ...dana, amount: 100000, originalAmount: null, own: null },
   ],
   uneven: false,
+  withPhoto: false,
   rest: 300000,
   extraTakers: [],
   changes: [],
@@ -80,6 +81,22 @@ describe("CostReviewView, new cost", () => {
     expect(out).toContain("₫1,000");
     expect(out).not.toContain("₫1,000.00");
     expect(out).toContain("takes the extra dong");
+  });
+});
+
+describe("CostReviewView, receipt photo", () => {
+  it("says a new cost is saved with a receipt photo, only when it is", () => {
+    expect(html({ ...base, withPhoto: true })).toContain("With a receipt photo.");
+    expect(html(base)).not.toContain("With a receipt photo.");
+  });
+
+  it("shows the photo as a changed field on an edit", () => {
+    const edit: CostReview = { ...base, kind: "edit", changes: [{ field: "photo", before: "None", after: "Added" }] };
+    const out = html(edit);
+    expect(out).toContain("Receipt photo");
+    expect(out).toContain("None");
+    expect(out).toContain("Added");
+    expect(out).not.toContain("Nothing changed.");
   });
 });
 

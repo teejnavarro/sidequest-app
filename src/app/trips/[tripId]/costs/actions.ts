@@ -3,16 +3,28 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
+import { deleteImages, putImage } from "@/lib/blob-store";
+import { readJpegUpload } from "@/lib/image-file";
 import { validateCostInput } from "@/lib/cost-input";
 import {
   buildCostReview,
   CHANGED_NOTICE,
+  photoActionOf,
   valuesFromCost,
   type CostFormState,
   type CostFormValues,
+  type CostPhotoState,
   type DeleteCostState,
 } from "@/lib/cost-form-state";
-import { createCost, deleteCost, getCostForMember, restoreCost, updateCost, type CostDetails } from "@/lib/costs";
+import {
+  createCost,
+  deleteCost,
+  getCostForMember,
+  restoreCost,
+  setCostPhotoForMember,
+  updateCost,
+  type CostDetails,
+} from "@/lib/costs";
 import { firstNameOf } from "@/lib/display-name";
 import { getTripForMember, listCostPeople } from "@/lib/trips";
 
@@ -60,6 +72,8 @@ const listAddress = (tripId: string) => `/trips/${tripId}/costs`;
 const SAVE_FAILED = "Couldn't save the cost. Please try again.";
 const DELETE_FAILED = "Couldn't delete the cost. Please try again.";
 const RESTORE_FAILED = "Couldn't restore the cost. Please try again.";
+const UPLOAD_FAILED = "Couldn't upload that image. Please try again.";
+const PHOTO_FAILED = "Couldn't add the photo. Try again with a smaller picture or better signal.";
 
 // What the person sees again after a stale save: the cost as it is now.
 function changedState(current: CostDetails): CostFormState {
@@ -73,14 +87,15 @@ function changedState(current: CostDetails): CostFormState {
 }
 
 // "Review" shows what will be saved; "Save" saves it. Both check the cost from scratch.
-// Returns the state to show again, "done" once saved, or "gone" for a trip or cost the
-// person can't reach (they end up at the Costs tab either way).
+// Returns the state to show again, "done" once a new cost is saved, "edited" once an edit is
+// saved (it ends at that cost's page), or "gone" for a trip or cost the person can't reach
+// (they end up at the Costs tab).
 async function reviewOrSave(
   userId: string,
   formData: FormData,
   tripId: string,
   costId: string,
-): Promise<CostFormState | "done" | "gone"> {
+): Promise<CostFormState | "done" | "edited" | "gone"> {
   const values = readValues(formData);
   const token = readText(formData, "updatedAt");
   const editing = readText(formData, "mode") === "edit";
@@ -101,25 +116,56 @@ async function reviewOrSave(
     return { errors: result.errors, values, review: null, notice: null, updatedAt: token };
   }
 
+  // The photo: what the form says to do, and a picked file checked (never uploaded) on both steps.
+  const photo = photoActionOf(readText(formData, "photoAction"));
+  let upload: Uint8Array | null = null;
+  if (photo === "replace") {
+    const checkedFile = await readJpegUpload(formData.get("photo"));
+    if (!checkedFile.ok) return { errors: { form: checkedFile.error }, values, review: null, notice: null, updatedAt: token };
+    upload = checkedFile.bytes;
+  }
+
   if (!editing) {
     if (!saving) {
-      const review = buildCostReview({ currency: trip.currency, input: result.value, people, before: null });
+      const review = buildCostReview({ currency: trip.currency, input: result.value, people, before: null, photo });
       return { errors: {}, values, review, notice: null, updatedAt: token };
     }
-    // Not in the trip or a repeat of the same save: nothing more to do either way.
-    await createCost(tripId, userId, costId, result.value);
+    const newPath = await uploadPhoto(upload);
+    if (newPath === "failed") return { errors: { form: UPLOAD_FAILED }, values, review: null, notice: null, updatedAt: token };
+    let outcome: Awaited<ReturnType<typeof createCost>>;
+    try {
+      outcome = await createCost(tripId, userId, costId, result.value, newPath ? { set: newPath } : "keep");
+    } catch (problem) {
+      if (newPath) await deleteImages([newPath]);
+      throw problem;
+    }
+    // Not in the trip or a repeat of the same save: the new file was not used, so delete it.
+    if (outcome !== "ok" && newPath) await deleteImages([newPath]);
     return "done";
   }
 
   const expected = new Date(token);
   if (saving) {
     if (Number.isNaN(expected.getTime())) return "gone";
-    const outcome = await updateCost(tripId, costId, userId, result.value, expected);
-    if (outcome === "changed") {
-      const current = await getCostForMember(tripId, costId, userId);
-      return current ? changedState(current) : "gone";
+    const newPath = await uploadPhoto(upload);
+    if (newPath === "failed") return { errors: { form: UPLOAD_FAILED }, values, review: null, notice: null, updatedAt: token };
+    const change = newPath ? { set: newPath } : photo === "remove" ? ("remove" as const) : ("keep" as const);
+    let outcome: Awaited<ReturnType<typeof updateCost>>;
+    try {
+      outcome = await updateCost(tripId, costId, userId, result.value, expected, change);
+    } catch (problem) {
+      if (newPath) await deleteImages([newPath]);
+      throw problem;
     }
-    return "done";
+    if (typeof outcome === "object") {
+      // Saved: the file it replaced or removed is no longer used.
+      if (change !== "keep" && outcome.oldPhoto) await deleteImages([outcome.oldPhoto]);
+      return "edited";
+    }
+    if (newPath) await deleteImages([newPath]);
+    if (outcome === "not-found") return "gone";
+    const current = await getCostForMember(tripId, costId, userId);
+    return current ? changedState(current) : "gone";
   }
 
   const current = await getCostForMember(tripId, costId, userId);
@@ -128,8 +174,19 @@ async function reviewOrSave(
   if (Number.isNaN(expected.getTime()) || expected.getTime() !== current.updatedAt.getTime()) {
     return changedState(current);
   }
-  const review = buildCostReview({ currency: trip.currency, input: result.value, people, before: current });
+  const review = buildCostReview({ currency: trip.currency, input: result.value, people, before: current, photo });
   return { errors: {}, values, review, notice: null, updatedAt: token };
+}
+
+// Puts a checked photo in the private store: the new path, null when there is none, or "failed".
+// The review step never calls this: only Save uploads.
+async function uploadPhoto(upload: Uint8Array | null): Promise<string | null | "failed"> {
+  if (!upload) return null;
+  try {
+    return await putImage("cost-photos", upload);
+  } catch {
+    return "failed";
+  }
 }
 
 export async function reviewOrSaveCostAction(
@@ -143,7 +200,7 @@ export async function reviewOrSaveCostAction(
   const costId = readText(formData, "costId");
   if (!COST_ID.test(costId)) redirect(listAddress(tripId));
 
-  let outcome: CostFormState | "done" | "gone";
+  let outcome: CostFormState | "done" | "edited" | "gone";
   try {
     outcome = await reviewOrSave(user.id, formData, tripId, costId);
   } catch {
@@ -156,11 +213,52 @@ export async function reviewOrSaveCostAction(
     };
   }
 
+  if (outcome === "edited") {
+    const address = `${listAddress(tripId)}/${costId}`;
+    revalidatePath(listAddress(tripId));
+    revalidatePath(address);
+    redirect(address); // an edit returns to the cost's page
+  }
   if (outcome === "done" || outcome === "gone") {
     if (outcome === "done") revalidatePath(listAddress(tripId));
     redirect(listAddress(tripId)); // redirect works by throwing: keep it outside try/catch
   }
   return outcome;
+}
+
+// The Cost page's "Add photo" box: checks the file, stores it, puts it on the cost, and deletes
+// whichever file is no longer used. Only a current member can; the path never comes from the form.
+export async function addCostPhotoAction(_prev: CostPhotoState, formData: FormData): Promise<CostPhotoState> {
+  const user = await getCurrentUser();
+
+  const tripId = readText(formData, "tripId");
+  const costId = readText(formData, "costId");
+  if (tripId === "") redirect("/trips");
+  if (costId === "") redirect(listAddress(tripId));
+
+  const upload = await readJpegUpload(formData.get("photo"));
+  if (!upload.ok) return { error: PHOTO_FAILED };
+  let path: string;
+  try {
+    path = await putImage("cost-photos", upload.bytes);
+  } catch {
+    return { error: PHOTO_FAILED };
+  }
+  let saved: Awaited<ReturnType<typeof setCostPhotoForMember>>;
+  try {
+    saved = await setCostPhotoForMember(tripId, costId, user.id, path);
+  } catch {
+    await deleteImages([path]);
+    return { error: PHOTO_FAILED };
+  }
+  if (!saved.ok) {
+    await deleteImages([path]);
+    return { error: PHOTO_FAILED };
+  }
+  if (saved.old) await deleteImages([saved.old]);
+  revalidatePath(listAddress(tripId));
+  revalidatePath(`${listAddress(tripId)}/${costId}`);
+  return {};
 }
 
 export async function deleteCostAction(

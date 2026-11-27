@@ -199,6 +199,16 @@ describe("Edit cost page", () => {
     });
     expect(html).toContain('href="/trips/trip-1/costs/cost-1/delete"');
     expect(html).toContain("Delete cost");
+    expect(html).toContain('href="/trips/trip-1/costs/cost-1"'); // the back link returns to the cost's page
+    expect(html).toContain(">Cost</span>");
+  });
+
+  it("gives the form the photo route only when the cost has a photo, never a storage path", async () => {
+    expect(formProps(await run(EditCostPage, "cost-1")).photoSrc).toBeNull();
+    mocks.getCostForMember.mockResolvedValue({ ...cost, hasPhoto: true });
+    const html = await run(EditCostPage, "cost-1");
+    expect(formProps(html).photoSrc).toBe("/trips/trip-1/costs/cost-1/photo");
+    expect(html).not.toContain("cost-photos/");
   });
 
   it("lists guests in both pickers and shows a zero-decimal cost without decimals", async () => {

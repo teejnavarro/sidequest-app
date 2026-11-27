@@ -58,7 +58,7 @@ describe("Delete cost page", () => {
       "It moves to the trash for everyone and stops counting in balances. Anyone in the trip can put it back.",
     );
     expect(html).not.toContain("You can&#x27;t undo this");
-    const keep = html.match(/<a [^>]*href="\/trips\/trip-1\/costs\/cost-1\/edit"[^>]*>Keep cost<\/a>/)?.[0] ?? "";
+    const keep = html.match(/<a [^>]*href="\/trips\/trip-1\/costs\/cost-1"[^>]*>Keep cost<\/a>/)?.[0] ?? "";
     expect(keep).toContain("bg-amber");
     expect(html).toContain("data-delete");
     expect(html).toContain("&quot;costId&quot;:&quot;cost-1&quot;");

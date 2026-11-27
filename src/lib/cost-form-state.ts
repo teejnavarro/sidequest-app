@@ -87,7 +87,7 @@ export type ReviewPerson ={ spotId: string; name: string; isYou: boolean };
 // One changed field on an edit. Amounts, people and the category are ready to show; the date
 // is shown as "Sat, May 8". Old value first.
 export type CostChange = {
-  field: "amount" | "main" | "rate" | "description" | "paidBy" | "spentOn" | "category";
+  field: "amount" | "main" | "rate" | "description" | "paidBy" | "spentOn" | "category" | "photo";
   before: string;
   after: string;
 };
@@ -112,6 +112,8 @@ export type CostReview = {
   shares: (ReviewPerson & { amount: number; originalAmount: number | null; own: number | null })[];
   // True when the cost was split by what each person had.
   uneven: boolean;
+  // A new cost that is saved with a receipt photo (always false for an edit: see `changes`).
+  withPhoto: boolean;
   // What was left to share equally after the own amounts (the whole amount when equal).
   rest: number;
   // Who got one more minor unit than the smallest equal part. Empty when it divides evenly.
@@ -135,6 +137,15 @@ export type CostFormState = {
 
 export const CHANGED_NOTICE = "Someone just changed this cost. Check it again.";
 
+// True when the shares are what an equal split gives (on the original shares for a foreign cost).
+export function isEvenSplit(saved: Pick<CostDetails, "amount" | "paidBy" | "original" | "shares">): boolean {
+  const { original } = saved;
+  const unit = original ?? { amount: saved.amount };
+  const part = (share: CostDetails["shares"][number]) => (original ? (share.originalAmount ?? 0) : share.amount);
+  const equal = splitEqually(unit.amount, saved.shares.map((share) => share.spotId), saved.paidBy);
+  return equal.every((share, index) => share.amount === part(saved.shares[index]!));
+}
+
 // The form values for a saved cost. An equal split opens as equal; anything else opens as an
 // uneven split with every person's full share in their box and nothing left over. A cost in
 // another currency opens in that currency, with its original amounts and rate (or the card
@@ -144,8 +155,7 @@ export function valuesFromCost(saved: CostDetails): CostFormValues {
   const { original } = saved;
   const unit = original ?? { amount: saved.amount, currency: saved.currency, rate: null };
   const part = (share: CostDetails["shares"][number]) => (original ? (share.originalAmount ?? 0) : share.amount);
-  const equal = splitEqually(unit.amount, spotIds, saved.paidBy);
-  const isEqual = equal.every((share, index) => share.amount === part(saved.shares[index]!));
+  const isEqual = isEvenSplit(saved);
   return {
     description: saved.description,
     amount: amountText(unit.amount, unit.currency),
@@ -164,6 +174,14 @@ export function valuesFromCost(saved: CostDetails): CostFormValues {
   };
 }
 
+// What the form says to do with the receipt photo: keep what is saved, put the picked file in
+// its place, or take it off.
+export type PhotoAction = "keep" | "replace" | "remove";
+
+export function photoActionOf(value: string): PhotoAction {
+  return value === "replace" || value === "remove" ? value : "keep";
+}
+
 // Works out the review for a checked cost. `people` is every spot in the trip, so each id has
 // a name. For an edit, `before` is the cost as it is saved now.
 export function buildCostReview(options: {
@@ -172,8 +190,9 @@ export function buildCostReview(options: {
   input: CostInput & { ownParts: Record<string, number> | null };
   people: ReviewPerson[];
   before: CostDetails | null;
+  photo?: PhotoAction;
 }): CostReview {
-  const { currency, input, people, before } = options;
+  const { currency, input, people, before, photo = "keep" } = options;
   const { ownParts } = input;
   const person = (spotId: string): ReviewPerson =>
     people.find((p) => p.spotId === spotId) ?? { spotId, name: "Someone", isYou: false };
@@ -223,6 +242,8 @@ export function buildCostReview(options: {
     note("paidBy", person(before.paidBy).name, person(input.paidBy).name);
     note("spentOn", dayLabel(before.spentOn), dayLabel(input.spentOn));
     note("category", costCategoryOf(before.category).label, costCategoryOf(input.category).label);
+    if (photo === "replace") changes.push({ field: "photo", before: before.hasPhoto ? "Photo" : "None", after: before.hasPhoto ? "Changed" : "Added" });
+    if (photo === "remove" && before.hasPhoto) changes.push({ field: "photo", before: "Photo", after: "Removed" });
 
     const was = new Map(before.shares.map((share) => [share.spotId, share.amount]));
     const now = new Map(input.shares.map((share) => [share.spotId, share.amount]));
@@ -256,6 +277,7 @@ export function buildCostReview(options: {
     payer: person(input.paidBy),
     shares,
     uneven: ownParts !== null,
+    withPhoto: !before && photo === "replace",
     rest,
     extraTakers,
     changes,
@@ -264,3 +286,6 @@ export function buildCostReview(options: {
 }
 
 export type DeleteCostState = { error?: string };
+
+// The Cost page's "Add photo" box: an error to show under the hero, or nothing.
+export type CostPhotoState = { error?: string };

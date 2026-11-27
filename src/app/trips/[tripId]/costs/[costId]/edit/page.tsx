@@ -28,7 +28,7 @@ async function EditCostContent({ params }: { params: Params }) {
 
   return (
     <>
-      <TaskBand backHref={`/trips/${trip.id}/costs`} backLabel={trip.name} title="Edit cost" />
+      <TaskBand backHref={`/trips/${trip.id}/costs/${cost.id}`} backLabel="Cost" title="Edit cost" />
       <main className={screenClass}>
         <div className={`${cardClass} gap-4`}>
           <CostForm
@@ -39,6 +39,7 @@ async function EditCostContent({ params }: { params: Params }) {
             people={people}
             values={valuesFromCost(cost)}
             updatedAt={cost.updatedAt.toISOString()}
+            photoSrc={cost.hasPhoto ? `/trips/${trip.id}/costs/${cost.id}/photo` : null}
           />
         </div>
         <Link href={`/trips/${trip.id}/costs/${cost.id}/delete`} className={`${linkClass} justify-self-start text-owe`}>

@@ -63,13 +63,19 @@ export type CostDetails = {
   original: { amount: number; currency: string; rate: string | null } | null;
   shares: { spotId: string; amount: number; originalAmount: number | null }[]; // in the trip's list order
   updatedAt: Date;
+  hasPhoto: boolean; // only whether there is one: the path never leaves this file
 };
+
+// What a save does with the cost's receipt photo: leave it, remove it, or put a new file
+// (a path from putImage) in its place.
+export type CostPhotoChange = "keep" | "remove" | { set: string };
 
 const payerSpot = alias(tripMember, "payer_spot");
 const payerUser = alias(user, "payer_user");
 const creator = alias(user, "creator");
 const editor = alias(user, "editor");
 const deleter = alias(user, "deleter");
+const photoUser = alias(user, "photo_user");
 
 // A cost that is not in the trash. Every read and edit uses it; only the trash list, restore,
 // the currency lock, guest/member cost counts and deleting a trip look at trashed costs.
@@ -178,6 +184,7 @@ export async function getCostForMember(
       spentOn: cost.spentOn,
       paidBy: cost.paidBy,
       updatedAt: cost.updatedAt,
+      hasPhoto: sql<boolean>`${cost.photoPath} is not null`,
     })
     .from(cost)
     .where(found)
@@ -196,17 +203,199 @@ export async function getCostForMember(
   return { ...rest, original: original && { ...original, rate }, shares };
 }
 
+// One person (or guest) on a cost breakdown. `id` is the user id for a person and the spot id
+// for a guest, which only colors their face. The name is a first name ("Former member" for a
+// deleted account).
+export type CostPerson = {
+  spotId: string;
+  id: string;
+  name: string;
+  image: string | null;
+  isGuest: boolean;
+  isYou: boolean;
+  hasLeft: boolean;
+};
+
+export type CostBreakdown = {
+  id: string;
+  description: string;
+  amount: number;
+  currency: string;
+  category: string | null;
+  spentOn: string;
+  original: { amount: number; currency: string; rate: string | null } | null;
+  paidBy: string; // a spot id
+  payer: CostPerson;
+  shares: (CostPerson & { amount: number; originalAmount: number | null })[]; // in the trip's list order
+  addedBy: { name: string; isYou: boolean };
+  createdAt: Date;
+  editedBy: { name: string; isYou: boolean } | null; // null when the cost was never edited
+  updatedAt: Date;
+  // The receipt photo's adder ("you" or a first name) and time. Never the path.
+  photo: { by: string; at: Date } | null;
+};
+
+// One cost for its breakdown page: who paid, each person's share, and who added and last edited
+// it. Read-only. Null when it does not exist, is in the trash, belongs to another trip, or the
+// person is not in this trip. Every one of those looks the same.
+export async function getCostBreakdownForMember(
+  tripId: string,
+  costId: string,
+  userId: string,
+): Promise<CostBreakdown | null> {
+  const found = and(eq(cost.id, costId), eq(cost.tripId, tripId), live, isMemberOf(tripId, userId));
+  const rows = await db
+    .select({
+      id: cost.id,
+      description: cost.description,
+      amount: cost.amount,
+      currency: cost.currency,
+      originalAmount: cost.originalAmount,
+      originalCurrency: cost.originalCurrency,
+      rate: cost.rate,
+      category: cost.category,
+      spentOn: cost.spentOn,
+      paidBy: cost.paidBy,
+      payerUserId: payerSpot.userId,
+      payerName: sql<string>`coalesce(${payerUser.name}, ${payerSpot.guestName})`,
+      payerImage: payerUser.image,
+      payerHasLeft: sql<boolean>`${payerSpot.leftAt} is not null`,
+      createdById: creator.id,
+      createdByName: creator.name,
+      createdAt: cost.createdAt,
+      updatedById: editor.id,
+      updatedByName: editor.name,
+      updatedAt: cost.updatedAt,
+      hasPhoto: sql<boolean>`${cost.photoPath} is not null`,
+      photoById: photoUser.id,
+      photoByName: photoUser.name,
+      photoAt: cost.photoAt,
+    })
+    .from(cost)
+    .innerJoin(payerSpot, eq(payerSpot.id, cost.paidBy))
+    .leftJoin(payerUser, eq(payerUser.id, payerSpot.userId))
+    .innerJoin(creator, eq(creator.id, cost.createdBy))
+    .innerJoin(editor, eq(editor.id, cost.updatedBy))
+    .leftJoin(photoUser, eq(photoUser.id, cost.photoBy))
+    .where(found)
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  const shareRows = await db
+    .select({
+      spotId: costShare.spotId,
+      userId: tripMember.userId,
+      name: sql<string>`coalesce(${user.name}, ${tripMember.guestName})`,
+      image: user.image,
+      hasLeft: sql<boolean>`${tripMember.leftAt} is not null`,
+      amount: costShare.amount,
+      originalAmount: costShare.originalAmount,
+    })
+    .from(costShare)
+    .innerJoin(cost, eq(cost.id, costShare.costId))
+    .innerJoin(tripMember, eq(tripMember.id, costShare.spotId))
+    .leftJoin(user, eq(user.id, tripMember.userId))
+    .where(and(eq(costShare.costId, costId), found))
+    .orderBy(asc(tripMember.joinedAt), asc(tripMember.id));
+
+  const personOf = (spot: { spotId: string; userId: string | null; name: string; image: string | null; hasLeft: boolean }) => ({
+    spotId: spot.spotId,
+    id: spot.userId ?? spot.spotId,
+    name: firstNameOf(spot.name),
+    image: spot.image,
+    isGuest: spot.userId === null,
+    isYou: spot.userId === userId,
+    hasLeft: spot.hasLeft,
+  });
+  const { originalAmount, originalCurrency, rate } = row;
+  const original = originalOf({ amount: originalAmount, currency: originalCurrency });
+  return {
+    id: row.id,
+    description: row.description,
+    amount: row.amount,
+    currency: row.currency,
+    category: row.category,
+    spentOn: row.spentOn,
+    original: original && { ...original, rate },
+    paidBy: row.paidBy,
+    payer: personOf({
+      spotId: row.paidBy,
+      userId: row.payerUserId,
+      name: row.payerName,
+      image: row.payerImage,
+      hasLeft: row.payerHasLeft,
+    }),
+    shares: shareRows.map((share) => ({ ...personOf(share), amount: share.amount, originalAmount: share.originalAmount })),
+    addedBy: { name: firstNameOf(row.createdByName), isYou: row.createdById === userId },
+    createdAt: row.createdAt,
+    editedBy:
+      row.updatedAt.getTime() === row.createdAt.getTime()
+        ? null
+        : { name: firstNameOf(row.updatedByName), isYou: row.updatedById === userId },
+    updatedAt: row.updatedAt,
+    photo:
+      row.hasPhoto && row.photoAt
+        ? { by: row.photoById === userId ? "you" : firstNameOf(row.photoByName ?? ""), at: row.photoAt }
+        : null,
+  };
+}
+
+// The path of a cost's receipt photo, only for a person still in the trip and only for a live
+// cost in that trip. Null for everything else, which all look the same. The path is for the
+// photo route to read the file with; it never goes to the browser.
+export async function getCostPhotoForMember(tripId: string, costId: string, userId: string): Promise<string | null> {
+  const rows = await db
+    .select({ path: cost.photoPath })
+    .from(cost)
+    .where(and(eq(cost.id, costId), eq(cost.tripId, tripId), live, isMemberOf(tripId, userId)))
+    .limit(1);
+  return rows[0]?.path ?? null;
+}
+
+// Puts a photo on a cost (a path), or takes it off (null), for any current member of the trip,
+// on a live cost. One statement; `old` is the path it replaced (the subquery reads the row as
+// it was before this statement), for the caller to delete. updated_at / updated_by are left
+// alone on purpose: a photo is not an edit, and an open Edit form must not clash with it.
+export async function setCostPhotoForMember(
+  tripId: string,
+  costId: string,
+  userId: string,
+  path: string | null,
+): Promise<{ ok: true; old: string | null } | { ok: false }> {
+  const rows = await db
+    .update(cost)
+    .set({
+      photoPath: path,
+      photoBy: path === null ? null : userId,
+      photoAt: path === null ? null : sql`now()`,
+      updatedAt: sql`${cost.updatedAt}`,
+    })
+    .where(and(eq(cost.id, costId), eq(cost.tripId, tripId), live, isMemberOf(tripId, userId)))
+    .returning({ old: sql<string | null>`(select old_cost.photo_path from cost old_cost where old_cost.id = ${costId})` });
+  return rows.length > 0 ? { ok: true, old: rows[0]!.old ?? null } : { ok: false };
+}
+
+// The photo columns a save writes: a new file with who and when, or all empty.
+function photoColumns(photo: CostPhotoChange, userId: string) {
+  return typeof photo === "object"
+    ? { path: photo.set, by: userId, at: sql`now()` }
+    : { path: null, by: null, at: null };
+}
+
 // Adds a cost and its shares, only if the person is in the trip and every spot in it belongs
 // to the trip. The id is made by the form, so a double tap saves once: an id that is already
 // there (made by this person in this trip) changes nothing and counts as "ok". The currency
-// is the trip's currency as it is now.
+// is the trip's currency as it is now. "repeat" is that same save again (a photo sent with it
+// was not used, so the caller deletes it). A new cost's photo is `{ set: path }` or nothing.
 export async function createCost(
   tripId: string,
   userId: string,
   id: string,
   input: CostInput,
-): Promise<"ok" | "not-found"> {
+  photo: CostPhotoChange = "keep",
+): Promise<"ok" | "repeat" | "not-found"> {
   const original = originalColumns(input.money);
+  const photoNew = photoColumns(photo, userId);
   const insertCost = db
     .insert(cost)
     .select(
@@ -229,6 +418,9 @@ export async function createCost(
           rate: sql<string | null>`${original.rate}::text`.as("rate"),
           deletedAt: sql<Date | null>`null::timestamp`.as("deleted_at"),
           deletedBy: sql<string | null>`null::text`.as("deleted_by"),
+          photoPath: sql<string | null>`${photoNew.path}::text`.as("photo_path"),
+          photoBy: sql<string | null>`${photoNew.by}::text`.as("photo_by"),
+          photoAt: sql<Date | null>`${photoNew.at}::timestamp`.as("photo_at"),
         })
         .from(trip)
         .where(
@@ -272,24 +464,28 @@ export async function createCost(
       and(eq(cost.id, id), eq(cost.tripId, tripId), eq(cost.createdBy, userId), isMemberOf(tripId, userId)),
     )
     .limit(1);
-  return existing.length > 0 ? "ok" : "not-found";
+  return existing.length > 0 ? "repeat" : "not-found";
 }
 
 // Changes a cost and replaces its shares, for any member, only if the cost has not been
 // saved by someone else since the person opened it (`expectedUpdatedAt`, compared to the
 // millisecond because that is all a Date holds). Returns "changed" when it has. The shares
-// are only replaced when the cost update matched.
+// are only replaced when the cost update matched. `photo` keeps, removes or replaces the
+// receipt photo in the same statement; a saved edit returns the path it replaced (null when
+// there was none) so the caller can delete that file.
 export async function updateCost(
   tripId: string,
   costId: string,
   userId: string,
   input: CostInput,
   expectedUpdatedAt: Date,
-): Promise<"ok" | "changed" | "not-found"> {
+  photo: CostPhotoChange = "keep",
+): Promise<"changed" | "not-found" | { ok: true; oldPhoto: string | null }> {
   const mine = and(eq(cost.id, costId), eq(cost.tripId, tripId), live, isMemberOf(tripId, userId));
   const justSaved = and(mine, eq(cost.updatedBy, userId), sql`${cost.updatedAt} = now()`);
 
   const original = originalColumns(input.money);
+  const photoUpdate = photoColumns(photo, userId);
   const updateRow = db
     .update(cost)
     .set({
@@ -303,6 +499,9 @@ export async function updateCost(
       rate: original.rate,
       updatedBy: userId,
       updatedAt: sql`now()`,
+      ...(photo === "keep"
+        ? {}
+        : { photoPath: photoUpdate.path, photoBy: photoUpdate.by, photoAt: photoUpdate.at }),
     })
     .where(
       and(
@@ -311,7 +510,10 @@ export async function updateCost(
         sql`date_trunc('milliseconds', ${cost.updatedAt}) = ${expectedUpdatedAt.toISOString()}::timestamp`,
       ),
     )
-    .returning({ id: cost.id });
+    .returning({
+      id: cost.id,
+      oldPhoto: sql<string | null>`(select old_cost.photo_path from cost old_cost where old_cost.id = ${costId})`,
+    });
 
   const removeShares = db
     .delete(costShare)
@@ -333,7 +535,7 @@ export async function updateCost(
   );
 
   const [updated] = await db.batch([updateRow, removeShares, ...insertShares]);
-  if (updated.length > 0) return "ok";
+  if (updated.length > 0) return { ok: true, oldPhoto: updated[0]!.oldPhoto ?? null };
 
   const existing = await db.select({ id: cost.id }).from(cost).where(mine).limit(1);
   return existing.length > 0 ? "changed" : "not-found";

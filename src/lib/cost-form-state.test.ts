@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CostDetails } from "./costs";
-import { buildCostReview, defaultCostValues, valuesFromCost } from "./cost-form-state";
+import { buildCostReview, defaultCostValues, isEvenSplit, photoActionOf, valuesFromCost } from "./cost-form-state";
 import { validateCostInput } from "./cost-input";
 
 const people = [
@@ -34,6 +34,7 @@ const saved: CostDetails = {
     { spotId: "c", amount: 33333, originalAmount: null },
   ],
   updatedAt: new Date("2027-03-12T10:00:00.000Z"),
+  hasPhoto: false,
 };
 
 describe("buildCostReview for a new cost", () => {
@@ -120,6 +121,31 @@ describe("buildCostReview for an edit", () => {
   });
 });
 
+describe("receipt photo in the review", () => {
+  const withPhoto = { ...saved, hasPhoto: true };
+  const reviewOf = (before: typeof saved | null, photo: "keep" | "replace" | "remove") =>
+    buildCostReview({ currency: "PHP", input: checked(), people, before, photo });
+
+  it("reads the form's choice, treating anything unknown as keep", () => {
+    expect(["replace", "remove", "keep", "", "x"].map(photoActionOf)).toEqual(["replace", "remove", "keep", "keep", "keep"]);
+  });
+
+  it("marks a new cost saved with a photo, and nothing when there is none", () => {
+    expect(reviewOf(null, "replace").withPhoto).toBe(true);
+    expect(reviewOf(null, "keep").withPhoto).toBe(false);
+    expect(reviewOf(null, "remove").withPhoto).toBe(false);
+  });
+
+  it("lists Added, Changed and Removed on an edit, and nothing for keep", () => {
+    expect(reviewOf(saved, "replace").changes).toEqual([{ field: "photo", before: "None", after: "Added" }]);
+    expect(reviewOf(withPhoto, "replace").changes).toEqual([{ field: "photo", before: "Photo", after: "Changed" }]);
+    expect(reviewOf(withPhoto, "remove").changes).toEqual([{ field: "photo", before: "Photo", after: "Removed" }]);
+    expect(reviewOf(withPhoto, "keep").changes).toEqual([]);
+    expect(reviewOf(saved, "remove").changes).toEqual([]);
+    expect(reviewOf(saved, "replace").withPhoto).toBe(false);
+  });
+});
+
 describe("valuesFromCost", () => {
   it("turns a saved cost back into form values", () => {
     expect(valuesFromCost(saved)).toEqual({
@@ -170,6 +196,46 @@ describe("valuesFromCost", () => {
     const again = validateCostInput(values, context);
     if (!again.ok) throw new Error(JSON.stringify(again.errors));
     expect(again.value.shares).toEqual(uneven.shares);
+  });
+});
+
+describe("isEvenSplit", () => {
+  it("is true for an equal PHP split, including the leftover centavo", () => {
+    expect(isEvenSplit(saved)).toBe(true);
+    expect(isEvenSplit({ ...saved, amount: 100000, paidBy: "b", shares: [
+      { spotId: "a", amount: 33333, originalAmount: null },
+      { spotId: "b", amount: 33334, originalAmount: null },
+      { spotId: "c", amount: 33333, originalAmount: null },
+    ] })).toBe(true);
+  });
+
+  it("is false when the leftover centavo is on the wrong person", () => {
+    expect(isEvenSplit({ ...saved, paidBy: "b" })).toBe(false);
+  });
+
+  it("is false for an uneven split", () => {
+    expect(
+      isEvenSplit({ ...saved, amount: 186000, shares: [
+        { spotId: "a", amount: 98666, originalAmount: null },
+        { spotId: "b", amount: 28667, originalAmount: null },
+        { spotId: "c", amount: 58667, originalAmount: null },
+      ] }),
+    ).toBe(false);
+  });
+
+  it("checks a foreign cost on its original shares", () => {
+    const foreign = {
+      ...saved,
+      original: { amount: 300000, currency: "VND", rate: "435" },
+      shares: [
+        { spotId: "a", amount: 70000, originalAmount: 100000 },
+        { spotId: "b", amount: 70000, originalAmount: 100000 },
+        { spotId: "c", amount: 60000, originalAmount: 100000 },
+      ],
+    };
+    expect(isEvenSplit(foreign)).toBe(true);
+    foreign.shares[2] = { spotId: "c", amount: 60000, originalAmount: 90000 };
+    expect(isEvenSplit(foreign)).toBe(false);
   });
 });
 
@@ -226,6 +292,7 @@ describe("costs in another currency", () => {
       paidBy: value.paidBy,
       shares: value.shares,
       updatedAt: new Date(0),
+      hasPhoto: false,
     };
   }
 

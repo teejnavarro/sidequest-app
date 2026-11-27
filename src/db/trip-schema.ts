@@ -237,6 +237,11 @@ export const cost = pgTable(
     // Trash: set by Delete, cleared by Restore. No cascade from user, like created_by.
     deletedAt: timestamp("deleted_at"),
     deletedBy: text("deleted_by").references(() => user.id),
+    // One optional receipt photo: a private Blob path (never sent to the browser), who added it
+    // and when. A photo change does not touch updated_at / updated_by. No cascade from user.
+    photoPath: text("photo_path"),
+    photoBy: text("photo_by").references(() => user.id),
+    photoAt: timestamp("photo_at"),
   },
   (table) => [
     index("cost_tripId_idx").on(table.tripId),

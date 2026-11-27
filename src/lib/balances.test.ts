@@ -257,6 +257,7 @@ describe("whole trips through the cost checks", () => {
             original: null,
             shares,
             updatedAt: new Date(0),
+            hasPhoto: false,
           };
           const again = validateCostInput(valuesFromCost(saved), context);
           if (!again.ok) throw new Error(`reopened cost refused: ${JSON.stringify(again.errors)}`);
