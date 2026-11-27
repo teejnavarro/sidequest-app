@@ -23,7 +23,9 @@ export function CostPhotoBox({ tripId, costId, photoSrc }: { tripId: string; cos
   const error = readError ? FAILED : (state.error ?? null);
 
   async function onPick(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
+    // React clears event.currentTarget once the handler awaits, so keep the input itself.
+    const picker = event.currentTarget;
+    const file = picker.files?.[0];
     if (!file) return;
     setPreparing(true);
     setReadError(false);
@@ -31,10 +33,10 @@ export function CostPhotoBox({ tripId, costId, photoSrc }: { tripId: string; cos
       const small = await shrinkImage(file);
       const transfer = new DataTransfer();
       transfer.items.add(small);
-      event.currentTarget.files = transfer.files;
+      picker.files = transfer.files;
       form.current?.requestSubmit();
     } catch (problem) {
-      event.currentTarget.value = "";
+      picker.value = "";
       if (!(problem instanceof ImageReadError)) console.error("image-shrink-failed");
       setReadError(true);
     } finally {
