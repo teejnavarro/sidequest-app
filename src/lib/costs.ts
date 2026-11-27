@@ -355,6 +355,9 @@ export async function createCost(
           rate: sql<string | null>`${original.rate}::text`.as("rate"),
           deletedAt: sql<Date | null>`null::timestamp`.as("deleted_at"),
           deletedBy: sql<string | null>`null::text`.as("deleted_by"),
+          photoPath: sql<string | null>`null::text`.as("photo_path"),
+          photoBy: sql<string | null>`null::text`.as("photo_by"),
+          photoAt: sql<Date | null>`null::timestamp`.as("photo_at"),
         })
         .from(trip)
         .where(
