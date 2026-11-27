@@ -135,6 +135,15 @@ export type CostFormState = {
 
 export const CHANGED_NOTICE = "Someone just changed this cost. Check it again.";
 
+// True when the shares are what an equal split gives (on the original shares for a foreign cost).
+export function isEvenSplit(saved: Pick<CostDetails, "amount" | "paidBy" | "original" | "shares">): boolean {
+  const { original } = saved;
+  const unit = original ?? { amount: saved.amount };
+  const part = (share: CostDetails["shares"][number]) => (original ? (share.originalAmount ?? 0) : share.amount);
+  const equal = splitEqually(unit.amount, saved.shares.map((share) => share.spotId), saved.paidBy);
+  return equal.every((share, index) => share.amount === part(saved.shares[index]!));
+}
+
 // The form values for a saved cost. An equal split opens as equal; anything else opens as an
 // uneven split with every person's full share in their box and nothing left over. A cost in
 // another currency opens in that currency, with its original amounts and rate (or the card
@@ -144,8 +153,7 @@ export function valuesFromCost(saved: CostDetails): CostFormValues {
   const { original } = saved;
   const unit = original ?? { amount: saved.amount, currency: saved.currency, rate: null };
   const part = (share: CostDetails["shares"][number]) => (original ? (share.originalAmount ?? 0) : share.amount);
-  const equal = splitEqually(unit.amount, spotIds, saved.paidBy);
-  const isEqual = equal.every((share, index) => share.amount === part(saved.shares[index]!));
+  const isEqual = isEvenSplit(saved);
   return {
     description: saved.description,
     amount: amountText(unit.amount, unit.currency),
