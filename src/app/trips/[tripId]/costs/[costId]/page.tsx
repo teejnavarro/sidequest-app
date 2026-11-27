@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Info, PencilSimple, PlusCircle } from "@phosphor-icons/react/dist/ssr";
+import { Camera, Info, PencilSimple, PlusCircle } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getCostBreakdownForMember, type CostPerson } from "@/lib/costs";
@@ -12,6 +12,7 @@ import { formatMoney, rateText } from "@/lib/money";
 import { paymentTimeLabel } from "@/lib/payment-dates";
 import { dayLabel } from "@/lib/schedule-options";
 import { CostCategoryIcon } from "@/components/cost-category";
+import { CostPhotoBox } from "@/components/cost-photo-box";
 import { Face } from "@/components/face";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
 import { cardClass, guestTag, helpClass, linkClass, quietButton, screenClass, skeleton } from "@/components/ui";
@@ -66,16 +67,20 @@ async function CostContent({ params }: { params: Promise<{ tripId: string; costI
     <>
       <TaskBand backHref={`/trips/${trip.id}/costs`} backLabel="Costs" title="Cost" />
       <main className={screenClass}>
-        <section className={`${cardClass} flex gap-3 px-5 py-4`} aria-label="Cost">
-          <span className="grid size-11 shrink-0 place-items-center rounded-full bg-blue-soft text-blue-text">
+        <section
+          className={`${cardClass} grid-cols-[2.75rem_minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-5 py-4`}
+          aria-label="Cost"
+        >
+          <span className="grid size-11 place-items-center rounded-full bg-blue-soft text-blue-text">
             <CostCategoryIcon category={cost.category} size={22} />
           </span>
-          <div className="grid min-w-0 flex-1 gap-0.5">
+          <div className="grid min-w-0 gap-0.5">
             <h2 className="text-[19px] wrap-anywhere">{cost.description}</h2>
             <p className="font-display text-[30px] leading-tight font-bold tabular-nums wrap-anywhere">{money(cost.amount)}</p>
             {foreign ? <p className={`${helpClass} wrap-anywhere`}>{foreign}</p> : null}
             <p className={helpClass}>{cost.category ? `${day} · ${costCategoryOf(cost.category).label}` : day}</p>
           </div>
+          <CostPhotoBox tripId={trip.id} costId={cost.id} photoSrc={cost.photo ? `${url}/photo` : null} />
         </section>
 
         <section className={`${cardClass} gap-3 px-5 py-4`} aria-label="Who paid and who owes">
@@ -130,6 +135,14 @@ async function CostContent({ params }: { params: Promise<{ tripId: string; costI
               Added by {who(cost.addedBy)} · {paymentTimeLabel(cost.createdAt, trip.timeZone)}
             </span>
           </p>
+          {cost.photo ? (
+            <p className="flex items-center gap-2 text-sm">
+              <Camera size={18} weight="bold" aria-hidden="true" className="shrink-0 text-muted" />
+              <span>
+                Photo added by {cost.photo.by} · {paymentTimeLabel(cost.photo.at, trip.timeZone)}
+              </span>
+            </p>
+          ) : null}
           {cost.editedBy ? (
             <p className="flex items-center gap-2 text-sm">
               <PencilSimple size={18} weight="bold" aria-hidden="true" className="shrink-0 text-muted" />

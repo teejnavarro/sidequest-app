@@ -16,6 +16,7 @@ vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("@/lib/costs", () => ({ getCostBreakdownForMember: mocks.getCostBreakdownForMember }));
+vi.mock("@/app/trips/[tripId]/costs/actions", () => ({ addCostPhotoAction: async () => ({}) }));
 
 type ContentProps = { params: Promise<{ tripId: string; costId: string }> };
 
@@ -60,6 +61,7 @@ const lunch = {
   createdAt: new Date("2026-11-27T12:40:00Z"),
   editedBy: null,
   updatedAt: new Date("2026-11-27T12:40:00Z"),
+  photo: null,
 };
 
 beforeEach(() => {
@@ -195,5 +197,38 @@ describe("the Cost page", () => {
     expect(html).toContain('href="/trips/trip-1/costs/c1/delete"');
     expect(html).toContain('href="/trips/trip-1/costs/balances"');
     expect(html).toContain('href="/trips/trip-1/costs"');
+  });
+});
+
+describe("the Cost page receipt photo", () => {
+  it("offers Add photo in the hero when there is no photo, and links to no photo address", async () => {
+    const html = await renderPage();
+    expect(html).toContain("Add photo");
+    expect(html).toContain('name="photo"');
+    expect(html).toContain('name="tripId" value="trip-1"');
+    expect(html).toContain('name="costId" value="c1"');
+    expect(html).not.toContain("/photo");
+    expect(html).not.toContain("Photo added by");
+  });
+
+  it("shows the thumbnail as a link to the checked photo route, and who added it", async () => {
+    mocks.getCostBreakdownForMember.mockResolvedValue({ ...lunch, photo: { by: "Ben", at: new Date("2026-11-28T01:02:00Z") } });
+    const html = await renderPage();
+    expect(html).toContain('href="/trips/trip-1/costs/c1/photo"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener"');
+    expect(html).toContain('src="/trips/trip-1/costs/c1/photo"');
+    expect(html).toContain('alt="Receipt photo"');
+    expect(html).not.toContain("Add photo");
+    expect(html).not.toContain('name="photo"');
+    expect(html).toContain("Photo added by Ben · Sat, Nov 28, 09:02");
+    expect(html).not.toContain("cost-photos/");
+  });
+
+  it("says you added it when you did, and keeps it apart from Last edited", async () => {
+    mocks.getCostBreakdownForMember.mockResolvedValue({ ...lunch, photo: { by: "you", at: new Date("2026-11-28T01:02:00Z") } });
+    const html = await renderPage();
+    expect(html).toContain("Photo added by you");
+    expect(html).not.toContain("Last edited by");
   });
 });
