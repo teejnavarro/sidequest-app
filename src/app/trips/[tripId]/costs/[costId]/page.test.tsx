@@ -136,6 +136,20 @@ describe("the Cost page", () => {
     expect(await renderPage()).not.toContain("Not an even split");
   });
 
+  it("shows each person's own amount on an uneven split, adding up to the total to the centavo", async () => {
+    mocks.getCostBreakdownForMember.mockResolvedValue({
+      ...lunch,
+      shares: [share(ana, 120000), share(ben, 100000), share(cara, 80000), share(dan, 80200)],
+    });
+    const html = await renderPage();
+    const rows = [...html.matchAll(/<li[^>]*>(.*?)<\/li>/g)].map((row) => row[1].replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
+    // Each row also holds the face's initial, so match the words and amount at the end.
+    expect(rows).toEqual(["You owe ₱1,200.00", "Ben owes ₱1,000.00", "Cara owes ₱800.00", "Dan's share ₱802.00"].map((words) => expect.stringMatching(new RegExp(`${words}$`))));
+    const centavos = rows.map((row) => Math.round(Number(row.split("₱")[1].replaceAll(",", "")) * 100));
+    expect(centavos.reduce((sum, amount) => sum + amount, 0)).toBe(380200);
+    expect(html).toContain("Dan paid ₱3,802.00");
+  });
+
   it("shows a foreign cost on one line, with the rate or without it", async () => {
     const foreign = {
       ...lunch,
@@ -223,6 +237,13 @@ describe("the Cost page receipt photo", () => {
     expect(html).not.toContain('name="photo"');
     expect(html).toContain("Photo added by Ben · Sat, Nov 28, 09:02");
     expect(html).not.toContain("cost-photos/");
+  });
+
+  it("names a deleted account as Former member when they added the photo", async () => {
+    mocks.getCostBreakdownForMember.mockResolvedValue({ ...lunch, photo: { by: "Former member", at: new Date("2026-11-28T01:02:00Z") } });
+    const html = await renderPage();
+    expect(html).toContain("Photo added by Former member · Sat, Nov 28, 09:02");
+    expect(html).toContain('alt="Receipt photo"');
   });
 
   it("says you added it when you did, and keeps it apart from Last edited", async () => {

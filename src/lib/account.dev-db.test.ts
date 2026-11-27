@@ -457,6 +457,12 @@ describe("account deletion on the dev database", () => {
     expect(byId[`${ID_PREFIX}p-sh-ada-${RUN}`]).toBe(RECEIPT_ADA);
   });
 
+  it("shows the kept cost photo to the others as added by Former member", async () => {
+    const breakdown = await costs.getCostBreakdownForMember(shared, `${ID_PREFIX}c-sh-${RUN}`, ADA);
+    expect(breakdown?.photo).toMatchObject({ by: "Former member" });
+    expect(breakdown?.photo?.at).toBeInstanceOf(Date);
+  });
+
   it("deletes a trip only they were in, with its costs, payments and guest", async () => {
     const { db } = dbModule;
     expect(await tripExists(solo)).toBe(false);
