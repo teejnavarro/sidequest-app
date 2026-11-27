@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getCostForMember } from "@/lib/costs";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
@@ -15,7 +15,7 @@ type Params = Promise<{ tripId: string; costId: string }>;
 // cost; a stranger, and a cost that does not exist, see the same "not found".
 async function DeleteCostContent({ params }: { params: Params }) {
   const { tripId, costId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, cost] = await Promise.all([
     getTripForMember(tripId, user.id),
     getCostForMember(tripId, costId, user.id),

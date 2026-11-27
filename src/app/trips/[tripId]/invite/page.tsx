@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowsClockwise, CaretRight } from "@phosphor-icons/react/dist/ssr";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getInviteCodeForMember, getTripForMember, listTripMembers } from "@/lib/trips";
 import { firstNameOf } from "@/lib/display-name";
 import type { TripMemberSummary } from "@/lib/trips";
@@ -71,7 +71,7 @@ function PersonRow({
 // data inside its own Suspense boundary.
 async function InviteContent({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
 
   const code = await getInviteCodeForMember(tripId, user.id);
   if (!code) notFound();

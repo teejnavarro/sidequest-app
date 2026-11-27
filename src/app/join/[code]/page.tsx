@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { getOptionalUser } from "@/lib/current-user";
+import { getOptionalUserForPage } from "@/lib/current-user";
 import { isInviteCode } from "@/lib/invite-code";
 import {
   getTripByInviteCode,
@@ -25,7 +25,7 @@ async function JoinContent({ params }: { params: Promise<{ code: string }> }) {
   const invited = await getTripByInviteCode(code);
   if (!invited) notFound();
 
-  const user = await getOptionalUser();
+  const user = await getOptionalUserForPage();
   const lowerCode = code.toLowerCase();
 
   if (!user) return <JoinView invited={invited} code={lowerCode} signedIn={false} />;

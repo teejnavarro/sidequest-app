@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CaretRight, CheckCircle, Crown, Info, XCircle } from "@phosphor-icons/react/dist/ssr";
 import { getAccountDeletionCheck, type DeletionCheck } from "@/lib/account";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { formatMoney } from "@/lib/money";
 import { ConfirmForm } from "@/components/confirm-form";
 import { TaskBand } from "@/components/task-band";
@@ -120,7 +120,7 @@ function Confirm({ check }: { check: DeletionCheck }) {
 // Inside the proxy matcher, but the real check is here: who is signed in, and what they
 // still own, are read fresh on every visit.
 async function DeleteAccountContent() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const check = await getAccountDeletionCheck(user.id);
   return check.handOver.length > 0 ? <HandOver trips={check.handOver} /> : <Confirm check={check} />;
 }

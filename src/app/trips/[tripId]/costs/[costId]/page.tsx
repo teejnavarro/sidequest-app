@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Camera, Info, PencilSimple, PlusCircle } from "@phosphor-icons/react/dist/ssr";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getCostBreakdownForMember, type CostPerson } from "@/lib/costs";
 import { isEvenSplit } from "@/lib/cost-form-state";
@@ -39,7 +39,7 @@ function Marks({ person }: { person: CostPerson }) {
 // trip sees the same "not found" as for a cost that does not exist or is in the trash.
 async function CostContent({ params }: { params: Promise<{ tripId: string; costId: string }> }) {
   const { tripId, costId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, cost] = await Promise.all([
     getTripForMember(tripId, user.id),
     getCostBreakdownForMember(tripId, costId, user.id),

@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ShieldCheck, SignOut } from "@phosphor-icons/react/dist/ssr";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { signOut } from "@/app/actions";
 import { Face } from "@/components/face";
 import { TaskBand } from "@/components/task-band";
@@ -11,7 +11,7 @@ import { NameForm } from "./name-form";
 import { PaymentDetailsCard } from "./payment-details-card";
 
 async function ProfileContent() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
 
   return (
     <>

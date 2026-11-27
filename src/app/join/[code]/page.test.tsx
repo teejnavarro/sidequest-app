@@ -5,7 +5,7 @@ import JoinPage, { metadata } from "./page";
 const CODE = "3f2b8c1e-9a4d-4e7b-8c11-5d6a7b9e0f12";
 
 const mocks = vi.hoisted(() => ({
-  getOptionalUser: vi.fn(),
+  getOptionalUserForPage: vi.fn(),
   getTripByInviteCode: vi.fn(),
   isTripMember: vi.fn(),
   hasLeftSpot: vi.fn(),
@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound, redirect: mocks.redirect }));
-vi.mock("@/lib/current-user", () => ({ getOptionalUser: mocks.getOptionalUser }));
+vi.mock("@/lib/current-user", () => ({ getOptionalUserForPage: mocks.getOptionalUserForPage }));
 vi.mock("@/lib/trips", () => ({
   getTripByInviteCode: mocks.getTripByInviteCode,
   isTripMember: mocks.isTripMember,
@@ -54,7 +54,7 @@ async function openInvite(code: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getTripByInviteCode.mockResolvedValue(invited);
-  mocks.getOptionalUser.mockResolvedValue(null);
+  mocks.getOptionalUserForPage.mockResolvedValue(null);
   mocks.isTripMember.mockResolvedValue(false);
   mocks.hasLeftSpot.mockResolvedValue(false);
   mocks.listUnclaimedGuestsByInviteCode.mockResolvedValue([]);
@@ -77,7 +77,7 @@ describe("opening an invite", () => {
   it("gives an unknown code the same not-found answer", async () => {
     mocks.getTripByInviteCode.mockResolvedValue(null);
     await expect(openInvite(CODE)).rejects.toThrow("not-found");
-    expect(mocks.getOptionalUser).not.toHaveBeenCalled();
+    expect(mocks.getOptionalUserForPage).not.toHaveBeenCalled();
   });
 
   it("shows a signed-out visitor the signed-out view", async () => {
@@ -89,20 +89,20 @@ describe("opening an invite", () => {
   });
 
   it("sends an existing member straight to the trip", async () => {
-    mocks.getOptionalUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
+    mocks.getOptionalUserForPage.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
     mocks.isTripMember.mockResolvedValue(true);
     await expect(openInvite(CODE)).rejects.toThrow("redirect:/trips/trip-1/schedule");
     expect(mocks.isTripMember).toHaveBeenCalledWith("trip-1", "u1");
   });
 
   it("offers a signed-in non-member the signed-in view with Join trip", async () => {
-    mocks.getOptionalUser.mockResolvedValue({ id: "u2", name: "Ben Reyes", image: null });
+    mocks.getOptionalUserForPage.mockResolvedValue({ id: "u2", name: "Ben Reyes", image: null });
     const view = await openInvite(CODE);
     expect(view.props).toEqual({ invited, code: CODE, signedIn: true, guests: [] });
   });
 
   it("gives a signed-in non-member the trip's unclaimed guests to pick from", async () => {
-    mocks.getOptionalUser.mockResolvedValue({ id: "u2", name: "Ben Reyes", image: null });
+    mocks.getOptionalUserForPage.mockResolvedValue({ id: "u2", name: "Ben Reyes", image: null });
     mocks.listUnclaimedGuestsByInviteCode.mockResolvedValue([{ id: "spot-1", name: "Lito" }]);
     const view = await openInvite(CODE);
     expect(view.props).toMatchObject({ signedIn: true, guests: [{ id: "spot-1", name: "Lito" }] });
@@ -110,7 +110,7 @@ describe("opening an invite", () => {
   });
 
   it("skips the guest question for a person who left, so Join trip just switches them back on", async () => {
-    mocks.getOptionalUser.mockResolvedValue({ id: "u2", name: "Ben Reyes", image: null });
+    mocks.getOptionalUserForPage.mockResolvedValue({ id: "u2", name: "Ben Reyes", image: null });
     mocks.hasLeftSpot.mockResolvedValue(true);
     mocks.listUnclaimedGuestsByInviteCode.mockResolvedValue([{ id: "spot-1", name: "Lito" }]);
     const view = await openInvite(CODE);
@@ -120,7 +120,7 @@ describe("opening an invite", () => {
   });
 
   it("does not read guests for an existing member, who is sent to the trip", async () => {
-    mocks.getOptionalUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
+    mocks.getOptionalUserForPage.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
     mocks.isTripMember.mockResolvedValue(true);
     await expect(openInvite(CODE)).rejects.toThrow("redirect:");
     expect(mocks.listUnclaimedGuestsByInviteCode).not.toHaveBeenCalled();

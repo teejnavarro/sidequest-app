@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { listMyTrips } from "@/lib/trips";
 import { Band } from "@/components/band";
 import { Face } from "@/components/face";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui";
 
 async function TripsContent() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trips = await listMyTrips(user.id);
   const now = new Date(); // after the session was read, so it is request-time
 

@@ -5,7 +5,7 @@ import PaymentPage from "./page";
 import DeletePaymentPage from "./delete/page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   getPaymentForParty: vi.fn(),
   notFound: vi.fn(() => {
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("@/lib/payments", () => ({ getPaymentForParty: mocks.getPaymentForParty }));
 vi.mock("./actions", () => ({ deletePaymentAction: async () => ({}) }));
@@ -56,7 +56,7 @@ const payment = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Ben Cruz", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Ben Cruz", image: null });
   mocks.getTripForMember.mockResolvedValue({ id: "trip-1", currency: "PHP", timeZone: "Asia/Manila" });
   mocks.getPaymentForParty.mockResolvedValue(payment);
 });
@@ -75,7 +75,7 @@ describe.each([
   });
 
   it("sends a signed-out visitor away before looking anything up", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(renderPage(Page)).rejects.toThrow("redirect:/");
     expect(mocks.getPaymentForParty).not.toHaveBeenCalled();
   });

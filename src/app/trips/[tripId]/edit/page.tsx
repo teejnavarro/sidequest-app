@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember, listTripMembers } from "@/lib/trips";
 import { countCostsForTrip } from "@/lib/costs";
 import { TripForm } from "@/components/trip-form";
@@ -13,7 +13,7 @@ import { cardClass, helpClass, linkClass, screenClass, skeleton } from "@/compon
 // member, and reads its data inside its own Suspense boundary.
 async function EditTripContent({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
 

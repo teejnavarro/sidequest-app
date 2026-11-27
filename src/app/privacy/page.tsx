@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { getOptionalUser } from "@/lib/current-user";
+import { getOptionalUserForPage } from "@/lib/current-user";
 import { TaskBand } from "@/components/task-band";
 import { cardClass, screenClass } from "@/components/ui";
 
@@ -8,7 +8,7 @@ import { cardClass, screenClass } from "@/components/ui";
 // Google asks for a public link before the sign-in app is published. The words are static;
 // only the back link depends on who is looking, so only it waits inside Suspense.
 async function PrivacyBand() {
-  const user = await getOptionalUser();
+  const user = await getOptionalUserForPage();
   return user ? (
     <TaskBand backHref="/profile" backLabel="Profile" title="Privacy note" />
   ) : (

@@ -3,9 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PrivacyPage from "./page";
 
-const mocks = vi.hoisted(() => ({ getOptionalUser: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getOptionalUserForPage: vi.fn() }));
 
-vi.mock("@/lib/current-user", () => ({ getOptionalUser: mocks.getOptionalUser }));
+vi.mock("@/lib/current-user", () => ({ getOptionalUserForPage: mocks.getOptionalUserForPage }));
 
 type Kids = { children: ReactElement[] };
 
@@ -26,12 +26,12 @@ function renderStatic() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getOptionalUser.mockResolvedValue(null);
+  mocks.getOptionalUserForPage.mockResolvedValue(null);
 });
 
 describe("PrivacyPage", () => {
   it("goes back to Profile when signed in", async () => {
-    mocks.getOptionalUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
+    mocks.getOptionalUserForPage.mockResolvedValue({ id: "u1", name: "Maya", image: null });
     const html = await renderBand();
     expect(html).toContain('href="/profile"');
     expect(html).toContain("Profile");
@@ -47,7 +47,7 @@ describe("PrivacyPage", () => {
 
   it("shows the approved note to everyone without reading the session", () => {
     const html = renderStatic();
-    expect(mocks.getOptionalUser).not.toHaveBeenCalled();
+    expect(mocks.getOptionalUserForPage).not.toHaveBeenCalled();
     for (const title of ["What Sidequest keeps", "Who sees it", "Where it lives", "Deleting your account"]) {
       expect(html).toContain(`>${title}</h2>`);
     }

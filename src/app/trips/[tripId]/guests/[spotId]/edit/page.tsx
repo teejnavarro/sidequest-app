@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { firstNameOf } from "@/lib/display-name";
 import { getGuestForEditor, getTripForMember, type GuestSpot } from "@/lib/trips";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
@@ -29,7 +29,7 @@ function blockers(guest: GuestSpot): string {
 // or does not exist) sees the same "not found".
 async function EditGuestContent({ params }: { params: Params }) {
   const { tripId, spotId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, guest] = await Promise.all([
     getTripForMember(tripId, user.id),
     getGuestForEditor(tripId, spotId, user.id),

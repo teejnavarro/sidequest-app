@@ -6,7 +6,7 @@ import MakeOwnerPage from "./[spotId]/owner/page";
 import RemoveMemberPage from "./[spotId]/remove/page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   getMemberForOwner: vi.fn(),
   notFound: vi.fn(() => {
@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({
   getTripForMember: mocks.getTripForMember,
   getMemberForOwner: mocks.getMemberForOwner,
@@ -55,7 +55,7 @@ const MEMBER = { spotId: "spot-1", userId: "u2", name: "Bea Santos", image: null
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "owner", name: "Maya", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "owner", name: "Maya", image: null });
   mocks.getTripForMember.mockResolvedValue(TRIP);
   mocks.getMemberForOwner.mockResolvedValue(MEMBER);
 });
@@ -68,7 +68,7 @@ describe.each([
   const render = () => renderContent(Page as (p: typeof props) => ReactElement);
 
   it("sends a signed-out visitor away before looking anything up", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(render()).rejects.toThrow("redirect:/");
     expect(mocks.getTripForMember).not.toHaveBeenCalled();
     expect(mocks.getMemberForOwner).not.toHaveBeenCalled();

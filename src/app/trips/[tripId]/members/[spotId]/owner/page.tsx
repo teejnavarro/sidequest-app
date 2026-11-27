@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { transferOwnershipAction } from "../../actions";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { firstNameOf } from "@/lib/display-name";
 import { getMemberForOwner, getTripForMember } from "@/lib/trips";
 import { ConfirmForm } from "@/components/confirm-form";
@@ -15,7 +15,7 @@ type Params = Promise<{ tripId: string; spotId: string }>;
 // Same checks as the Member page: only the owner, only for another person still in the trip.
 async function MakeOwnerContent({ params }: { params: Params }) {
   const { tripId, spotId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, member] = await Promise.all([
     getTripForMember(tripId, user.id),
     getMemberForOwner(tripId, spotId, user.id),

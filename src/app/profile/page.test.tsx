@@ -3,9 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProfilePage from "./page";
 
-const mocks = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getCurrentUserForPage: vi.fn() }));
 
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/app/actions", () => ({ signOut: vi.fn() }));
 vi.mock("./name-form", () => ({ NameForm: () => null }));
 vi.mock("./payment-details-card", () => ({ PaymentDetailsCard: () => null }));
@@ -20,7 +20,7 @@ async function renderContent() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Maya", image: null });
 });
 
 describe("ProfilePage", () => {
@@ -37,7 +37,7 @@ describe("ProfilePage", () => {
   });
 
   it("shows nothing to a signed-out visitor", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(renderContent()).rejects.toThrow("redirect:/");
   });
 });

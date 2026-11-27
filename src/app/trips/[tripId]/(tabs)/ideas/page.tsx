@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { hasScheduledIdeas, listIdeasForMember, type IdeaItem } from "@/lib/ideas";
 import { IDEA_TYPES, isIdeaType } from "@/lib/idea-options";
@@ -73,7 +73,7 @@ async function IdeasContent({
 }) {
   const { tripId } = await params;
   const { type: typeParam } = await searchParams;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
 

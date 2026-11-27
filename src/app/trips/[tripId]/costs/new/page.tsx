@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getNewCostDefaults } from "@/lib/costs";
 import { getTripForMember, listCostPeople } from "@/lib/trips";
 import { costPeople, defaultCostValues } from "@/lib/cost-form-state";
@@ -15,7 +15,7 @@ import { cardClass, screenClass, skeleton } from "@/components/ui";
 // the session is read, so a double tap on Save sends the same id twice and saves once.
 async function LogCostContent({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
 

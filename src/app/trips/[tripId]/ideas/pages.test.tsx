@@ -7,7 +7,7 @@ import EditIdeaPage from "./[ideaId]/edit/page";
 import DeleteIdeaPage from "./[ideaId]/delete/page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   getIdeaForMember: vi.fn(),
   notFound: vi.fn(() => {
@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("@/lib/ideas", () => ({ getIdeaForMember: mocks.getIdeaForMember }));
 // Show the form's props as text, so the pages' choices (which values, which currency) can be read.
@@ -60,7 +60,7 @@ const idea = (extra = {}) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.getTripForMember.mockResolvedValue(trip);
   mocks.getIdeaForMember.mockResolvedValue(idea());
 });
@@ -73,7 +73,7 @@ describe("Add an idea page", () => {
   });
 
   it("sends a signed-out visitor away before looking up the trip", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(run(AddIdeaPage)).rejects.toThrow("redirect:/");
     expect(mocks.getTripForMember).not.toHaveBeenCalled();
   });
@@ -108,7 +108,7 @@ describe("Edit idea page", () => {
   });
 
   it("sends a signed-out visitor away first", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(run(EditIdeaPage, "idea-1")).rejects.toThrow("redirect:/");
     expect(mocks.getIdeaForMember).not.toHaveBeenCalled();
   });
@@ -137,7 +137,7 @@ describe("Edit idea page", () => {
   });
 
   it("lets the trip owner in, because canChange says so", async () => {
-    mocks.getCurrentUser.mockResolvedValue({ id: "owner", name: "Owner", image: null });
+    mocks.getCurrentUserForPage.mockResolvedValue({ id: "owner", name: "Owner", image: null });
     mocks.getIdeaForMember.mockResolvedValue(idea({ canChange: true, addedBy: { id: "u9", name: "Ben", image: null } }));
     await expect(run(EditIdeaPage, "idea-1")).resolves.toContain("Chợ Bến Thành");
   });

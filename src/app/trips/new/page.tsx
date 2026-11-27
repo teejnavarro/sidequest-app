@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { emptyTripValues } from "@/lib/trip-form-state";
 import { TripForm } from "@/components/trip-form";
 import { TaskBand } from "@/components/task-band";
 import { cardClass, screenClass, skeleton } from "@/components/ui";
 
 async function NewTripContent() {
-  await getCurrentUser(); // signed-out visitors go home
+  await getCurrentUserForPage(); // signed-out visitors go home
   return (
     <div className={`${cardClass} gap-4`}>
       <TripForm mode="create" values={emptyTripValues} />

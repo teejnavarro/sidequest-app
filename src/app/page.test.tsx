@@ -3,9 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "./page";
 
-const mocks = vi.hoisted(() => ({ getOptionalUser: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getOptionalUserForPage: vi.fn() }));
 
-vi.mock("@/lib/current-user", () => ({ getOptionalUser: mocks.getOptionalUser }));
+vi.mock("@/lib/current-user", () => ({ getOptionalUserForPage: mocks.getOptionalUserForPage }));
 vi.mock("@/app/actions", () => ({ signInWithGoogle: vi.fn() }));
 
 type Params = Record<string, string | string[] | undefined>;
@@ -30,7 +30,7 @@ function renderStatic() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getOptionalUser.mockResolvedValue(null);
+  mocks.getOptionalUserForPage.mockResolvedValue(null);
 });
 
 describe("sign-in page", () => {
@@ -46,7 +46,7 @@ describe("sign-in page", () => {
   });
 
   it("sends a signed-in person to My trips instead", async () => {
-    mocks.getOptionalUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
+    mocks.getOptionalUserForPage.mockResolvedValue({ id: "u1", name: "Maya", image: null });
     const html = await renderSignIn({ deleted: "1" });
     expect(html).toContain('href="/trips"');
     expect(html).not.toContain("Your account is deleted.");
