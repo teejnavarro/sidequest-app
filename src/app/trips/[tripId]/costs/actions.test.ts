@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { deleteCostAction, restoreCostAction, reviewOrSaveCostAction } from "./actions";
+import { addCostPhotoAction, deleteCostAction, restoreCostAction, reviewOrSaveCostAction } from "./actions";
 import { emptyCostValues, type CostFormState } from "@/lib/cost-form-state";
 
 const mocks = vi.hoisted(() => ({
@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   deleteCost: vi.fn(),
   restoreCost: vi.fn(),
   getCostForMember: vi.fn(),
+  setCostPhotoForMember: vi.fn(),
+  putImage: vi.fn(),
+  deleteImages: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw new Error(`redirect:${url}`);
@@ -30,7 +33,9 @@ vi.mock("@/lib/costs", () => ({
   deleteCost: mocks.deleteCost,
   restoreCost: mocks.restoreCost,
   getCostForMember: mocks.getCostForMember,
+  setCostPhotoForMember: mocks.setCostPhotoForMember,
 }));
+vi.mock("@/lib/blob-store", () => ({ putImage: mocks.putImage, deleteImages: mocks.deleteImages }));
 
 const initial: CostFormState = { errors: {}, values: emptyCostValues, review: null, notice: null, updatedAt: "" };
 const LIST = "redirect:/trips/trip-1/costs";
@@ -75,6 +80,7 @@ const saved = {
     { spotId: "g", amount: 33333, originalAmount: null },
   ],
   updatedAt: new Date(OPENED),
+  hasPhoto: false,
 };
 
 beforeEach(() => {
@@ -86,7 +92,9 @@ beforeEach(() => {
   mocks.getTripForMember.mockResolvedValue({ id: "trip-1", currency: "PHP" });
   mocks.listCostPeople.mockResolvedValue(members);
   mocks.createCost.mockResolvedValue("ok");
-  mocks.updateCost.mockResolvedValue("ok");
+  mocks.updateCost.mockResolvedValue({ ok: true, oldPhoto: null });
+  mocks.putImage.mockResolvedValue("cost-photos/new.jpg");
+  mocks.setCostPhotoForMember.mockResolvedValue({ ok: true, old: null });
   mocks.deleteCost.mockResolvedValue(true);
   mocks.getCostForMember.mockResolvedValue(saved);
 });
@@ -189,6 +197,7 @@ describe("reviewOrSaveCostAction, new cost", () => {
       "u1",
       COST_ID,
       expect.objectContaining({ amount: 200000, money: { kind: "rate", currency: "VND", original: 870000, rate: "435" } }),
+      "keep",
     );
     const card = await send({ fx: "charged", charged: "bad" });
     expect(card.errors.charged).toBe("Enter an amount, like 1,250.50.");
@@ -232,7 +241,7 @@ describe("reviewOrSaveCostAction, new cost", () => {
       ],
       ownParts: null,
       money: { kind: "trip" },
-    });
+    }, "keep");
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1/costs");
   });
 
@@ -241,7 +250,7 @@ describe("reviewOrSaveCostAction, new cost", () => {
     expect(state.errors.sharedBy).toBe("Pick who shares it.");
     expect(mocks.createCost).not.toHaveBeenCalled();
     await expect(reviewOrSaveCostAction(initial, form({ step: "save", amount: "250" }, ["b"]))).rejects.toThrow(LIST);
-    expect(mocks.createCost).toHaveBeenLastCalledWith("trip-1", "u1", COST_ID, expect.objectContaining({ amount: 25000, shares: [{ spotId: "b", amount: 25000, originalAmount: null }] }));
+    expect(mocks.createCost).toHaveBeenLastCalledWith("trip-1", "u1", COST_ID, expect.objectContaining({ amount: 25000, shares: [{ spotId: "b", amount: 25000, originalAmount: null }] }), "keep");
   });
 
   it("uses the trip's currency, so a zero-decimal trip takes whole amounts only", async () => {
@@ -338,6 +347,7 @@ describe("reviewOrSaveCostAction, edit", () => {
       "u1",
       expect.objectContaining({ amount: 350000 }),
       new Date(OPENED),
+      "keep",
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1/costs");
     expect(mocks.revalidatePath).toHaveBeenCalledWith(`/trips/trip-1/costs/${COST_ID}`);
@@ -481,5 +491,170 @@ describe("restoreCostAction", () => {
       error: "Couldn't restore the cost. Please try again.",
     });
     expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+});
+
+// The receipt photo (SQ-035): checked at Review, uploaded only at Save, and no file is left
+// behind when a save is refused, repeated or fails.
+describe("receipt photo on Log a cost and Edit cost", () => {
+  const jpeg = () => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])], "image.jpg", { type: "image/jpeg" });
+  const newForm = (extra: Record<string, string | File> = {}) => {
+    const data = formWith({ ...good, tripId: "trip-1", costId: COST_ID, mode: "new", step: "review" });
+    for (const [key, value] of Object.entries(extra)) data.set(key, value);
+    return data;
+  };
+  const editForm = (extra: Record<string, string | File> = {}) =>
+    newForm({ mode: "edit", updatedAt: OPENED, ...extra });
+
+  it("checks a picked photo at Review but never uploads, and says the new cost has one", async () => {
+    const state = await reviewOrSaveCostAction(initial, newForm({ photoAction: "replace", photo: jpeg() }));
+    expect(state.review?.withPhoto).toBe(true);
+    expect(mocks.putImage).not.toHaveBeenCalled();
+    expect(mocks.createCost).not.toHaveBeenCalled();
+    const edit = await reviewOrSaveCostAction(initial, editForm({ photoAction: "replace", photo: jpeg() }));
+    expect(edit.review?.changes).toEqual([{ field: "photo", before: "None", after: "Added" }]);
+    expect(mocks.putImage).not.toHaveBeenCalled();
+  });
+
+  it("refuses a file that is not a JPEG at Review and at Save, uploading nothing", async () => {
+    const text = new File(["hello"], "image.jpg", { type: "image/jpeg" });
+    for (const step of ["review", "save"]) {
+      const state = await reviewOrSaveCostAction(initial, newForm({ step, photoAction: "replace", photo: text }));
+      expect(state.errors.form).toBe("That isn't a JPEG image. Choose another.");
+      expect(state.review).toBeNull();
+    }
+    expect(mocks.putImage).not.toHaveBeenCalled();
+    expect(mocks.createCost).not.toHaveBeenCalled();
+  });
+
+  it("uploads at Save and saves a new cost with the new file", async () => {
+    await expect(reviewOrSaveCostAction(initial, newForm({ step: "save", photoAction: "replace", photo: jpeg() }))).rejects.toThrow(LIST);
+    expect(mocks.putImage).toHaveBeenCalledWith("cost-photos", expect.any(Uint8Array));
+    expect(mocks.createCost).toHaveBeenCalledWith("trip-1", "u1", COST_ID, expect.anything(), { set: "cost-photos/new.jpg" });
+    expect(mocks.deleteImages).not.toHaveBeenCalled();
+  });
+
+  it("never reads a photo path from the form", async () => {
+    await expect(
+      reviewOrSaveCostAction(initial, newForm({ step: "save", photoPath: "cost-photos/evil.jpg", photoAction: "keep" })),
+    ).rejects.toThrow(LIST);
+    expect(mocks.createCost).toHaveBeenCalledWith("trip-1", "u1", COST_ID, expect.anything(), "keep");
+  });
+
+  it("deletes the new file when a new cost is a repeat, is refused, or fails", async () => {
+    mocks.createCost.mockResolvedValue("repeat");
+    await expect(reviewOrSaveCostAction(initial, newForm({ step: "save", photoAction: "replace", photo: jpeg() }))).rejects.toThrow(LIST);
+    expect(mocks.deleteImages).toHaveBeenLastCalledWith(["cost-photos/new.jpg"]);
+    mocks.createCost.mockResolvedValue("not-found");
+    await expect(reviewOrSaveCostAction(initial, newForm({ step: "save", photoAction: "replace", photo: jpeg() }))).rejects.toThrow(LIST);
+    expect(mocks.deleteImages).toHaveBeenCalledTimes(2);
+    mocks.createCost.mockRejectedValue(new Error("database down"));
+    const failed = await reviewOrSaveCostAction(initial, newForm({ step: "save", photoAction: "replace", photo: jpeg() }));
+    expect(failed.errors.form).toBe("Couldn't save the cost. Please try again.");
+    expect(mocks.deleteImages).toHaveBeenCalledTimes(3);
+  });
+
+  it("shows an upload failure without saving anything", async () => {
+    mocks.putImage.mockRejectedValue(new Error("blob down"));
+    const state = await reviewOrSaveCostAction(initial, newForm({ step: "save", photoAction: "replace", photo: jpeg() }));
+    expect(state.errors.form).toBe("Couldn't upload that image. Please try again.");
+    expect(mocks.createCost).not.toHaveBeenCalled();
+  });
+
+  it("on an edit, a replace deletes the old file and lands on the cost page", async () => {
+    mocks.updateCost.mockResolvedValue({ ok: true, oldPhoto: "cost-photos/old.jpg" });
+    await expect(reviewOrSaveCostAction(initial, editForm({ step: "save", photoAction: "replace", photo: jpeg() }))).rejects.toThrow(BREAKDOWN);
+    expect(mocks.updateCost).toHaveBeenCalledWith("trip-1", COST_ID, "u1", expect.anything(), new Date(OPENED), { set: "cost-photos/new.jpg" });
+    expect(mocks.deleteImages).toHaveBeenCalledWith(["cost-photos/old.jpg"]);
+  });
+
+  it("on an edit, a remove deletes the old file and a keep deletes nothing", async () => {
+    mocks.updateCost.mockResolvedValue({ ok: true, oldPhoto: "cost-photos/old.jpg" });
+    await expect(reviewOrSaveCostAction(initial, editForm({ step: "save", photoAction: "remove" }))).rejects.toThrow(BREAKDOWN);
+    expect(mocks.updateCost).toHaveBeenLastCalledWith("trip-1", COST_ID, "u1", expect.anything(), new Date(OPENED), "remove");
+    expect(mocks.deleteImages).toHaveBeenCalledWith(["cost-photos/old.jpg"]);
+    mocks.deleteImages.mockClear();
+    await expect(reviewOrSaveCostAction(initial, editForm({ step: "save", photoAction: "keep" }))).rejects.toThrow(BREAKDOWN);
+    expect(mocks.deleteImages).not.toHaveBeenCalled();
+  });
+
+  it("on an edit, deletes the new file when the cost changed since, or is gone, or the save fails", async () => {
+    mocks.updateCost.mockResolvedValue("changed");
+    const state = await reviewOrSaveCostAction(initial, editForm({ step: "save", photoAction: "replace", photo: jpeg() }));
+    expect(state.notice).toBe("Someone just changed this cost. Check it again.");
+    expect(mocks.deleteImages).toHaveBeenLastCalledWith(["cost-photos/new.jpg"]);
+    mocks.updateCost.mockResolvedValue("not-found");
+    await expect(reviewOrSaveCostAction(initial, editForm({ step: "save", photoAction: "replace", photo: jpeg() }))).rejects.toThrow(LIST);
+    expect(mocks.deleteImages).toHaveBeenCalledTimes(2);
+    mocks.updateCost.mockRejectedValue(new Error("database down"));
+    const failed = await reviewOrSaveCostAction(initial, editForm({ step: "save", photoAction: "replace", photo: jpeg() }));
+    expect(failed.errors.form).toBe("Couldn't save the cost. Please try again.");
+    expect(mocks.deleteImages).toHaveBeenCalledTimes(3);
+  });
+
+  it("shows Changed and Removed at the review of an edit", async () => {
+    mocks.getCostForMember.mockResolvedValue({ ...saved, hasPhoto: true });
+    const changed = await reviewOrSaveCostAction(initial, editForm({ photoAction: "replace", photo: jpeg() }));
+    expect(changed.review?.changes).toEqual([{ field: "photo", before: "Photo", after: "Changed" }]);
+    const removed = await reviewOrSaveCostAction(initial, editForm({ photoAction: "remove" }));
+    expect(removed.review?.changes).toEqual([{ field: "photo", before: "Photo", after: "Removed" }]);
+  });
+});
+
+describe("addCostPhotoAction (the Cost page box)", () => {
+  const jpeg = () => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])], "image.jpg", { type: "image/jpeg" });
+  const photoForm = (file: File | null = jpeg(), fields: Record<string, string> = { tripId: "trip-1", costId: COST_ID }) => {
+    const data = new FormData();
+    for (const [key, value] of Object.entries(fields)) data.set(key, value);
+    if (file) data.set("photo", file);
+    return data;
+  };
+  const FAILED = "Couldn't add the photo. Try again with a smaller picture or better signal.";
+
+  it("does nothing when signed out", async () => {
+    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    await expect(addCostPhotoAction({}, photoForm())).rejects.toThrow("redirect:/");
+    expect(mocks.putImage).not.toHaveBeenCalled();
+  });
+
+  it("stores the file, puts it on the cost as the signed-in person, and refreshes the cost's pages", async () => {
+    await expect(addCostPhotoAction({}, photoForm())).resolves.toEqual({});
+    expect(mocks.putImage).toHaveBeenCalledWith("cost-photos", expect.any(Uint8Array));
+    expect(mocks.setCostPhotoForMember).toHaveBeenCalledWith("trip-1", COST_ID, "u1", "cost-photos/new.jpg");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/trips/trip-1/costs");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/trips/trip-1/costs/${COST_ID}`);
+    expect(mocks.deleteImages).not.toHaveBeenCalled();
+  });
+
+  it("deletes the file it replaced", async () => {
+    mocks.setCostPhotoForMember.mockResolvedValue({ ok: true, old: "cost-photos/old.jpg" });
+    await addCostPhotoAction({}, photoForm());
+    expect(mocks.deleteImages).toHaveBeenCalledWith(["cost-photos/old.jpg"]);
+  });
+
+  it("refuses a missing file or one that is not a JPEG, uploading nothing", async () => {
+    await expect(addCostPhotoAction({}, photoForm(null))).resolves.toEqual({ error: FAILED });
+    const text = new File(["hello"], "image.jpg", { type: "image/jpeg" });
+    await expect(addCostPhotoAction({}, photoForm(text))).resolves.toEqual({ error: FAILED });
+    expect(mocks.putImage).not.toHaveBeenCalled();
+  });
+
+  it("deletes the new file when the save is refused or fails, and when the upload fails says so", async () => {
+    mocks.setCostPhotoForMember.mockResolvedValue({ ok: false });
+    await expect(addCostPhotoAction({}, photoForm())).resolves.toEqual({ error: FAILED });
+    expect(mocks.deleteImages).toHaveBeenLastCalledWith(["cost-photos/new.jpg"]);
+    mocks.setCostPhotoForMember.mockRejectedValue(new Error("database down"));
+    await expect(addCostPhotoAction({}, photoForm())).resolves.toEqual({ error: FAILED });
+    expect(mocks.deleteImages).toHaveBeenCalledTimes(2);
+    mocks.putImage.mockRejectedValue(new Error("blob down"));
+    await expect(addCostPhotoAction({}, photoForm())).resolves.toEqual({ error: FAILED });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("ignores any path in the form and goes back when an id is missing", async () => {
+    await addCostPhotoAction({}, photoForm(jpeg(), { tripId: "trip-1", costId: COST_ID, photoPath: "cost-photos/evil.jpg" }));
+    expect(mocks.setCostPhotoForMember).toHaveBeenCalledWith("trip-1", COST_ID, "u1", "cost-photos/new.jpg");
+    await expect(addCostPhotoAction({}, photoForm(jpeg(), { costId: COST_ID }))).rejects.toThrow("redirect:/trips");
+    await expect(addCostPhotoAction({}, photoForm(jpeg(), { tripId: "trip-1" }))).rejects.toThrow(LIST);
   });
 });

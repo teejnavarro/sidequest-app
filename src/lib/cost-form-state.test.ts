@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CostDetails } from "./costs";
-import { buildCostReview, defaultCostValues, isEvenSplit, valuesFromCost } from "./cost-form-state";
+import { buildCostReview, defaultCostValues, isEvenSplit, photoActionOf, valuesFromCost } from "./cost-form-state";
 import { validateCostInput } from "./cost-input";
 
 const people = [
@@ -118,6 +118,31 @@ describe("buildCostReview for an edit", () => {
       ["Maya", 100000, 50000],
       ["Ben", null, 50000],
     ]);
+  });
+});
+
+describe("receipt photo in the review", () => {
+  const withPhoto = { ...saved, hasPhoto: true };
+  const reviewOf = (before: typeof saved | null, photo: "keep" | "replace" | "remove") =>
+    buildCostReview({ currency: "PHP", input: checked(), people, before, photo });
+
+  it("reads the form's choice, treating anything unknown as keep", () => {
+    expect(["replace", "remove", "keep", "", "x"].map(photoActionOf)).toEqual(["replace", "remove", "keep", "keep", "keep"]);
+  });
+
+  it("marks a new cost saved with a photo, and nothing when there is none", () => {
+    expect(reviewOf(null, "replace").withPhoto).toBe(true);
+    expect(reviewOf(null, "keep").withPhoto).toBe(false);
+    expect(reviewOf(null, "remove").withPhoto).toBe(false);
+  });
+
+  it("lists Added, Changed and Removed on an edit, and nothing for keep", () => {
+    expect(reviewOf(saved, "replace").changes).toEqual([{ field: "photo", before: "None", after: "Added" }]);
+    expect(reviewOf(withPhoto, "replace").changes).toEqual([{ field: "photo", before: "Photo", after: "Changed" }]);
+    expect(reviewOf(withPhoto, "remove").changes).toEqual([{ field: "photo", before: "Photo", after: "Removed" }]);
+    expect(reviewOf(withPhoto, "keep").changes).toEqual([]);
+    expect(reviewOf(saved, "remove").changes).toEqual([]);
+    expect(reviewOf(saved, "replace").withPhoto).toBe(false);
   });
 });
 
