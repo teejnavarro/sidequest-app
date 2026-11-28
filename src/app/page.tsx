@@ -35,7 +35,7 @@ const LEGS: { id: string; label: string; title: string; steps: Step[] }[] = [
         headline: "Start a trip in a minute.",
         line: "Give it a name and dates, and the money's in pesos unless you say so.",
         image: shotTrip,
-        alt: "Trip header for Siargao trip with its dates and four people going, above the Schedule tab",
+        alt: "Trip header for Siargao trip with its dates and four people going, above the Schedule tab with a check-in on Day 1",
       },
       {
         number: "02",
@@ -56,7 +56,7 @@ const LEGS: { id: string; label: string; title: string; steps: Step[] }[] = [
         headline: "One card per day, so nobody has to ask what time.",
         line: "Approved ideas drop into their day, in the trip's own time zone.",
         image: shotSchedule,
-        alt: "Schedule tab with a card for each day, and Day 2 holding a morning, a 13:00 and an evening item",
+        alt: "Schedule tab with a card for each day: a check-in on Day 1 and a morning, a 13:00 and an evening item on Day 2",
       },
     ],
   },
