@@ -71,11 +71,17 @@ describe("demo trip", () => {
     const { splitEqually } = await import("@/lib/money");
 
     // The viewer must exist already (signed in once on localhost).
-    const viewerRows = await db
-      .select({ id: schema.user.id })
-      .from(schema.user)
-      .where(sql`lower(${schema.user.email}) = ${viewerEmail}`)
-      .limit(1);
+    // A driver error can quote the query and the email, so a failure here says only this.
+    let viewerRows: { id: string }[];
+    try {
+      viewerRows = await db
+        .select({ id: schema.user.id })
+        .from(schema.user)
+        .where(sql`lower(${schema.user.email}) = ${viewerEmail}`)
+        .limit(1);
+    } catch {
+      throw new Error("Couldn't look up the demo account. Check DEMO_VIEWER_EMAIL in .env.development.local.");
+    }
     const viewerId = viewerRows[0]?.id;
     if (!viewerId) throw new Error("Sign in once on localhost with the demo account, then run again.");
     if (viewerId === BEA || viewerId === JO) throw new Error("Stopped: the viewer can't be a made-up user.");
@@ -206,8 +212,9 @@ describe("demo trip", () => {
     // be approved before it can go on a day, so the two scheduled ones are approved too.
     for (const id of [hopping, kayak, bonfire]) await ideas.approveIdea(tripId, id, BEA);
 
-    // 5. The schedule: Day 2 and Day 3 (the second and third trip days).
+    // 5. The schedule: Day 1 to Day 3.
     const placed = [
+      await schedule.addNewItem(tripId, BEA, { kind: "new", name: "Check in at the cottage", notes: null, day: days[0]!, slot: "afternoon", time: null }),
       await schedule.addIdeaToSchedule(tripId, BEA, { kind: "idea", ideaId: kayak, day: days[1]!, slot: "morning", time: null }),
       await schedule.addNewItem(tripId, BEA, { kind: "new", name: "Lunch at Kermit", notes: null, day: days[1]!, slot: "time", time: "13:00" }),
       await schedule.addIdeaToSchedule(tripId, BEA, { kind: "idea", ideaId: bonfire, day: days[1]!, slot: "evening", time: null }),
