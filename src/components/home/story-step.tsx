@@ -17,13 +17,14 @@ export type Step = {
 export function StoryStep({ step }: { step: Step }) {
   return (
     <Ticket
-      className="story-reveal md:min-h-[400px]"
-      mainClass="grid content-center justify-items-start gap-3 p-5 md:flex-1 md:p-6 lg:p-8"
-      sideClass="flex items-end justify-center bg-chip px-3 pt-6 md:w-[380px] md:shrink-0 lg:w-[420px]"
+      from="lg"
+      className="story-reveal lg:min-h-[400px]"
+      mainClass="grid content-center justify-items-start gap-3 p-5 md:p-8 lg:flex-1"
+      sideClass="flex items-end justify-center bg-chip px-3 pt-6 lg:w-[420px] lg:shrink-0"
       main={
         <>
           <span className={softTag}>Step {step.number}</span>
-          <h3 className="text-2xl md:text-[28px] lg:text-[34px]">{step.headline}</h3>
+          <h3 className="text-2xl md:text-[30px] lg:text-[34px]">{step.headline}</h3>
           <p className="text-muted">{step.line}</p>
         </>
       }
