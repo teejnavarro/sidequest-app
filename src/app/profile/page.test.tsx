@@ -27,11 +27,14 @@ describe("ProfilePage", () => {
   it("links the privacy note and Delete my account under Sign out", async () => {
     const html = await renderContent();
     const signOut = html.indexOf("Sign out");
+    const how = html.indexOf('href="/"');
     const privacy = html.indexOf('href="/privacy"');
     const del = html.indexOf('href="/profile/delete"');
     expect(signOut).toBeGreaterThan(-1);
-    expect(privacy).toBeGreaterThan(signOut);
+    expect(how).toBeGreaterThan(signOut);
+    expect(privacy).toBeGreaterThan(how);
     expect(del).toBeGreaterThan(privacy);
+    expect(html).toContain("How Sidequest works");
     expect(html).toContain("Privacy note");
     expect(html).toContain("Delete my account");
   });

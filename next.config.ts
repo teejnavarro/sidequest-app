@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "2mb" },
   },
   images: {
+    // 90 is for the homepage screenshots (src/components/home/story-step.tsx); 75 is the default.
+    qualities: [75, 90],
     remotePatterns: [new URL("https://lh3.googleusercontent.com/**")],
   },
   turbopack: {

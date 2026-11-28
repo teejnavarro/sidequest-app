@@ -107,3 +107,28 @@ h3 {
   line-height: 1.15;
   text-wrap: balance;
 }
+
+/* Homepage story (SQ-034). Everything is visible by default. src/components/home/story-motion.tsx
+   adds the story-js class to <html> only when a script runs and the person has not asked for
+   less motion, so no script, a script error and "reduce motion" all show the finished page,
+   with the plane at the top of its line.
+   - .story-reveal: starts faded and 16px low, and gets .in as it scrolls into view.
+   - .story-plane: the script sets its top as you scroll; the transition smooths each step. */
+@media (prefers-reduced-motion: no-preference) {
+  .story-js .story-reveal {
+    opacity: 0;
+    translate: 0 16px;
+    transition:
+      opacity 0.5s ease,
+      translate 0.5s ease;
+  }
+
+  .story-js .story-reveal.in {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  .story-js .story-plane {
+    transition: top 0.12s linear;
+  }
+}
