@@ -175,6 +175,23 @@ describe("demo trip", () => {
       cost: null,
       notes: null,
     });
+    // Two more ideas that do go on the schedule (a scheduled idea leaves the Ideas tab).
+    const kayak = await idea({
+      name: "Kayaking at Sugba Lagoon",
+      type: "adventure",
+      duration: "half",
+      area: "Sugba Lagoon",
+      cost: 900,
+      notes: null,
+    });
+    const bonfire = await idea({
+      name: "Bonfire on the beach",
+      type: "experience",
+      duration: "short",
+      area: "General Luna",
+      cost: null,
+      notes: null,
+    });
     const vote = async (ideaId: string, userId: string, choice: 1 | -1) => {
       if (!(await ideas.setVote(tripId, ideaId, userId, choice))) throw new Error("A vote was refused.");
     };
@@ -184,15 +201,17 @@ describe("demo trip", () => {
     await vote(surf, viewerId, -1);
     await vote(sunset, BEA, 1);
     await vote(sunset, viewerId, 1);
-    // An idea must be approved before it can go on a day.
-    for (const id of [hopping, surf, sunset]) await ideas.approveIdea(tripId, id, BEA);
+    for (const id of [kayak, bonfire]) for (const userId of [BEA, viewerId, JO]) await vote(id, userId, 1);
+    // Only island hopping is approved among the ideas that stay on the Ideas tab. An idea must
+    // be approved before it can go on a day, so the two scheduled ones are approved too.
+    for (const id of [hopping, kayak, bonfire]) await ideas.approveIdea(tripId, id, BEA);
 
     // 5. The schedule: Day 2 and Day 3 (the second and third trip days).
     const placed = [
-      await schedule.addIdeaToSchedule(tripId, BEA, { kind: "idea", ideaId: surf, day: days[1]!, slot: "morning", time: null }),
+      await schedule.addIdeaToSchedule(tripId, BEA, { kind: "idea", ideaId: kayak, day: days[1]!, slot: "morning", time: null }),
       await schedule.addNewItem(tripId, BEA, { kind: "new", name: "Lunch at Kermit", notes: null, day: days[1]!, slot: "time", time: "13:00" }),
-      await schedule.addIdeaToSchedule(tripId, BEA, { kind: "idea", ideaId: sunset, day: days[1]!, slot: "evening", time: null }),
-      await schedule.addIdeaToSchedule(tripId, BEA, { kind: "idea", ideaId: hopping, day: days[2]!, slot: "full", time: null }),
+      await schedule.addIdeaToSchedule(tripId, BEA, { kind: "idea", ideaId: bonfire, day: days[1]!, slot: "evening", time: null }),
+      await schedule.addNewItem(tripId, BEA, { kind: "new", name: "Rest day in General Luna", notes: null, day: days[2]!, slot: "full", time: null }),
     ];
     if (placed.some((id) => !id)) throw new Error("Could not fill the schedule.");
 
@@ -262,6 +281,13 @@ describe("demo trip", () => {
     if (!you || you.net <= 0) throw new Error("Check failed: Migs should be owed money.");
     if (!balances.payments.some((line) => line.from === spots.jo && line.to === spots.bea)) {
       throw new Error("Check failed: the settle-up should contain Jo paying Bea.");
+    }
+
+    // The Ideas tab must stay filled: at least 3 ideas off the schedule, island hopping approved.
+    const open = await ideas.listIdeasForMember(tripId, viewerId);
+    const hoppingOpen = open.find((item) => item.id === hopping);
+    if (open.length < 3 || !hoppingOpen?.approvedAt) {
+      throw new Error("Check failed: the Ideas tab needs 3 unscheduled ideas, island hopping approved.");
     }
 
     console.log(`Demo trip ready: /trips/${tripId}/schedule`);
