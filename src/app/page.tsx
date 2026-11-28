@@ -5,6 +5,7 @@ import { getOptionalUserForPage } from "@/lib/current-user";
 import { signInWithGoogle } from "@/app/actions";
 import { primaryButton, skeleton } from "@/components/ui";
 import { RouteLine } from "@/components/route-line";
+import { StoryMotion } from "@/components/home/story-motion";
 import { Ticket } from "@/components/home/ticket";
 import { StoryStep, type Step } from "@/components/home/story-step";
 import { GITHUB_URL, HowItsBuilt } from "@/components/home/how-its-built";
@@ -175,6 +176,7 @@ async function LastStopAction() {
 export default function Home({ searchParams }: { searchParams: SearchParams }) {
   return (
     <main className="flex-1">
+      <StoryMotion />
       <header className="bg-band px-4 pb-[88px] text-on-band md:pb-[112px]">
         <div className="mx-auto w-full max-w-[480px] md:max-w-[1040px]">
           <div className="flex min-h-11 items-center justify-between pt-4">

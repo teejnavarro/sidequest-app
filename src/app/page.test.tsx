@@ -2,6 +2,7 @@ import { Suspense, isValidElement, type ReactElement, type ReactNode } from "rea
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "./page";
+import { StoryMotion } from "@/components/home/story-motion";
 
 const mocks = vi.hoisted(() => ({ getOptionalUserForPage: vi.fn() }));
 
@@ -135,5 +136,17 @@ describe("static page", () => {
     const images = renderStatic().match(/<img[^>]*>/g) ?? [];
     expect(images).toHaveLength(6);
     for (const image of images) expect(image).toMatch(/alt="[^"]+"/);
+  });
+});
+
+describe("story motion", () => {
+  it("renders nothing and sits on the page once", () => {
+    expect(renderToStaticMarkup(<StoryMotion />)).toBe("");
+    const hasMotion = (node: ReactNode): boolean =>
+      Array.isArray(node)
+        ? node.some(hasMotion)
+        : isValidElement<Record<string, ReactNode>>(node) &&
+          (node.type === StoryMotion || Object.values(node.props).some(hasMotion));
+    expect(hasMotion(page())).toBe(true);
   });
 });
