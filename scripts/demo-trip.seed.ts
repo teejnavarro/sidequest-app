@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import { describe, it, vi } from "vitest";
 
-// Builds a made-up trip, "Siargao 2027", on the DEV database for the homepage screenshots.
+// Builds a made-up trip, "Siargao trip", on the DEV database for the homepage screenshots.
 // Run with: npm.cmd run demo:seed
 //
 // Safety rules (the same as the dev-db tests):
@@ -52,7 +52,7 @@ function dayFromToday(offset: number): string {
 }
 
 describe("demo trip", () => {
-  it("builds Siargao 2027 for the homepage screenshots", async () => {
+  it("builds Siargao trip for the homepage screenshots", async () => {
     const { viewerEmail, databaseUrl, blobToken } = devEnv();
     process.env.DATABASE_URL = databaseUrl;
     delete process.env.PREVIEW_DATABASE_URL;
@@ -107,7 +107,7 @@ describe("demo trip", () => {
     const start = dayFromToday(12);
     const days = [0, 1, 2, 3, 4].map((offset) => dayFromToday(12 + offset));
     const tripId = await trips.createTrip(BEA, {
-      name: "Siargao 2027",
+      name: "Siargao trip",
       startDate: start,
       endDate: days[4]!,
       timeZone: "Asia/Manila",
