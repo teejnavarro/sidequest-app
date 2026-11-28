@@ -4,6 +4,7 @@ Approved by the owner on 2026-10-31, and the amended version (stages, payment de
 fixes) approved the same day. Amended again on 2026-11-14 (earlier dates, build in bundles)
 and on 2026-11-17 (uneven splits: what each person had, the rest shared equally).
 Amended again on 2026-11-27 (an optional receipt photo on a cost).
+Amended again on 2026-11-25 (homepage audience).
 This brief is the contract; changes need the owner's approval.
 
 ```
@@ -24,6 +25,8 @@ Final deliverable: A live web app on a free web address, working well in a phone
 
 Audience:        The owner and their travel groups (about 2–10 people per trip).
                  Recruiters and interviewers see the GitHub repo.
+                 People who find the homepage with no context (the homepage also
+                 markets the app).
 
 In scope (Phase 1) is built in three stages, timed to when each part gets used.
 
