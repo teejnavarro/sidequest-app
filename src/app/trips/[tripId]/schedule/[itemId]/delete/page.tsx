@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getScheduleItemForMember } from "@/lib/schedule";
 import { RemoveItemForm } from "@/components/remove-item-form";
@@ -16,7 +16,7 @@ type Params = Promise<{ tripId: string; itemId: string }>;
 // "not found" as an item that does not exist.
 async function DeleteItemContent({ params }: { params: Params }) {
   const { tripId, itemId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, item] = await Promise.all([
     getTripForMember(tripId, user.id),
     getScheduleItemForMember(tripId, itemId, user.id),

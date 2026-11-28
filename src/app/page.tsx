@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { GoogleLogo } from "@phosphor-icons/react/dist/ssr";
-import { getOptionalUser } from "@/lib/current-user";
+import { getOptionalUserForPage } from "@/lib/current-user";
 import { signInWithGoogle } from "@/app/actions";
 import { linkClass, primaryButton, skeleton } from "@/components/ui";
 
@@ -16,7 +16,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 // Reads the session and the address, so it stays inside Suspense.
 async function SignInArea({ searchParams }: { searchParams: SearchParams }) {
-  const [user, { deleted }] = await Promise.all([getOptionalUser(), searchParams]);
+  const [user, { deleted }] = await Promise.all([getOptionalUserForPage(), searchParams]);
 
   if (user) {
     return (

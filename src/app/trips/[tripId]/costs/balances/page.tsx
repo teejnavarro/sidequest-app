@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getBalancesForMember, listCostsForMember, type BalancePerson } from "@/lib/costs";
 import { listPaymentsForMember, type PaymentListItem, type PaymentPerson } from "@/lib/payments";
@@ -222,7 +222,7 @@ function BalanceRow({ person, currency }: { person: BalancePerson; currency: str
 // This page sits outside the trip layout, so it checks the person is in the trip for itself.
 async function BalancesContent({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
   const [balances, paid, costList] = await Promise.all([

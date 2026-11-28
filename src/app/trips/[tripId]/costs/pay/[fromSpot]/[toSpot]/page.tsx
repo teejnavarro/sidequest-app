@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Bank, DeviceMobile } from "@phosphor-icons/react/dist/ssr";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getPayPageForMember, type PayPage, type PaymentAccountView } from "@/lib/payments";
 import { FORMER_MEMBER_NAME } from "@/lib/display-name";
@@ -83,7 +83,7 @@ function receiverReason(page: PayPage): string {
 // Anyone in the trip may look at a line; only the payer and the receiver get "Mark it paid".
 async function PayContent({ params }: { params: Params }) {
   const { tripId, fromSpot, toSpot } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, page] = await Promise.all([
     getTripForMember(tripId, user.id),
     getPayPageForMember(tripId, fromSpot, toSpot, user.id),

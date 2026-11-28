@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resetInviteLinkAction } from "../actions";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { ConfirmForm } from "@/components/confirm-form";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
@@ -13,7 +13,7 @@ import { cardClass, primaryButton, screenClass, skeleton } from "@/components/ui
 // member or a stranger sees the same "not found" as for a missing trip.
 async function ResetLinkContent({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip || trip.ownerId !== user.id) notFound();
 

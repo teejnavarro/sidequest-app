@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import DeleteCostPage from "./[costId]/delete/page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   getCostForMember: vi.fn(),
   notFound: vi.fn(() => {
@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("@/lib/costs", () => ({ getCostForMember: mocks.getCostForMember }));
 vi.mock("./[costId]/delete/delete-form", () => ({
@@ -37,7 +37,7 @@ const cost = { id: "cost-1", description: "Dinner <b>" };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
   mocks.getTripForMember.mockResolvedValue(trip);
   mocks.getCostForMember.mockResolvedValue(cost);
 });

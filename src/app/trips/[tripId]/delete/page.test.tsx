@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import DeleteTripPage from "./page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   listTripMembers: vi.fn(),
   countCostsForTrip: vi.fn(),
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({
   getTripForMember: mocks.getTripForMember,
   listTripMembers: mocks.listTripMembers,
@@ -52,7 +52,7 @@ async function renderContent() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.countCostsForTrip.mockResolvedValue({ total: 0, trashed: 0 });
 });
 
@@ -71,7 +71,7 @@ describe("DeleteTripPage", () => {
   });
 
   it("sends a signed-out visitor away before looking anything up", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(renderContent()).rejects.toThrow("redirect:/");
     expect(mocks.getTripForMember).not.toHaveBeenCalled();
   });

@@ -5,7 +5,7 @@ import EditGuestPage from "./[spotId]/edit/page";
 import RemoveGuestPage from "./[spotId]/remove/page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   getGuestForEditor: vi.fn(),
   notFound: vi.fn(() => {
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({
   getTripForMember: mocks.getTripForMember,
   getGuestForEditor: mocks.getGuestForEditor,
@@ -47,7 +47,7 @@ const GUEST = { spotId: "spot-1", name: "Lito", addedById: "u2", addedByName: "B
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u2", name: "Ben", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u2", name: "Ben", image: null });
   mocks.getTripForMember.mockResolvedValue(TRIP);
   mocks.getGuestForEditor.mockResolvedValue(GUEST);
 });
@@ -59,7 +59,7 @@ describe.each([
   const render = () => renderContent(Page as (p: typeof props) => ReactElement);
 
   it("sends a signed-out visitor away before looking anything up", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(render()).rejects.toThrow("redirect:/");
     expect(mocks.getTripForMember).not.toHaveBeenCalled();
     expect(mocks.getGuestForEditor).not.toHaveBeenCalled();
@@ -123,7 +123,7 @@ describe("Edit guest", () => {
   });
 
   it("names the adder's first name and the trip owner for another editor", async () => {
-    mocks.getCurrentUser.mockResolvedValue({ id: "owner", name: "Maya", image: null });
+    mocks.getCurrentUserForPage.mockResolvedValue({ id: "owner", name: "Maya", image: null });
     expect(await html()).toContain("Added by Ben. Only Ben or the trip owner can change this guest.");
   });
 

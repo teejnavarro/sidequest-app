@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import PayPage from "./page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   getPayPageForMember: vi.fn(),
   notFound: vi.fn(() => {
@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("@/lib/payments", () => ({ getPayPageForMember: mocks.getPayPageForMember }));
 vi.mock("@/app/trips/[tripId]/costs/payments/actions", () => ({ recordPaymentAction: async () => ({}) }));
@@ -61,7 +61,7 @@ const payerView = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Ben Cruz", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Ben Cruz", image: null });
   mocks.getTripForMember.mockResolvedValue({ id: "trip-1", currency: "PHP", timeZone: "Asia/Manila" });
   mocks.getPayPageForMember.mockResolvedValue(payerView);
 });
@@ -77,7 +77,7 @@ describe("the Pay page", () => {
   });
 
   it("sends a signed-out visitor away before looking anything up", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(render()).rejects.toThrow("redirect:/");
     expect(mocks.getPayPageForMember).not.toHaveBeenCalled();
   });

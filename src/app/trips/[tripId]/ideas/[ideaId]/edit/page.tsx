@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getIdeaForMember } from "@/lib/ideas";
 import { IdeaForm } from "@/components/idea-form";
@@ -16,7 +16,7 @@ type Params = Promise<{ tripId: string; ideaId: string }>;
 // idea that does not exist.
 async function EditIdeaContent({ params }: { params: Params }) {
   const { tripId, ideaId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, idea] = await Promise.all([
     getTripForMember(tripId, user.id),
     getIdeaForMember(tripId, ideaId, user.id),

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import ResetLinkPage from "./page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("not-found");
@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("../actions", () => ({ resetInviteLinkAction: vi.fn() }));
 vi.mock("@/components/confirm-form", () => ({
@@ -37,13 +37,13 @@ async function renderContent() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "owner", name: "Maya", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "owner", name: "Maya", image: null });
   mocks.getTripForMember.mockResolvedValue({ id: "trip-1", name: "Saigon barkada", ownerId: "owner" });
 });
 
 describe("New invite link page", () => {
   it("sends a signed-out visitor away before looking anything up", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(renderContent()).rejects.toThrow("redirect:/");
     expect(mocks.getTripForMember).not.toHaveBeenCalled();
   });

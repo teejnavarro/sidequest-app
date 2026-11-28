@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import InvitePage from "./page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getInviteCodeForMember: vi.fn(),
   getTripForMember: vi.fn(),
   listTripMembers: vi.fn(),
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({
   getInviteCodeForMember: mocks.getInviteCodeForMember,
   getTripForMember: mocks.getTripForMember,
@@ -41,7 +41,7 @@ async function renderContent() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   vi.stubEnv("BETTER_AUTH_URL", "http://localhost:3000");
 });
 
@@ -56,7 +56,7 @@ describe("InvitePage", () => {
   });
 
   it("sends a signed-out visitor away before looking anything up", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(renderContent()).rejects.toThrow("redirect:/");
     expect(mocks.getInviteCodeForMember).not.toHaveBeenCalled();
   });
@@ -141,7 +141,7 @@ describe("InvitePage", () => {
     });
 
     it("shows an edit link to the adder only for their own guest", async () => {
-      mocks.getCurrentUser.mockResolvedValue({ id: "u2", name: "Ben", image: null });
+      mocks.getCurrentUserForPage.mockResolvedValue({ id: "u2", name: "Ben", image: null });
       const html = await renderFor(people);
       expect(html).toContain('href="/trips/trip-1/guests/g1/edit"');
       expect(html).not.toContain("/guests/g2/edit");
@@ -149,7 +149,7 @@ describe("InvitePage", () => {
     });
 
     it("shows no edit links to a member who neither added a guest nor owns the trip", async () => {
-      mocks.getCurrentUser.mockResolvedValue({ id: "u3", name: "Jo", image: null });
+      mocks.getCurrentUserForPage.mockResolvedValue({ id: "u3", name: "Jo", image: null });
       const html = await renderFor([...people, member("u3", "Jo")]);
       expect(html).not.toContain("/edit");
     });
@@ -162,7 +162,7 @@ describe("InvitePage", () => {
       expect(asOwner).toMatch(/<a [^>]*class="[^"]*\bmin-w-0\b[^"]*"[^>]*>(?:(?!<\/a>).)*W{40}/);
       expect(asOwner).toMatch(nameSpan);
 
-      mocks.getCurrentUser.mockResolvedValue({ id: "u3", name: "Jo", image: null });
+      mocks.getCurrentUserForPage.mockResolvedValue({ id: "u3", name: "Jo", image: null });
       const asOther = await renderFor([...long, member("u3", "Jo")]); // a plain row
       expect(asOther).toMatch(/<div class="[^"]*\bmin-w-0\b[^"]*">(?:(?!<\/div>).)*W{40}/);
       expect(asOther).toMatch(nameSpan);
@@ -197,7 +197,7 @@ describe("InvitePage", () => {
     });
 
     it("gives a member plain rows and no Get a new link", async () => {
-      mocks.getCurrentUser.mockResolvedValue({ id: "u2", name: "Ben", image: null });
+      mocks.getCurrentUserForPage.mockResolvedValue({ id: "u2", name: "Ben", image: null });
       const html = await renderFor(people);
       expect(html).not.toContain("/members/");
       expect(html).not.toContain("Manage");

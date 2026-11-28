@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarPlus, Lightbulb } from "@phosphor-icons/react/dist/ssr";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { listScheduleForMember, type ScheduleListItem } from "@/lib/schedule";
 import { tripDays, whenLabel } from "@/lib/schedule-options";
@@ -92,7 +92,7 @@ function DayCard({
 // trip's time zone after the session is read.
 async function ScheduleContent({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
 

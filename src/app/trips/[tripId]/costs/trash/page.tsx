@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { listTrashForMember, type TrashItem } from "@/lib/costs";
 import { formatMoney } from "@/lib/money";
@@ -42,7 +42,7 @@ function TrashRow({ item, tripId, timeZone }: { item: TrashItem; tripId: string;
 // trip. The list is read through the privacy layer too, which hands a stranger nothing.
 async function TrashContent({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
 

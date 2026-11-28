@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getPaymentForParty } from "@/lib/payments";
 import { paymentSentence } from "@/lib/payment-input";
@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Delete payment | Sidequest" };
 // Same rule as the payment page: only the payer or the receiver gets here.
 async function DeletePaymentContent({ params }: { params: Promise<{ tripId: string; paymentId: string }> }) {
   const { tripId, paymentId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, payment] = await Promise.all([
     getTripForMember(tripId, user.id),
     getPaymentForParty(tripId, paymentId, user.id),

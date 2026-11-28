@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { listApprovedUnscheduled } from "@/lib/schedule";
 import { tripDays } from "@/lib/schedule-options";
@@ -46,7 +46,7 @@ async function AddToScheduleContent({
 }) {
   const { tripId } = await params;
   const { from, idea: ideaParam } = await searchParams;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
 

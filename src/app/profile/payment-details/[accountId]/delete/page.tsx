@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { ConfirmForm } from "@/components/confirm-form";
 import { TaskBand } from "@/components/task-band";
 import { cardClass, primaryButton, screenClass, skeleton } from "@/components/ui";
@@ -12,7 +12,7 @@ import { deletePaymentAccountAction } from "../../actions";
 
 async function DeletePaymentDetailsContent({ params }: { params: Promise<{ accountId: string }> }) {
   const { accountId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const account = await getMyPaymentAccount(user.id, accountId);
   if (!account) notFound();
 

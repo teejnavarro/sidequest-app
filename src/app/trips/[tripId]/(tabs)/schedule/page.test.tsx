@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SchedulePage from "./page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   listScheduleForMember: vi.fn(),
   notFound: vi.fn(() => {
@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("@/lib/schedule", () => ({ listScheduleForMember: mocks.listScheduleForMember }));
 // The scroller draws nothing, so mark where it is used.
@@ -67,7 +67,7 @@ beforeEach(() => {
   // Long before the trip, so no day is "today" unless a test says so.
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2027-01-01T12:00:00Z"));
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
   mocks.getTripForMember.mockResolvedValue(trip);
   mocks.listScheduleForMember.mockResolvedValue([]);
 });
@@ -85,7 +85,7 @@ describe("the Schedule tab", () => {
   });
 
   it("sends a signed-out visitor away before looking anything up", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(render()).rejects.toThrow("redirect:/");
     expect(mocks.getTripForMember).not.toHaveBeenCalled();
   });

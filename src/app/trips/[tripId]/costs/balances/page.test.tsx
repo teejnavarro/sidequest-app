@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import BalancesPage from "./page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   getBalancesForMember: vi.fn(),
   listCostsForMember: vi.fn(),
@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("@/lib/costs", () => ({
   getBalancesForMember: mocks.getBalancesForMember,
@@ -66,7 +66,7 @@ const example = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
   mocks.getTripForMember.mockResolvedValue({ id: "trip-1", currency: "PHP", timeZone: "Asia/Manila" });
   mocks.getBalancesForMember.mockResolvedValue(example);
   mocks.listPaymentsForMember.mockResolvedValue([]);
@@ -104,7 +104,7 @@ describe("the Balances page", () => {
   });
 
   it("sends a signed-out visitor away before looking anything up", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(render()).rejects.toThrow("redirect:/");
     expect(mocks.getTripForMember).not.toHaveBeenCalled();
   });

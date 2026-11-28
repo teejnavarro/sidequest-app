@@ -7,7 +7,7 @@ import MoveItemPage from "./[itemId]/edit/page";
 import DeleteItemPage from "./[itemId]/delete/page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   getScheduleItemForMember: vi.fn(),
   listApprovedUnscheduled: vi.fn(),
@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("@/lib/schedule", () => ({
   getScheduleItemForMember: mocks.getScheduleItemForMember,
@@ -83,7 +83,7 @@ const ideaItem = (extra = {}) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.getTripForMember.mockResolvedValue(trip);
   mocks.getScheduleItemForMember.mockResolvedValue(item());
   mocks.listApprovedUnscheduled.mockResolvedValue(ideas);
@@ -102,7 +102,7 @@ describe.each([
   });
 
   it("sends a signed-out visitor away before looking anything up", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(run(page, options)).rejects.toThrow("redirect:/");
     expect(mocks.getTripForMember).not.toHaveBeenCalled();
   });

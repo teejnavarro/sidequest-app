@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember, listTripMembers } from "@/lib/trips";
 import { countCostsForTrip } from "@/lib/costs";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
@@ -14,7 +14,7 @@ import { DeleteForm } from "./delete-form";
 // the same "not found" as for a missing trip.
 async function DeleteTripContent({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip || trip.ownerId !== user.id) notFound();
 

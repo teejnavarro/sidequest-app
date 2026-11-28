@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CrownSimple } from "@phosphor-icons/react/dist/ssr";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { firstNameOf } from "@/lib/display-name";
 import { getMemberForOwner, getTripForMember } from "@/lib/trips";
 import { Face } from "@/components/face";
@@ -17,7 +17,7 @@ type Params = Promise<{ tripId: string; spotId: string }>;
 // row and a person who already left all see the same "not found".
 async function MemberContent({ params }: { params: Params }) {
   const { tripId, spotId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, member] = await Promise.all([
     getTripForMember(tripId, user.id),
     getMemberForOwner(tripId, spotId, user.id),

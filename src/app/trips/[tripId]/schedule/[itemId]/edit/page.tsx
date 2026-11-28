@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getScheduleItemForMember } from "@/lib/schedule";
 import { tripDays } from "@/lib/schedule-options";
@@ -19,7 +19,7 @@ type Params = Promise<{ tripId: string; itemId: string }>;
 // sees the same "not found" as for an item that does not exist.
 async function MoveItemContent({ params }: { params: Params }) {
   const { tripId, itemId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, item] = await Promise.all([
     getTripForMember(tripId, user.id),
     getScheduleItemForMember(tripId, itemId, user.id),

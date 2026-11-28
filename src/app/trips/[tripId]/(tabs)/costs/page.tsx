@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CaretRight, DownloadSimple, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { getBalancesForMember, listCostsForMember, type CostListItem } from "@/lib/costs";
 import { formatMoney } from "@/lib/money";
@@ -92,7 +92,7 @@ function groupByDay(costs: CostListItem[]): { day: string; costs: CostListItem[]
 // the person is in the trip for itself.
 async function CostsContent({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
 

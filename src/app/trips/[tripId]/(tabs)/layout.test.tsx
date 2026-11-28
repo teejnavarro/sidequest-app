@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TripLayout from "./layout";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   listTripMembers: vi.fn(),
   notFound: vi.fn(() => {
@@ -16,7 +16,7 @@ vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
   usePathname: () => "/trips/trip-1/schedule",
 }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({
   getTripForMember: mocks.getTripForMember,
   listTripMembers: mocks.listTripMembers,
@@ -40,7 +40,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2027-03-01T04:00:00Z"));
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.listTripMembers.mockResolvedValue([{ id: "u1", name: "Maya", image: null }]);
   mocks.getTripForMember.mockResolvedValue({
     id: "trip-1",

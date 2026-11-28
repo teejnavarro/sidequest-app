@@ -4,11 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import DeleteAccountPage from "./page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getAccountDeletionCheck: vi.fn(),
 }));
 
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/account", () => ({ getAccountDeletionCheck: mocks.getAccountDeletionCheck }));
 vi.mock("./actions", () => ({ deleteAccountAction: vi.fn() }));
 vi.mock("@/components/confirm-form", () => ({
@@ -28,14 +28,14 @@ async function renderContent() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Maya", image: null });
   mocks.getAccountDeletionCheck.mockResolvedValue(empty);
 });
 
 // The layout's check does not protect this page, so the page must check for itself.
 describe("DeleteAccountPage", () => {
   it("sends a signed-out visitor away before reading anything", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(renderContent()).rejects.toThrow("redirect:/");
     expect(mocks.getAccountDeletionCheck).not.toHaveBeenCalled();
   });

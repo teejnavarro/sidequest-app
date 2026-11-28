@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import IdeasPage from "./page";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getCurrentUserForPage: vi.fn(),
   getTripForMember: vi.fn(),
   listIdeasForMember: vi.fn(),
   hasScheduledIdeas: vi.fn(),
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/current-user", () => ({ getCurrentUserForPage: mocks.getCurrentUserForPage }));
 vi.mock("@/lib/trips", () => ({ getTripForMember: mocks.getTripForMember }));
 vi.mock("@/lib/ideas", () => ({
   listIdeasForMember: mocks.listIdeasForMember,
@@ -67,7 +67,7 @@ const idea = (id: string, name: string, type: string, addedBy = person("u1", "Ma
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getCurrentUser.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
+  mocks.getCurrentUserForPage.mockResolvedValue({ id: "u1", name: "Maya Cruz", image: null });
   mocks.getTripForMember.mockResolvedValue(trip);
   mocks.listIdeasForMember.mockResolvedValue([]);
   mocks.hasScheduledIdeas.mockResolvedValue(false);
@@ -82,7 +82,7 @@ describe("the Ideas tab", () => {
   });
 
   it("sends a signed-out visitor away before looking anything up", async () => {
-    mocks.getCurrentUser.mockRejectedValue(new Error("redirect:/"));
+    mocks.getCurrentUserForPage.mockRejectedValue(new Error("redirect:/"));
     await expect(render()).rejects.toThrow("redirect:/");
     expect(mocks.getTripForMember).not.toHaveBeenCalled();
   });
@@ -256,7 +256,7 @@ describe("the Ideas tab", () => {
     });
 
     it("is shown for every idea to the trip owner", async () => {
-      mocks.getCurrentUser.mockResolvedValue({ id: "owner", name: "Owner", image: null });
+      mocks.getCurrentUserForPage.mockResolvedValue({ id: "owner", name: "Owner", image: null });
       mocks.listIdeasForMember.mockResolvedValue([mine, theirs]);
       const html = await render();
       expect(html).toContain('href="/trips/trip-1/ideas/1/edit"');
@@ -264,7 +264,7 @@ describe("the Ideas tab", () => {
     });
 
     it("is not shown to another member who added neither", async () => {
-      mocks.getCurrentUser.mockResolvedValue({ id: "u3", name: "Third", image: null });
+      mocks.getCurrentUserForPage.mockResolvedValue({ id: "u3", name: "Third", image: null });
       mocks.listIdeasForMember.mockResolvedValue([mine, theirs]);
       expect(await render()).not.toContain("Edit idea");
     });

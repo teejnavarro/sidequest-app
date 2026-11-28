@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { PaymentAccountForm } from "@/components/payment-account-form";
 import { TaskBand } from "@/components/task-band";
 import { cardClass, linkClass, screenClass, skeleton } from "@/components/ui";
@@ -12,7 +12,7 @@ import { getMyPaymentAccount } from "@/lib/payments";
 // for details that do not exist.
 async function EditPaymentDetailsContent({ params }: { params: Promise<{ accountId: string }> }) {
   const { accountId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const account = await getMyPaymentAccount(user.id, accountId);
   if (!account) notFound();
 

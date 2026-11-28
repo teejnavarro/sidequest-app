@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getGuestForEditor, getTripForMember } from "@/lib/trips";
 import { TaskBand, TaskBandLoading } from "@/components/task-band";
 import { cardClass, primaryButton, screenClass, skeleton } from "@/components/ui";
@@ -15,7 +15,7 @@ type Params = Promise<{ tripId: string; spotId: string }>;
 // guest that does not exist or has already taken their spot.
 async function RemoveGuestContent({ params }: { params: Params }) {
   const { tripId, spotId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, guest] = await Promise.all([
     getTripForMember(tripId, user.id),
     getGuestForEditor(tripId, spotId, user.id),

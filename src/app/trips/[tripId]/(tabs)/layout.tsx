@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CaretLeft, MapPin, PencilSimple } from "@phosphor-icons/react/dist/ssr";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember, listTripMembers } from "@/lib/trips";
 import { formatTripRange, todayInZone, tripTimeLabel } from "@/lib/trip-dates";
 import { timeZoneLabel, timeZoneOffset } from "@/lib/trip-options";
@@ -22,7 +22,7 @@ async function TripShell({
   children: React.ReactNode;
 }) {
   const { tripId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const [trip, members] = await Promise.all([
     getTripForMember(tripId, user.id),
     listTripMembers(tripId, user.id),

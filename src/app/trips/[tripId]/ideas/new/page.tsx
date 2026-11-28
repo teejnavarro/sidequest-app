@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUserForPage } from "@/lib/current-user";
 import { getTripForMember } from "@/lib/trips";
 import { emptyIdeaValues } from "@/lib/idea-form-state";
 import { IdeaForm } from "@/components/idea-form";
@@ -12,7 +12,7 @@ import { cardClass, screenClass, skeleton } from "@/components/ui";
 // trip, and reads its data inside its own Suspense boundary.
 async function AddIdeaContent({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUserForPage();
   const trip = await getTripForMember(tripId, user.id);
   if (!trip) notFound();
 
