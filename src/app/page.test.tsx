@@ -132,6 +132,16 @@ describe("static page", () => {
     }
   });
 
+  it("shows the tools behind the app, with no name", () => {
+    const html = renderStatic();
+    expect(html).toContain("Behind the scenes");
+    expect(html).toMatch(/<h2[^>]*>How it&#x27;s built<\/h2>/);
+    expect(html).toContain("Claude Code");
+    expect(html).toContain("with a person approving every step");
+    expect(html).not.toContain("A note from the maker");
+    expect(html).not.toContain("data analytics");
+  });
+
   it("gives every screenshot a description", () => {
     const images = renderStatic().match(/<img[^>]*>/g) ?? [];
     expect(images).toHaveLength(6);
