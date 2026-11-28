@@ -107,3 +107,48 @@ h3 {
   line-height: 1.15;
   text-wrap: balance;
 }
+
+/* Homepage story (SQ-034). Everything is visible by default. Motion is only added when the
+   browser can tie an animation to scrolling AND the person has not asked for less motion, so
+   Firefox and "reduce motion" see the finished page, with the plane at the top of its line.
+   - .story-reveal: fades in and rises about 14px as it enters the screen.
+   - .story-journey / .story-plane: the plane rides the dashed line as the journey scrolls by. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    @keyframes story-rise {
+      from {
+        opacity: 0;
+        translate: 0 14px;
+      }
+      to {
+        opacity: 1;
+        translate: 0 0;
+      }
+    }
+
+    @keyframes story-fly {
+      from {
+        top: 0;
+      }
+      to {
+        top: calc(100% - 1.75rem);
+      }
+    }
+
+    .story-reveal {
+      animation: story-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+
+    .story-journey {
+      view-timeline-name: --journey;
+    }
+
+    .story-plane {
+      animation: story-fly linear both;
+      animation-timeline: --journey;
+      animation-range: cover 15% cover 85%;
+    }
+  }
+}
