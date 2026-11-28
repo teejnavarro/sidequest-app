@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ShieldCheck, SignOut } from "@phosphor-icons/react/dist/ssr";
+import { Compass, ShieldCheck, SignOut } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUserForPage } from "@/lib/current-user";
 import { signOut } from "@/app/actions";
 import { Face } from "@/components/face";
@@ -27,6 +27,13 @@ async function ProfileContent() {
         </button>
       </form>
       <div className="grid">
+        <Link
+          href="/"
+          className={`inline-flex min-h-11 items-center justify-center gap-1.5 text-sm font-bold text-blue-text underline underline-offset-2 ${focusRing}`}
+        >
+          <Compass size={18} weight="bold" aria-hidden="true" />
+          How Sidequest works
+        </Link>
         <Link
           href="/privacy"
           className={`inline-flex min-h-11 items-center justify-center gap-1.5 text-sm font-bold text-blue-text underline underline-offset-2 ${focusRing}`}
